@@ -1,0 +1,6 @@
+.git
+.serena
+**/bin
+**/obj
+.env
+.secrets

@@ -1,0 +1,7 @@
+bin/
+obj/
+.env
+.secrets/
+*.user
+*.suo
+.DS_Store

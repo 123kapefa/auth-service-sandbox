@@ -1,0 +1,12 @@
+@page
+@model MfaSetupModel
+@{
+    ViewData["Title"] = "Настройка TOTP";
+}
+<h1>Настройка TOTP</h1>
+@if (!string.IsNullOrWhiteSpace(Model.SharedKey)) { <p>Введите этот ключ в приложение-аутентификатор: <code>@Model.SharedKey</code></p> }
+@if (!string.IsNullOrWhiteSpace(Model.Message)) { <p class="@(Model.Succeeded ? "success" : "error")">@Model.Message</p> }
+<form method="post">
+    <label>Код из приложения <input asp-for="Code" inputmode="numeric" autocomplete="one-time-code" /></label>
+    <button type="submit">Включить MFA</button>
+</form>

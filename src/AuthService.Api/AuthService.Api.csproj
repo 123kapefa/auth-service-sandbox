@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="../AuthService.Contracts/AuthService.Contracts.csproj" />
+    <ProjectReference Include="../AuthService.Core/AuthService.Core.csproj" />
+    <ProjectReference Include="../AuthService.Domain/AuthService.Domain.csproj" />
+    <ProjectReference Include="../AuthService.Infrastructure.Postgres/AuthService.Infrastructure.Postgres.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="OpenIddict.AspNetCore" />
+  </ItemGroup>
+</Project>

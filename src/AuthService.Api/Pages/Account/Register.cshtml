@@ -1,0 +1,16 @@
+@page
+@model RegisterModel
+@{
+    ViewData["Title"] = "Регистрация";
+}
+<h1>Создать учётную запись</h1>
+@if (!string.IsNullOrWhiteSpace(Model.Message)) { <p class="success">@Model.Message</p> }
+@foreach (var error in Model.Errors) { <p class="error">@error</p> }
+<form method="post">
+    <label>Email <input asp-for="Input.Email" autocomplete="email" /></label>
+    <label>Имя пользователя <input asp-for="Input.UserName" autocomplete="username" /></label>
+    <label>Отображаемое имя <input asp-for="Input.DisplayName" /></label>
+    <label>Пароль <input asp-for="Input.Password" type="password" autocomplete="new-password" /></label>
+    <button type="submit">Зарегистрироваться</button>
+</form>
+<p><a asp-page="Login">Войти</a></p>

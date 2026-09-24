@@ -1,0 +1,14 @@
+@page
+@model LoginModel
+@{
+    ViewData["Title"] = "Вход";
+}
+<h1>Вход</h1>
+@if (!string.IsNullOrWhiteSpace(Model.Error)) { <p class="error">@Model.Error</p> }
+<form method="post">
+    <input type="hidden" asp-for="ReturnUrl" />
+    <label>Email <input asp-for="Input.Email" autocomplete="email" /></label>
+    <label>Пароль <input asp-for="Input.Password" type="password" autocomplete="current-password" /></label>
+    <button type="submit">Войти</button>
+</form>
+<p><a asp-page="Register">Регистрация</a> · <a asp-page="ForgotPassword">Не помню пароль</a></p>

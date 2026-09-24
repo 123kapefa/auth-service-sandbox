@@ -1,0 +1,12 @@
+@page
+@model MfaVerifyModel
+@{
+    ViewData["Title"] = "Проверка MFA";
+}
+<h1>Введите код MFA</h1>
+@if (!string.IsNullOrWhiteSpace(Model.Error)) { <p class="error">@Model.Error</p> }
+<form method="post">
+    <input type="hidden" asp-for="ReturnUrl" />
+    <label>Код <input asp-for="Code" inputmode="numeric" autocomplete="one-time-code" /></label>
+    <button type="submit">Подтвердить</button>
+</form>

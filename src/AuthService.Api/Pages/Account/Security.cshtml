@@ -1,0 +1,14 @@
+@page
+@model SecurityModel
+@{
+    ViewData["Title"] = "Безопасность";
+}
+<h1>Безопасность аккаунта</h1>
+<p>Email: @Model.Email</p>
+<p>MFA: @(Model.MfaEnabled ? "включена" : "не настроена")</p>
+@if (!string.IsNullOrWhiteSpace(Model.Message)) { <p class="success">@Model.Message</p> }
+@if (!Model.MfaEnabled) { <p><a asp-page="MfaSetup">Настроить MFA</a></p> }
+<form method="post">
+    <button type="submit">Завершить все refresh-сессии</button>
+</form>
+<form method="post" asp-page="Logout"><button type="submit">Выйти</button></form>

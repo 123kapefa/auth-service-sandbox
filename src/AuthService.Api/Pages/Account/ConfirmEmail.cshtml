@@ -1,0 +1,8 @@
+@page
+@model ConfirmEmailModel
+@{
+    ViewData["Title"] = "Подтверждение email";
+}
+<h1>Подтверждение email</h1>
+<p class="@(Model.Succeeded ? "success" : "error")">@Model.Message</p>
+<p><a asp-page="Login">Перейти ко входу</a></p>
