@@ -6,7 +6,7 @@ namespace AuthService.Infrastructure.Postgres;
 
 public static class DependencyInjectionExtensions
 {
-    public static IServiceCollection AddPostgresInfrastructure(
+    public static IServiceCollection AddInfrastructurePostgres(
         this IServiceCollection services,
         IConfiguration configuration)
     {

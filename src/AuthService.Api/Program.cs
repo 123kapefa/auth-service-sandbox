@@ -1,16 +1,11 @@
-using AuthService.Infrastructure.Postgres;
+using AuthService.Api.Configuration;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddPostgresInfrastructure(builder.Configuration);
-builder.Services.AddHealthChecks();
+builder.Services.AddAuthServiceRegistrations(builder.Configuration);
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
-app.MapHealthChecks("/health/live");
-app.MapGet("/health/ready", async (AuthDbContext dbContext, CancellationToken cancellationToken) =>
-    await dbContext.Database.CanConnectAsync(cancellationToken)
-        ? Results.Ok(new { status = "ready" })
-        : Results.StatusCode(StatusCodes.Status503ServiceUnavailable));
+app.UseAuthServicePipeline();
 
-app.Run();
+await app.RunAsync();
