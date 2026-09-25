@@ -5,7 +5,4 @@
     <ProjectReference Include="../AuthService.Domain/AuthService.Domain.csproj" />
     <ProjectReference Include="../AuthService.Infrastructure.Postgres/AuthService.Infrastructure.Postgres.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="OpenIddict.AspNetCore" />
-  </ItemGroup>
 </Project>
