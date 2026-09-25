@@ -14,5 +14,3 @@ app.MapGet("/health/ready", async (AuthDbContext dbContext, CancellationToken ca
         : Results.StatusCode(StatusCodes.Status503ServiceUnavailable));
 
 app.Run();
-
-public partial class Program;
