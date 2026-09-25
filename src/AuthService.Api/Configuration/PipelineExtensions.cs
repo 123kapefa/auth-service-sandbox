@@ -5,6 +5,9 @@ public static class PipelineExtensions
 {
     public static WebApplication UseAuthServicePipeline(this WebApplication app)
     {
+        // Первым: всё, что дальше читает IP клиента или схему запроса, должно видеть настоящие значения.
+        app.UseAuthServiceForwardedHeaders();
+
         app.MapAuthServiceHealthEndpoints();
 
         return app;

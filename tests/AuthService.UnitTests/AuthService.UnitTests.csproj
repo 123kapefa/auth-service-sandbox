@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../../src/AuthService.Api/AuthService.Api.csproj" />
     <ProjectReference Include="../../src/AuthService.Domain/AuthService.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
