@@ -5,7 +5,6 @@
     <Project Path="src/AuthService.Core/AuthService.Core.csproj" />
     <Project Path="src/AuthService.Domain/AuthService.Domain.csproj" />
     <Project Path="src/AuthService.Infrastructure.Postgres/AuthService.Infrastructure.Postgres.csproj" />
-    <Project Path="src/AuthService.Migrator/AuthService.Migrator.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AuthService.IntegrationTests/AuthService.IntegrationTests.csproj" />

@@ -18,17 +18,6 @@ services:
     ports:
       - "${MAILPIT_UI_PORT:-8025}:8025"
 
-  migrator:
-    build:
-      context: .
-      target: migrator
-    environment:
-      DOTNET_ENVIRONMENT: Development
-      ConnectionStrings__AuthDb: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
-    depends_on:
-      postgres:
-        condition: service_healthy
-
   auth-service:
     build:
       context: .
@@ -48,8 +37,6 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_started
-      migrator:
-        condition: service_completed_successfully
 
   # --- Keycloak (этап 1, docs/keycloak/01-stand.md) ---------------------------------
   # Отдельная БД: в реальных проектах Keycloak не делит базу с приложениями.
