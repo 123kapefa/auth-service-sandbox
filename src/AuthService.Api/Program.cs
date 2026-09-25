@@ -2,7 +2,7 @@ using AuthService.Infrastructure.Postgres;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddPostgresInfrastructure(builder.Configuration, builder.Environment);
+builder.Services.AddPostgresInfrastructure(builder.Configuration);
 builder.Services.AddHealthChecks();
 
 var app = builder.Build();

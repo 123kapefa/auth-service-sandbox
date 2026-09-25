@@ -1,7 +1,5 @@
-using AuthService.Infrastructure.Postgres.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using OpenIddict.EntityFrameworkCore;
 
 namespace AuthService.Infrastructure.Postgres;
 
@@ -14,7 +12,6 @@ public sealed class AuthDbContextFactory : IDesignTimeDbContextFactory<AuthDbCon
         var options = new DbContextOptionsBuilder<AuthDbContext>();
         options.UseNpgsql(connectionString);
         options.UseSnakeCaseNamingConvention();
-        options.UseOpenIddict<OidcApplication, OidcAuthorization, OidcScope, OidcToken, Guid>();
         return new AuthDbContext(options.Options);
     }
 }
