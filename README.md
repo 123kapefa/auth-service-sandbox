@@ -1,5 +1,8 @@
 # Auth Service
 
+> Идёт эксперимент: OpenIddict заменяется на Keycloak — см. [docs/keycloak/README.md](docs/keycloak/README.md).
+> Исходная реализация на OpenIddict — тег `openiddict-baseline`.
+
 Отдельный IAM-микросервис на .NET 10: ASP.NET Core Identity, PostgreSQL и OpenIddict. Прикладной код организован vertical slices в `Core/Features`; HTTP/UI — тонкий адаптер над ними.
 
 ## Локальный запуск
