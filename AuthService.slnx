@@ -9,6 +9,7 @@
   <Folder Name="/src/Shared/">
     <Project Path="src/Shared/Framework/Framework.csproj" />
     <Project Path="src/Shared/SharedKernel/SharedKernel.csproj" />
+    <Project Path="src/Shared/Validation/Validation.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AuthService.IntegrationTests/AuthService.IntegrationTests.csproj" />
