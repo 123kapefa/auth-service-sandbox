@@ -26,10 +26,12 @@ services:
     build:
       context: .
       target: api
+    # dotnet не должен быть PID 1: иначе упавший при старте процесс зависает, а контейнер остаётся "running".
+    init: true
     ports:
       - "8080:8080"
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: Docker
       ConnectionStrings__AuthDb: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
     depends_on:
       postgres:
