@@ -39,10 +39,10 @@ scripts/keycloak/check-stand.sh
 |---|---|---|
 | `79990000001` | customer | обычный покупатель |
 | `79990000002` | customer, admin | может переключиться в режим admin |
-| `79990000003` | customer, manager, courier | несколько staff-ролей |
+| `79990000003` | customer, manager | может переключиться в режим manager |
 | `79990000004` | customer | заблокирован |
 | `1234567890` | customer, admin | сразу в режиме **admin** |
-| `0987654321` | customer, manager, courier | сразу в режиме **manager** |
+| `0987654321` | customer, manager | сразу в режиме **manager** |
 
 ## Этапы
 

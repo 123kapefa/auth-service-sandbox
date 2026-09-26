@@ -50,7 +50,7 @@ Keycloak отбрасывает незнакомые атрибуты, пока 
 - **Realm roles** — общие для realm.
 - **Client roles** — принадлежат конкретному клиенту.
 
-Бизнес-роли `customer`, `manager`, `courier`, `admin` — это **client roles** клиента
+Бизнес-роли `customer`, `manager`, `admin` — это **client roles** клиента
 `sandbox-api` (*Clients → sandbox-api → Roles*). Так в токен попадают только они, без
 служебных ролей Keycloak (`offline_access`, `uma_authorization`).
 

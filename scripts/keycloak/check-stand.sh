@@ -35,13 +35,13 @@ check "customer: phone"            "$(echo "$T" | claim phone)" +79990000001
 T=$(token 79990000002)
 check "admin: role"                "$(echo "$T" | claim role)" admin,customer
 T=$(token 79990000003)
-check "manager+courier: available_roles" "$(echo "$T" | claim available_roles)" courier,customer,manager
+check "manager: available_roles" "$(echo "$T" | claim available_roles)" customer,manager
 check "нет служебных ролей Keycloak" "$(echo "$T" | claim realm_access)" None
 
 T=$(token 1234567890)
 check "admin в режиме admin: active_mode" "$(echo "$T" | claim active_mode)" admin
 T=$(token 0987654321)
-check "manager+courier в режиме manager: active_mode" "$(echo "$T" | claim active_mode)" manager
+check "manager в режиме manager: active_mode" "$(echo "$T" | claim active_mode)" manager
 
 echo "3. Два адреса Keycloak"
 # Запрос «как из контейнера» (Host: keycloak:8180): iss — внешний адрес, ключи — внутренний.

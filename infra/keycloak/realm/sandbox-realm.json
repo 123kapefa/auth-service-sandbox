@@ -57,10 +57,6 @@
           "description": "Менеджер"
         },
         {
-          "name": "courier",
-          "description": "Курьер"
-        },
-        {
           "name": "admin",
           "description": "Администратор"
         }
@@ -308,8 +304,7 @@
       "clientRoles": {
         "sandbox-api": [
           "customer",
-          "manager",
-          "courier"
+          "manager"
         ]
       }
     },
@@ -386,8 +381,7 @@
       "clientRoles": {
         "sandbox-api": [
           "customer",
-          "manager",
-          "courier"
+          "manager"
         ]
       }
     },
