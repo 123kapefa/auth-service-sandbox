@@ -4,6 +4,7 @@
     <Project Path="src/AuthService.Contracts/AuthService.Contracts.csproj" />
     <Project Path="src/AuthService.Core/AuthService.Core.csproj" />
     <Project Path="src/AuthService.Domain/AuthService.Domain.csproj" />
+    <Project Path="src/AuthService.Infrastructure.Keycloak/AuthService.Infrastructure.Keycloak.csproj" />
     <Project Path="src/AuthService.Infrastructure.Postgres/AuthService.Infrastructure.Postgres.csproj" />
   </Folder>
   <Folder Name="/src/Shared/">

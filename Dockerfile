@@ -6,6 +6,7 @@ COPY src/AuthService.Api/AuthService.Api.csproj src/AuthService.Api/
 COPY src/AuthService.Contracts/AuthService.Contracts.csproj src/AuthService.Contracts/
 COPY src/AuthService.Core/AuthService.Core.csproj src/AuthService.Core/
 COPY src/AuthService.Domain/AuthService.Domain.csproj src/AuthService.Domain/
+COPY src/AuthService.Infrastructure.Keycloak/AuthService.Infrastructure.Keycloak.csproj src/AuthService.Infrastructure.Keycloak/
 COPY src/AuthService.Infrastructure.Postgres/AuthService.Infrastructure.Postgres.csproj src/AuthService.Infrastructure.Postgres/
 # Shared-проекты: без их .csproj restore не увидит их пакеты, и publish --no-restore упадёт.
 COPY src/Shared/Authentication/Authentication.csproj src/Shared/Authentication/
