@@ -38,3 +38,6 @@ docker compose up -d --wait
 | Auth Service | http://localhost:8080/health/ready |
 | Keycloak (админка) | http://localhost:8180/admin |
 | Mailpit | http://localhost:8025 |
+
+Окружения `Development` (`dotnet run`, порт 5080), `Docker` (compose, порт 8080) и `Production`,
+и что где хранится — [docs/environments.md](docs/environments.md).
