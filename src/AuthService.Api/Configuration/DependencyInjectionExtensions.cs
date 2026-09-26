@@ -12,7 +12,7 @@ public static class DependencyInjectionExtensions
     {
         services.AddAuthServiceForwardedHeaders(configuration);
         services.AddAuthServiceAuthentication(configuration);
-        services.AddCore();
+        services.AddCore(configuration);
         services.AddInfrastructurePostgres(configuration);
         services.AddAuthServiceHealthChecks();
 
