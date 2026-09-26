@@ -7,6 +7,11 @@ COPY src/AuthService.Contracts/AuthService.Contracts.csproj src/AuthService.Cont
 COPY src/AuthService.Core/AuthService.Core.csproj src/AuthService.Core/
 COPY src/AuthService.Domain/AuthService.Domain.csproj src/AuthService.Domain/
 COPY src/AuthService.Infrastructure.Postgres/AuthService.Infrastructure.Postgres.csproj src/AuthService.Infrastructure.Postgres/
+# Shared-проекты: без их .csproj restore не увидит их пакеты, и publish --no-restore упадёт.
+COPY src/Shared/Authentication/Authentication.csproj src/Shared/Authentication/
+COPY src/Shared/Framework/Framework.csproj src/Shared/Framework/
+COPY src/Shared/SharedKernel/SharedKernel.csproj src/Shared/SharedKernel/
+COPY src/Shared/Validation/Validation.csproj src/Shared/Validation/
 RUN dotnet restore src/AuthService.Api/AuthService.Api.csproj
 COPY . .
 RUN dotnet publish src/AuthService.Api/AuthService.Api.csproj -c Release --no-restore -o /out/api
