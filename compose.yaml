@@ -10,6 +10,10 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    # Порт наружу — для окружения Development: приложение, запущенное на машине (dotnet run),
+    # ходит в базу через localhost. Контейнерам он не нужен, они ходят по имени postgres.
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
