@@ -1,0 +1,112 @@
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
+using PlatformAuth;
+
+namespace AuthService.IntegrationTests.Infrastructure;
+
+/// <summary>
+/// Весь сервис в памяти. Keycloak не нужен: ключи подписи подменены тестовым RSA-ключом,
+/// остальная проверка токена (iss, aud, срок, RS256), политики и права — настоящие.
+/// </summary>
+public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
+{
+    // Как в appsettings.Development.json: тесты проверяют ту же конфигурацию, с которой сервис запускается.
+    public const string ISSUER = "http://localhost:8180/realms/sandbox";
+    public const string AUDIENCE = "sandbox-api";
+
+    // Порт 1 никто не слушает: база гарантированно недоступна, тесты не зависят от Docker.
+    private const string UNREACHABLE_DATABASE = "Host=127.0.0.1;Port=1;Database=auth_service;Username=test;Password=test;Timeout=1";
+
+    private readonly RSA _rsa = RSA.Create(2048);
+    private readonly RsaSecurityKey _signingKey;
+
+    public AuthServiceWebFactory() => _signingKey = new RsaSecurityKey(_rsa) { KeyId = "test-key" };
+
+    /// <summary>Клиент с access-токеном пользователя; null — анонимный клиент.</summary>
+    public HttpClient CreateClientFor(TestUser? user)
+    {
+        HttpClient client = CreateClient();
+        if (user is not null)
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateToken(user));
+        }
+
+        return client;
+    }
+
+    public string CreateToken(TestUser user)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        DateTime now = DateTime.UtcNow;
+        return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = ISSUER,
+            Audience = AUDIENCE,
+            IssuedAt = now,
+            NotBefore = now,
+            Expires = now.AddMinutes(5),
+            SigningCredentials = new SigningCredentials(_signingKey, SecurityAlgorithms.RsaSha256),
+            Claims = new Dictionary<string, object>(StringComparer.Ordinal)
+            {
+                [AuthClaims.SUBJECT] = user.Id.ToString(),
+                [AuthClaims.PHONE] = user.Phone,
+                [AuthClaims.ROLE] = user.Roles.ToArray(),
+                [AuthClaims.AVAILABLE_ROLES] = user.Roles.ToArray(),
+                [AuthClaims.ACTIVE_MODE] = user.ActiveMode,
+            },
+        });
+    }
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseSetting("ConnectionStrings:AuthDb", UNREACHABLE_DATABASE);
+        builder.ConfigureTestServices(services =>
+            services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+            {
+                var configuration = new OpenIdConnectConfiguration { Issuer = ISSUER };
+                configuration.SigningKeys.Add(_signingKey);
+                options.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(configuration);
+            }));
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _rsa.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+}
+
+/// <summary>Тестовый пользователь — как пользователи realm sandbox.</summary>
+public sealed record TestUser(string Name, Guid Id, string Phone, IReadOnlyList<string> Roles, string ActiveMode)
+{
+    public static TestUser Customer { get; } =
+        new("покупатель", Guid.NewGuid(), "+79990000001", [AuthModes.CUSTOMER], AuthModes.CUSTOMER);
+
+    public static TestUser AdminInCustomerMode { get; } =
+        new("админ в режиме customer", Guid.NewGuid(), "+79990000002", [AuthModes.CUSTOMER, AuthModes.ADMIN], AuthModes.CUSTOMER);
+
+    public static TestUser ManagerInCustomerMode { get; } =
+        new("менеджер в режиме customer", Guid.NewGuid(), "+79990000003", [AuthModes.CUSTOMER, AuthModes.MANAGER], AuthModes.CUSTOMER);
+
+    public static TestUser AdminInAdminMode { get; } =
+        new("админ в режиме admin", Guid.NewGuid(), "+71234567890", [AuthModes.CUSTOMER, AuthModes.ADMIN], AuthModes.ADMIN);
+
+    public static TestUser ManagerInManagerMode { get; } =
+        new("менеджер в режиме manager", Guid.NewGuid(), "+70987654321", [AuthModes.CUSTOMER, AuthModes.MANAGER], AuthModes.MANAGER);
+
+    public override string ToString() => Name;
+}
