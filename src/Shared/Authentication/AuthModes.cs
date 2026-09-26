@@ -5,6 +5,5 @@ public static class AuthModes
 {
     public const string CUSTOMER = "customer";
     public const string MANAGER = "manager";
-    public const string COURIER = "courier";
     public const string ADMIN = "admin";
 }
