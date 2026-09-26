@@ -25,7 +25,7 @@ docker compose up -d --wait keycloak
 scripts/keycloak/check-stand.sh
 ```
 
-Ожидается `Итого: 16 ✓, 0 ✗`.
+Ожидается `Итого: 19 ✓, 0 ✗`.
 
 | Что | Адрес | Доступ |
 |---|---|---|

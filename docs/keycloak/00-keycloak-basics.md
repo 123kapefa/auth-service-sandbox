@@ -69,7 +69,8 @@ Client — приложение, зарегистрированное в Keycloa
 
 Важные настройки (*Clients → sandbox-bff → Settings*):
 - **Valid redirect URIs** — куда Keycloak может вернуть пользователя с кодом. Остальное
-  отклоняется: защита от кражи кода.
+  отклоняется: защита от кражи кода. У нас — `/auth/callback` сервиса: `http://localhost:8080`
+  (Docker) и `http://localhost:5080` (Development); *Valid post logout redirect URIs* — те же хосты.
 - **Client authentication** = on → confidential, есть *Credentials → Client secret*.
   Значение берётся из `.env` (`SANDBOX_BFF_CLIENT_SECRET`) при импорте.
 - **Standard flow** = вход через браузер; **Direct access grants** = логин/пароль через API

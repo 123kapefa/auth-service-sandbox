@@ -54,6 +54,19 @@ check "заблокированный не получает токен" "$(token
 check "неверный пароль отклонён" "$(curl -s -d grant_type=password -d client_id=dev-cli -d username=79990000001 -d password=wrong \
   "$KC/realms/$REALM/protocol/openid-connect/token" | claim error)" invalid_grant
 
+echo "5. Вход в приложение (клиент sandbox-bff)"
+# authorize <redirect_uri> [pkce] → "<HTTP-код> <куда редирект>"
+authorize() {
+  local pkce=""
+  [ "${2:-}" = pkce ] && pkce="&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256"
+  curl -s -o /dev/null -w '%{http_code} %{redirect_url}' \
+    "$KC/realms/$REALM/protocol/openid-connect/auth?client_id=sandbox-bff&response_type=code&scope=openid&state=s1&redirect_uri=$1$pkce"
+}
+check "наш callback → страница входа" "$(authorize http://localhost:8080/auth/callback pkce | cut -d' ' -f1)" 200
+check "чужой redirect_uri отклонён" "$(authorize https://evil.example/cb pkce | cut -d' ' -f1)" 400
+check "без PKCE — ошибка invalid_request" \
+  "$(authorize http://localhost:8080/auth/callback | grep -o 'error=invalid_request' || echo 'нет ошибки')" error=invalid_request
+
 echo
 echo "Итого: $PASS ✓, $FAIL ✗"
 [ "$FAIL" -eq 0 ]
