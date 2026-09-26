@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -82,7 +84,56 @@ public sealed class JwtAuthenticationTests : IDisposable
         Assert.False(result.IsValid);
     }
 
+    [Fact]
+    public async Task Cookie_UsedWhenNoAuthorizationHeader() =>
+        Assert.Equal("token-from-cookie", await ReceiveTokenAsync(_bearer, cookie: "token-from-cookie"));
+
+    [Fact]
+    public async Task AuthorizationHeader_WinsOverCookie() =>
+        Assert.Null(await ReceiveTokenAsync(_bearer, cookie: "token-from-cookie", authorizationHeader: "Bearer from-header"));
+
+    [Fact]
+    public async Task NoCookie_NoToken() =>
+        Assert.Null(await ReceiveTokenAsync(_bearer, cookie: null));
+
+    [Fact]
+    public async Task EmptyCookieSetting_DisablesCookie()
+    {
+        JwtBearerOptions headerOnly = BuildBearerOptions(new()
+        {
+            ["Authentication:Authority"] = ISSUER,
+            ["Authentication:Audience"] = AUDIENCE,
+            ["Authentication:RequireHttpsMetadata"] = "false",
+            ["Authentication:AccessTokenCookie"] = string.Empty,
+        });
+
+        Assert.Null(await ReceiveTokenAsync(headerOnly, cookie: "token-from-cookie"));
+    }
+
     public void Dispose() => _rsa.Dispose();
+
+    // Токен, который обработчик возьмёт из запроса. null — обработчик сам прочитает заголовок (или токена нет).
+    private static async Task<string?> ReceiveTokenAsync(JwtBearerOptions bearer, string? cookie, string? authorizationHeader = null)
+    {
+        var httpContext = new DefaultHttpContext();
+        if (cookie is not null)
+        {
+            httpContext.Request.Headers.Cookie = $"{AuthCookies.ACCESS_TOKEN}={cookie}";
+        }
+
+        if (authorizationHeader is not null)
+        {
+            httpContext.Request.Headers.Authorization = authorizationHeader;
+        }
+
+        var context = new MessageReceivedContext(
+            httpContext,
+            new AuthenticationScheme(JwtBearerDefaults.AuthenticationScheme, null, typeof(JwtBearerHandler)),
+            bearer);
+        await bearer.Events.MessageReceived(context);
+
+        return context.Token;
+    }
 
     private string CreateToken(
         string issuer = ISSUER,

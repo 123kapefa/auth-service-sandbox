@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Net.Http.Headers;
 
 namespace PlatformAuth;
 
@@ -54,5 +55,22 @@ public static class JwtAuthenticationExtensions
             NameClaimType = AuthClaims.SUBJECT,
             RoleClaimType = AuthClaims.ROLE,
         };
+
+        bearer.Events = new JwtBearerEvents { OnMessageReceived = context => ReadTokenFromCookie(context, settings) };
+    }
+
+    // Заголовок Authorization главнее: явно переданный токен (например, от другого сервиса)
+    // не подменяется cookie, оставшейся в браузере.
+    private static Task ReadTokenFromCookie(MessageReceivedContext context, JwtAuthenticationOptions settings)
+    {
+        if (!string.IsNullOrWhiteSpace(settings.AccessTokenCookie)
+            && !context.Request.Headers.ContainsKey(HeaderNames.Authorization)
+            && context.Request.Cookies.TryGetValue(settings.AccessTokenCookie, out string? token)
+            && !string.IsNullOrWhiteSpace(token))
+        {
+            context.Token = token;
+        }
+
+        return Task.CompletedTask;
     }
 }

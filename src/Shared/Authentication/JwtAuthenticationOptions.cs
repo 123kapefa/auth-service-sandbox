@@ -20,6 +20,12 @@ public sealed class JwtAuthenticationOptions
     /// <summary>Ожидаемый aud — кому адресован токен.</summary>
     public string Audience { get; init; } = string.Empty;
 
+    /// <summary>
+    /// Cookie, из которой берётся access-токен, если нет заголовка Authorization.
+    /// Пусто — только заголовок.
+    /// </summary>
+    public string? AccessTokenCookie { get; init; } = AuthCookies.ACCESS_TOKEN;
+
     /// <summary>Требовать https для discovery и ключей. false — только локально.</summary>
     public bool RequireHttpsMetadata { get; init; } = true;
 

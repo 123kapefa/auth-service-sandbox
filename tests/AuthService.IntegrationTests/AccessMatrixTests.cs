@@ -78,6 +78,17 @@ public sealed class AccessMatrixTests(AuthServiceWebFactory factory) : IClassFix
     }
 
     [Fact]
+    public async Task AccessTokenCookie_AuthenticatesWithoutHeader()
+    {
+        using HttpClient client = factory.CreateClientFor(null);
+        client.DefaultRequestHeaders.Add("Cookie", $"{AuthCookies.ACCESS_TOKEN}={factory.CreateToken(TestUser.AdminInAdminMode)}");
+
+        HttpResponseMessage response = await client.GetAsync(new Uri("/demo/admin-only/", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Me_ReturnsTokenDataAndPermissionsOfActiveMode()
     {
         TestUser user = TestUser.ManagerInManagerMode;
