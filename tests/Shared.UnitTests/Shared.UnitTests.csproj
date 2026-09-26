@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../../src/Shared/Authentication/Authentication.csproj" />
     <ProjectReference Include="../../src/Shared/Framework/Framework.csproj" />
     <ProjectReference Include="../../src/Shared/SharedKernel/SharedKernel.csproj" />
     <ProjectReference Include="../../src/Shared/Validation/Validation.csproj" />
