@@ -10,6 +10,7 @@ public static class DependencyInjectionExtensions
         IConfiguration configuration)
     {
         services.AddAuthServiceForwardedHeaders(configuration);
+        services.AddAuthServiceAuthentication(configuration);
         services.AddInfrastructurePostgres(configuration);
         services.AddAuthServiceHealthChecks();
 

@@ -4,6 +4,7 @@
     <ProjectReference Include="../AuthService.Core/AuthService.Core.csproj" />
     <ProjectReference Include="../AuthService.Domain/AuthService.Domain.csproj" />
     <ProjectReference Include="../AuthService.Infrastructure.Postgres/AuthService.Infrastructure.Postgres.csproj" />
+    <ProjectReference Include="../Shared/Authentication/Authentication.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />

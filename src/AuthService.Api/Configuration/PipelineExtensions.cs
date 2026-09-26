@@ -8,6 +8,9 @@ public static class PipelineExtensions
         // Первым: всё, что дальше читает IP клиента или схему запроса, должно видеть настоящие значения.
         app.UseAuthServiceForwardedHeaders();
 
+        // После прокси-заголовков (нужны настоящие схема и IP), до эндпоинтов.
+        app.UseAuthServiceAuthentication();
+
         app.MapAuthServiceHealthEndpoints();
 
         return app;
