@@ -40,6 +40,10 @@
 | `ConnectionStrings:AuthDb` | Infrastructure; без неё сервис не стартует | в файле, `localhost:5432` | из `compose.yaml` (`.env`), `postgres:5432` | переменная окружения |
 | `AllowedHosts` | ASP.NET Core; чужой `Host` → 400 | `*` (база) | `*` (база) | `auth-sandbox.example;localhost` |
 | `ForwardedHeaders:TrustedNetworks` | `ForwardedHeadersConfiguration` | по умолчанию в коде: `172.16.0.0/12`, `127.0.0.0/8` | так же | так же; задать, если прокси в другой сети |
+| `Authentication:Authority` | проверка токенов (`iss`) | `http://localhost:8180/realms/sandbox` | так же | `https://id.auth-sandbox.example/realms/sandbox` |
+| `Authentication:MetadataAddress` | откуда брать ключи | — (из Authority) | `http://keycloak:8180/.../openid-configuration` | задать, если сервер входа доступен по внутреннему адресу |
+| `Authentication:Audience` | проверка токенов (`aud`) | `sandbox-api` (база) | так же | так же |
+| `Authentication:RequireHttpsMetadata` | https для discovery | `false` | `false` | `true` (по умолчанию) |
 | `Logging:LogLevel` | ASP.NET Core | Debug | Debug для `AuthService`, фреймворк — Warning | Warning |
 
 ## Почему у Development и Docker разные адреса
@@ -49,9 +53,9 @@
 - **Development**: сервис на машине ходит в Postgres через проброшенный порт `localhost:${POSTGRES_PORT:-5432}`;
 - **Docker**: сервис в контейнере ходит к соседям по имени сервиса compose — `postgres:5432`.
 
-На этапе 2 то же самое будет с Keycloak: браузер и `iss` в токенах — `http://localhost:8180`, а контейнер
-скачивает ключи с `http://keycloak:8180`. Блок `Authentication` появится во всех трёх файлах вместе с кодом,
-который его читает.
+То же с Keycloak: браузер и `iss` в токенах — `http://localhost:8180` (`Authentication:Authority`), а контейнер
+скачивает ключи с `http://keycloak:8180` (`Authentication:MetadataAddress`). Подробно —
+[keycloak/02-token-api.md](keycloak/02-token-api.md).
 
 ## Запуск
 
