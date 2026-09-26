@@ -38,7 +38,18 @@ T=$(token 79990000003)
 check "manager+courier: available_roles" "$(echo "$T" | claim available_roles)" courier,customer,manager
 check "нет служебных ролей Keycloak" "$(echo "$T" | claim realm_access)" None
 
-echo "3. Защита"
+T=$(token 1234567890)
+check "admin в режиме admin: active_mode" "$(echo "$T" | claim active_mode)" admin
+T=$(token 0987654321)
+check "manager+courier в режиме manager: active_mode" "$(echo "$T" | claim active_mode)" manager
+
+echo "3. Два адреса Keycloak"
+# Запрос «как из контейнера» (Host: keycloak:8180): iss — внешний адрес, ключи — внутренний.
+D=$(curl -s -H "Host: keycloak:8180" "$KC/realms/$REALM/.well-known/openid-configuration")
+check "iss не зависит от адреса запроса" "$(echo "$D" | claim issuer)" "$KC/realms/$REALM"
+check "jwks_uri — по адресу запроса" "$(echo "$D" | claim jwks_uri)" "http://keycloak:8180/realms/$REALM/protocol/openid-connect/certs"
+
+echo "4. Защита"
 check "заблокированный не получает токен" "$(token 79990000004 | claim error_description)" "Account disabled"
 check "неверный пароль отклонён" "$(curl -s -d grant_type=password -d client_id=dev-cli -d username=79990000001 -d password=wrong \
   "$KC/realms/$REALM/protocol/openid-connect/token" | claim error)" invalid_grant

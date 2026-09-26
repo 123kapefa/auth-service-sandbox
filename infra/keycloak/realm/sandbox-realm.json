@@ -339,6 +339,59 @@
       }
     },
     {
+      "username": "1234567890",
+      "enabled": true,
+      "emailVerified": false,
+      "attributes": {
+        "phone": [
+          "+71234567890"
+        ],
+        "active_mode": [
+          "admin"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test1234!",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "sandbox-api": [
+          "customer",
+          "admin"
+        ]
+      }
+    },
+    {
+      "username": "0987654321",
+      "enabled": true,
+      "emailVerified": false,
+      "attributes": {
+        "phone": [
+          "+70987654321"
+        ],
+        "active_mode": [
+          "manager"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test1234!",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "sandbox-api": [
+          "customer",
+          "manager",
+          "courier"
+        ]
+      }
+    },
+    {
       "username": "service-account-sandbox-bff",
       "enabled": true,
       "serviceAccountClientId": "sandbox-bff",

@@ -25,7 +25,7 @@ docker compose up -d --wait keycloak
 scripts/keycloak/check-stand.sh
 ```
 
-Ожидается `Итого: 12 ✓, 0 ✗`.
+Ожидается `Итого: 16 ✓, 0 ✗`.
 
 | Что | Адрес | Доступ |
 |---|---|---|
@@ -41,6 +41,8 @@ scripts/keycloak/check-stand.sh
 | `79990000002` | customer, admin | может переключиться в режим admin |
 | `79990000003` | customer, manager, courier | несколько staff-ролей |
 | `79990000004` | customer | заблокирован |
+| `1234567890` | customer, admin | сразу в режиме **admin** |
+| `0987654321` | customer, manager, courier | сразу в режиме **manager** |
 
 ## Этапы
 

@@ -15,7 +15,7 @@
 - `infra/keycloak/realm/sandbox-realm.json` — весь realm как код: настройки, роли, клиенты,
   мапперы, тестовые пользователи, журнал событий.
 - `.env.example` — блок Keycloak: порт, админ, пароль БД, секрет клиента `sandbox-bff`.
-- `scripts/keycloak/check-stand.sh` — автоматическая проверка (12 пунктов).
+- `scripts/keycloak/check-stand.sh` — автоматическая проверка (16 пунктов; этап 2 добавил пользователей в служебных режимах и проверку двух адресов Keycloak).
 
 ### Почему так
 
@@ -38,7 +38,7 @@ docker compose up -d --wait keycloak
 scripts/keycloak/check-stand.sh
 ```
 
-Ожидается `Итого: 12 ✓, 0 ✗`.
+Ожидается `Итого: 16 ✓, 0 ✗`.
 
 Посмотреть токен целиком:
 

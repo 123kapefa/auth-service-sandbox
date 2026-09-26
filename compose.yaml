@@ -68,6 +68,9 @@ services:
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
       # Адрес, от которого зависит `iss` в токенах: браузер и приложения должны видеть один и тот же.
       KC_HOSTNAME: http://localhost:${KEYCLOAK_PORT:-8180}
+      # Служебные адреса (jwks_uri, token_endpoint) — по адресу, с которого пришёл запрос:
+      # контейнер, спросивший keycloak:8180, получит ключи с keycloak:8180, а iss останется localhost:8180.
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       KC_HTTP_PORT: "8180"
       KC_HEALTH_ENABLED: "true"
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
