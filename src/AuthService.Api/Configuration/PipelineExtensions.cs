@@ -1,3 +1,5 @@
+using Framework.Endpoints;
+
 namespace AuthService.Api.Configuration;
 
 /// <summary>Порядок middleware и маршрутов сервиса.</summary>
@@ -12,6 +14,7 @@ public static class PipelineExtensions
         app.UseAuthServiceAuthentication();
 
         app.MapAuthServiceHealthEndpoints();
+        app.MapEndpoints();
 
         return app;
     }

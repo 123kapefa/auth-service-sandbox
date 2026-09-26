@@ -6,7 +6,7 @@ namespace PlatformAuth;
 
 public static class PermissionExtensions
 {
-    /// <summary>Права по активному режиму с картой сервиса TMap.</summary>
+    /// <summary>Права по активному режиму с картой сервиса TMap и CurrentUser («кто вызвал») для эндпоинтов.</summary>
     public static IServiceCollection AddPlatformPermissions<TMap>(this IServiceCollection services)
         where TMap : class, IRolePermissionMap
     {
@@ -14,6 +14,9 @@ public static class PermissionExtensions
         services.AddSingleton<IPermissionResolver, ActiveModePermissionResolver>();
         services.AddSingleton<IAuthorizationHandler, PermissionRequirementHandler>();
         services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+
+        services.AddHttpContextAccessor();
+        services.AddScoped<CurrentUser>();
 
         return services;
     }

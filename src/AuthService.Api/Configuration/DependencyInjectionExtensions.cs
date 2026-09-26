@@ -1,3 +1,4 @@
+using AuthService.Core;
 using AuthService.Infrastructure.Postgres;
 
 namespace AuthService.Api.Configuration;
@@ -11,6 +12,7 @@ public static class DependencyInjectionExtensions
     {
         services.AddAuthServiceForwardedHeaders(configuration);
         services.AddAuthServiceAuthentication(configuration);
+        services.AddCore();
         services.AddInfrastructurePostgres(configuration);
         services.AddAuthServiceHealthChecks();
 

@@ -2,5 +2,6 @@
   <ItemGroup>
     <ProjectReference Include="../AuthService.Domain/AuthService.Domain.csproj" />
     <ProjectReference Include="../Shared/Authentication/Authentication.csproj" />
+    <ProjectReference Include="../Shared/Framework/Framework.csproj" />
   </ItemGroup>
 </Project>
