@@ -3,6 +3,7 @@
     <ProjectReference Include="../AuthService.Contracts/AuthService.Contracts.csproj" />
     <ProjectReference Include="../AuthService.Core/AuthService.Core.csproj" />
     <ProjectReference Include="../AuthService.Domain/AuthService.Domain.csproj" />
+    <ProjectReference Include="../AuthService.Infrastructure.Keycloak/AuthService.Infrastructure.Keycloak.csproj" />
     <ProjectReference Include="../AuthService.Infrastructure.Postgres/AuthService.Infrastructure.Postgres.csproj" />
     <ProjectReference Include="../Shared/Authentication/Authentication.csproj" />
   </ItemGroup>

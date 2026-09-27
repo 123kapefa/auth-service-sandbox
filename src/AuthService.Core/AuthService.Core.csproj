@@ -4,5 +4,9 @@
     <ProjectReference Include="../AuthService.Domain/AuthService.Domain.csproj" />
     <ProjectReference Include="../Shared/Authentication/Authentication.csproj" />
     <ProjectReference Include="../Shared/Framework/Framework.csproj" />
+    <ProjectReference Include="../Shared/Validation/Validation.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
   </ItemGroup>
 </Project>

@@ -1,9 +1,10 @@
 using AuthService.Core.Authorization;
+using AuthService.Infrastructure.Keycloak;
 using PlatformAuth;
 
 namespace AuthService.Api.Configuration;
 
-/// <summary>Проверка токенов Keycloak, политики «роль + режим» и права сервиса.</summary>
+/// <summary>Проверка токенов Keycloak, политики «роль + режим», права сервиса и клиент входа (Keycloak).</summary>
 public static class AuthenticationConfiguration
 {
     public static IServiceCollection AddAuthServiceAuthentication(
@@ -13,6 +14,7 @@ public static class AuthenticationConfiguration
         services.AddPlatformJwtAuthentication(configuration);
         services.AddPlatformAuthorization();
         services.AddPlatformPermissions<AuthServiceRolePermissions>();
+        services.AddInfrastructureKeycloak(configuration);
 
         return services;
     }

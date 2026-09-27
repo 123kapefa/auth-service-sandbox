@@ -1,12 +1,17 @@
 using AuthService.Core.Features.Auth.Cookies;
 using AuthService.Core.Features.Auth.ReturnUrls;
+using AuthService.Core.Features.Auth.UseCases.Callback;
+using AuthService.Core.Features.Auth.UseCases.Login;
+using AuthService.Core.Features.Auth.UseCases.Logout;
+using AuthService.Core.Features.Auth.UseCases.Refresh;
+using FluentValidation;
 using Framework.Endpoints;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AuthService.Core;
 
-/// <summary>Регистрация слоя Core: эндпоинты сценариев (IEndpoint) и службы входа из этой сборки.</summary>
+/// <summary>Регистрация слоя Core: эндпоинты (IEndpoint), валидаторы, хендлеры сценариев и службы входа.</summary>
 public static class Registration
 {
     public static IServiceCollection AddCore(this IServiceCollection services, IConfiguration configuration)
@@ -20,6 +25,12 @@ public static class Registration
         services.AddSingleton<AuthCookieWriter>();
         services.AddSingleton<LoginStateStore>();
         services.AddSingleton<ReturnUrlValidator>();
+
+        services.AddValidatorsFromAssembly(typeof(Registration).Assembly, includeInternalTypes: true);
+        services.AddScoped<LoginHandler>();
+        services.AddScoped<CallbackHandler>();
+        services.AddScoped<RefreshHandler>();
+        services.AddScoped<LogoutHandler>();
 
         return services;
     }

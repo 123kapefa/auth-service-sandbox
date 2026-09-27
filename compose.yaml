@@ -33,6 +33,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ConnectionStrings__AuthDb: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Keycloak__ClientSecret: ${SANDBOX_BFF_CLIENT_SECRET}
     depends_on:
       postgres:
         condition: service_healthy

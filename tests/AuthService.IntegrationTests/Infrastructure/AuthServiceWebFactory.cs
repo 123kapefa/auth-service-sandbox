@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using AuthService.Core.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -30,6 +32,13 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
     private readonly RsaSecurityKey _signingKey;
 
     public AuthServiceWebFactory() => _signingKey = new RsaSecurityKey(_rsa) { KeyId = "test-key" };
+
+    /// <summary>Подставной сервер входа вместо Keycloak.</summary>
+    public FakeIdentityProvider IdentityProvider { get; } = new();
+
+    /// <summary>Клиент как браузер без автоматических переходов и cookie: тест видит каждый 302 и Set-Cookie.</summary>
+    public HttpClient CreateBrowserClient() =>
+        CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
 
     /// <summary>Клиент с access-токеном пользователя; null — анонимный клиент.</summary>
     public HttpClient CreateClientFor(TestUser? user)
@@ -71,12 +80,16 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
     {
         builder.UseSetting("ConnectionStrings:AuthDb", UNREACHABLE_DATABASE);
         builder.ConfigureTestServices(services =>
+        {
             services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
             {
                 var configuration = new OpenIdConnectConfiguration { Issuer = ISSUER };
                 configuration.SigningKeys.Add(_signingKey);
                 options.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(configuration);
-            }));
+            });
+            services.RemoveAll<IIdentityProvider>();
+            services.AddSingleton<IIdentityProvider>(IdentityProvider);
+        });
     }
 
     protected override void Dispose(bool disposing)
