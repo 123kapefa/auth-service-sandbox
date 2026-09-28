@@ -17,7 +17,8 @@ namespace AuthService.Infrastructure.Keycloak;
 
 /// <summary>
 /// Вход через Keycloak по OIDC: authorization code + PKCE (S256), refresh с ротацией, завершение сессии.
-/// Адреса берутся из discovery: страница входа — внешний адрес (для браузера), token/logout — внутренний.
+/// Адреса берутся из discovery: страница входа — внешний адрес (для браузера), token — внутренний,
+/// logout — рядом с token (Keycloak отдаёт end_session_endpoint внешним).
 /// </summary>
 internal sealed partial class KeycloakIdentityProvider(
     HttpClient httpClient,
@@ -94,7 +95,7 @@ internal sealed partial class KeycloakIdentityProvider(
         }
 
         Result<HttpResponseMessage, Error> response = await PostFormAsync(
-            configuration.Value.EndSessionEndpoint,
+            BackchannelLogoutEndpoint(configuration.Value),
             new Dictionary<string, string>(StringComparer.Ordinal) { ["refresh_token"] = refreshToken },
             cancellationToken);
         if (response.IsFailure)
@@ -195,6 +196,12 @@ internal sealed partial class KeycloakIdentityProvider(
         LogUnexpectedResponse(logger, (int)message.StatusCode);
         return IdentityProviderErrors.Unavailable();
     }
+
+    // end_session_endpoint Keycloak отдаёт как адрес для браузера (внешний, localhost:8180) даже контейнеру,
+    // а выход по refresh-токену — вызов сервис → Keycloak. Берём соседа token_endpoint, он внутренний:
+    // .../openid-connect/token → .../openid-connect/logout.
+    private static string BackchannelLogoutEndpoint(OpenIdConnectConfiguration configuration) =>
+        new Uri(new Uri(configuration.TokenEndpoint), "logout").ToString();
 
     private static string RandomToken() => Base64UrlEncoder.Encode(RandomNumberGenerator.GetBytes(32));
 

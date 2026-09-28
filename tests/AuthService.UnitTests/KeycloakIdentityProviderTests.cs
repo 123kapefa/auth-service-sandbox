@@ -124,7 +124,7 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
     }
 
     [Fact]
-    public async Task Logout_PostsRefreshTokenToInternalEndpoint()
+    public async Task Logout_PostsRefreshTokenToInternalEndpoint_EvenThoughDiscoveryGivesExternal()
     {
         _keycloak.LogoutResponse = (HttpStatusCode.NoContent, string.Empty);
 
@@ -183,7 +183,10 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
         public override DateTimeOffset GetUtcNow() => now;
     }
 
-    /// <summary>Discovery, JWKS, token и logout Keycloak — как их видит контейнер (внутренний адрес).</summary>
+    /// <summary>
+    /// Discovery, JWKS, token и logout Keycloak — как их видит контейнер: token и certs внутренние,
+    /// authorization и end_session — внешние (так отвечает настоящий Keycloak с KC_HOSTNAME_BACKCHANNEL_DYNAMIC).
+    /// </summary>
     private sealed class FakeKeycloak : HttpMessageHandler
     {
         private const string DISCOVERY = $$"""
@@ -191,7 +194,7 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
               "issuer": "http://localhost:8180/realms/sandbox",
               "authorization_endpoint": "{{EXTERNAL}}/auth",
               "token_endpoint": "{{INTERNAL}}/token",
-              "end_session_endpoint": "{{INTERNAL}}/logout",
+              "end_session_endpoint": "{{EXTERNAL}}/logout",
               "jwks_uri": "{{INTERNAL}}/certs"
             }
             """;
