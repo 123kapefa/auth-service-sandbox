@@ -10,6 +10,10 @@ public static class PipelineExtensions
         // Первым: всё, что дальше читает IP клиента или схему запроса, должно видеть настоящие значения.
         app.UseAuthServiceForwardedHeaders();
 
+        // Демо-страница для тестов входа: wwwroot/index.html на «/».
+        app.UseDefaultFiles();
+        app.UseStaticFiles();
+
         // После прокси-заголовков (нужны настоящие схема и IP), до эндпоинтов.
         app.UseAuthServiceAuthentication();
 
