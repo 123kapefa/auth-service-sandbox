@@ -29,6 +29,7 @@
   "defaultLocale": "ru",
   "loginTheme": "sandbox",
   "browserFlow": "sandbox browser",
+  "webAuthnPolicyPasswordlessPasskeysEnabled": true,
   "authenticationFlows": [
     {
       "alias": "sandbox browser",
@@ -141,7 +142,26 @@
   },
   "localizationTexts": {
     "ru": {
-      "usernameOrEmail": "Телефон или почта"
+      "usernameOrEmail": "Телефон или почта",
+      "requiredAction.webauthn-register-passwordless": "Регистрация ключа доступа",
+      "webauthn-display-name": "Ключ доступа",
+      "webauthn-help-text": "Войдите с помощью ключа доступа.",
+      "webauthn-passwordless-display-name": "Ключ доступа",
+      "webauthn-passwordless-help-text": "Вход без пароля: отпечаток пальца, лицо или PIN-код устройства.",
+      "webauthn-login-title": "Вход с ключом доступа",
+      "webauthn-available-authenticators": "Доступные ключи доступа",
+      "webauthn-doAuthenticate": "Войти с ключом доступа",
+      "webauthn-registration-init-label": "Ключ доступа (метка по умолчанию)",
+      "webauthn-error-registration": "Не удалось зарегистрировать ключ доступа.<br /> {0}",
+      "webauthn-error-api-get": "Не удалось войти с ключом доступа.<br /> {0}",
+      "webauthn-error-user-not-found": "Ключ доступа принадлежит неизвестному пользователю.",
+      "passkey-login-title": "Вход с ключом доступа",
+      "passkey-available-authenticators": "Доступные ключи доступа",
+      "passkey-unsupported-browser-text": "Этот браузер не поддерживает ключи доступа. Попробуйте другой или обратитесь к администратору.",
+      "passkey-doAuthenticate": "Войти с ключом доступа",
+      "passkey-createdAt-label": "Создан",
+      "passkey-autofill-select": "Выберите ключ доступа",
+      "notSetUp": "Не настроено: {{name}}."
     },
     "en": {
       "usernameOrEmail": "Phone or email"
@@ -161,6 +181,10 @@
           "client": {
             "sandbox-api": [
               "customer"
+            ],
+            "account": [
+              "view-profile",
+              "manage-account"
             ]
           }
         }
@@ -179,6 +203,78 @@
         {
           "name": "admin",
           "description": "Администратор"
+        }
+      ],
+      "account": [
+        {
+          "name": "view-profile",
+          "description": "${role_view-profile}",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {}
+        },
+        {
+          "name": "manage-account",
+          "description": "${role_manage-account}",
+          "composite": true,
+          "composites": {
+            "client": {
+              "account": [
+                "manage-account-links"
+              ]
+            }
+          },
+          "clientRole": true,
+          "attributes": {}
+        },
+        {
+          "name": "manage-account-links",
+          "description": "${role_manage-account-links}",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {}
+        },
+        {
+          "name": "manage-consent",
+          "description": "${role_manage-consent}",
+          "composite": true,
+          "composites": {
+            "client": {
+              "account": [
+                "view-consent"
+              ]
+            }
+          },
+          "clientRole": true,
+          "attributes": {}
+        },
+        {
+          "name": "view-consent",
+          "description": "${role_view-consent}",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {}
+        },
+        {
+          "name": "view-applications",
+          "description": "${role_view-applications}",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {}
+        },
+        {
+          "name": "delete-account",
+          "description": "${role_delete-account}",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {}
+        },
+        {
+          "name": "view-groups",
+          "description": "${role_view-groups}",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {}
         }
       ]
     }
@@ -292,6 +388,31 @@
           }
         }
       ]
+    },
+    {
+      "name": "account-access",
+      "description": "Только для личного кабинета Keycloak: роли клиентов в токене (API кабинета проверяет роли клиента account)",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "client roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "claim.name": "resource_access.${client_id}.roles",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
     }
   ],
   "defaultDefaultClientScopes": [
@@ -349,6 +470,83 @@
         "openid-min"
       ],
       "optionalClientScopes": []
+    },
+    {
+      "clientId": "account",
+      "name": "${client_account}",
+      "rootUrl": "${authBaseUrl}",
+      "baseUrl": "/realms/sandbox/account/",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "/realms/sandbox/account/*"
+      ],
+      "webOrigins": [],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "post.logout.redirect.uris": "+"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": false,
+      "nodeReRegistrationTimeout": 0,
+      "defaultClientScopes": [],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "account-console",
+      "name": "${client_account-console}",
+      "rootUrl": "${authBaseUrl}",
+      "baseUrl": "/realms/sandbox/account/",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "/realms/sandbox/account/*"
+      ],
+      "webOrigins": [],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "post.logout.redirect.uris": "+",
+        "pkce.code.challenge.method": "S256"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": false,
+      "nodeReRegistrationTimeout": 0,
+      "protocolMappers": [
+        {
+          "name": "audience resolve",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-resolve-mapper",
+          "consentRequired": false,
+          "config": {}
+        }
+      ],
+      "defaultClientScopes": [
+        "openid-min",
+        "account-access"
+      ],
+      "optionalClientScopes": []
     }
   ],
   "users": [
@@ -376,7 +574,10 @@
         "sandbox-api": [
           "customer"
         ]
-      }
+      },
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
     },
     {
       "username": "79990000002",
@@ -403,7 +604,10 @@
           "customer",
           "admin"
         ]
-      }
+      },
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
     },
     {
       "username": "79990000003",
@@ -430,7 +634,10 @@
           "customer",
           "manager"
         ]
-      }
+      },
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
     },
     {
       "username": "79990000004",
@@ -456,7 +663,10 @@
         "sandbox-api": [
           "customer"
         ]
-      }
+      },
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
     },
     {
       "username": "1234567890",
@@ -483,7 +693,10 @@
           "customer",
           "admin"
         ]
-      }
+      },
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
     },
     {
       "username": "0987654321",
@@ -510,7 +723,10 @@
           "customer",
           "manager"
         ]
-      }
+      },
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
     },
     {
       "username": "79990000005",
@@ -536,7 +752,10 @@
         "sandbox-api": [
           "customer"
         ]
-      }
+      },
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
     },
     {
       "username": "79990000006",
@@ -568,7 +787,10 @@
         "sandbox-api": [
           "customer"
         ]
-      }
+      },
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
     },
     {
       "username": "service-account-sandbox-bff",
@@ -593,6 +815,17 @@
             "{\"unmanagedAttributePolicy\": \"ADMIN_EDIT\", \"attributes\": [{\"name\": \"username\", \"displayName\": \"${username}\", \"validations\": {\"length\": {\"min\": 3, \"max\": 255}, \"username-prohibited-characters\": {}, \"up-username-not-idn-homograph\": {}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"email\", \"displayName\": \"${email}\", \"validations\": {\"email\": {}, \"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"firstName\", \"displayName\": \"${firstName}\", \"validations\": {\"length\": {\"max\": 255}, \"person-name-prohibited-characters\": {}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"lastName\", \"displayName\": \"${lastName}\", \"validations\": {\"length\": {\"max\": 255}, \"person-name-prohibited-characters\": {}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}], \"groups\": []}"
           ]
         }
+      }
+    ]
+  },
+  "clientScopeMappings": {
+    "account": [
+      {
+        "client": "account-console",
+        "roles": [
+          "manage-account",
+          "view-groups"
+        ]
       }
     ]
   }

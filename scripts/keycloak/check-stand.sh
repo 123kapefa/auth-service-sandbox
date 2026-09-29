@@ -37,6 +37,7 @@ check "admin: role"                "$(echo "$T" | claim role)" admin,customer
 T=$(token 79990000003)
 check "manager: available_roles" "$(echo "$T" | claim available_roles)" customer,manager
 check "нет служебных ролей Keycloak" "$(echo "$T" | claim realm_access)" None
+check "нет ролей клиентов Keycloak (resource_access)" "$(echo "$T" | claim resource_access)" None
 
 T=$(token 1234567890)
 check "admin в режиме admin: active_mode" "$(echo "$T" | claim active_mode)" admin
@@ -64,6 +65,8 @@ LOGIN_PAGE=$(curl -s "$KC/realms/$REALM/protocol/openid-connect/auth?client_id=s
 SCRIPT=$(echo "$LOGIN_PAGE" | grep -o 'src="[^"]*phone-login.js"' | head -1 | cut -d'"' -f2)
 check "тема sandbox подключает скрипт телефона" "$([ -n "$SCRIPT" ] && echo да || echo нет)" да
 check "скрипт телефона отдаётся" "$(curl -s -o /dev/null -w '%{http_code}' "${SCRIPT/#\//$KC/}")" 200
+check "вход по ключу доступа (passkey) на странице" "$(echo "$LOGIN_PAGE" | grep -q 'Войти с ключом доступа' && echo да || echo нет)" да
+check "нет неверного перевода «Войти с помощью пароля»" "$(echo "$LOGIN_PAGE" | grep -q 'Войти с помощью пароля' && echo есть || echo нет)" нет
 check "на странице входа есть «Забыли пароль?»" "$(echo "$LOGIN_PAGE" | grep -q 'reset-credentials' && echo да || echo нет)" да
 
 echo "6. Вход в приложение (клиент sandbox-bff)"
