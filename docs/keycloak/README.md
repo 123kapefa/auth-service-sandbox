@@ -25,24 +25,24 @@ docker compose up -d --wait keycloak
 scripts/keycloak/check-stand.sh
 ```
 
-Ожидается `Итого: 19 ✓, 0 ✗`.
+Ожидается `Итого: 22 ✓, 0 ✗`.
 
 | Что | Адрес | Доступ |
-|---|---|---|
+|---|---|---|---|
 | Админка Keycloak | http://localhost:8180/admin | `admin` / `admin`, слева выбрать realm **sandbox** |
 | Discovery | http://localhost:8180/realms/sandbox/.well-known/openid-configuration | — |
 | Личный кабинет пользователя | http://localhost:8180/realms/sandbox/account | тестовый пользователь |
 
-Тестовые пользователи (пароль у всех `Test1234!`):
+Тестовые пользователи (пароль у всех `Test1234!`; войти можно по телефону или по почте):
 
-| Логин | Роли | Особенность |
+| Логин (телефон) | Почта | Роли | Особенность |
 |---|---|---|
-| `79990000001` | customer | обычный покупатель |
-| `79990000002` | customer, admin | может переключиться в режим admin |
-| `79990000003` | customer, manager | может переключиться в режим manager |
-| `79990000004` | customer | заблокирован |
-| `1234567890` | customer, admin | сразу в режиме **admin** |
-| `0987654321` | customer, manager | сразу в режиме **manager** |
+| `79990000001` | `customer@sandbox.test` | customer | обычный покупатель |
+| `79990000002` | `customer-admin@sandbox.test` | customer, admin | может переключиться в режим admin |
+| `79990000003` | `customer-manager@sandbox.test` | customer, manager | может переключиться в режим manager |
+| `79990000004` | `blocked@sandbox.test` | customer | заблокирован |
+| `1234567890` | `admin@sandbox.test` | customer, admin | сразу в режиме **admin** |
+| `0987654321` | `manager@sandbox.test` | customer, manager | сразу в режиме **manager** |
 
 ## Этапы
 

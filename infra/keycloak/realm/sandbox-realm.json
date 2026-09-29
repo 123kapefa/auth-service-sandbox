@@ -4,8 +4,8 @@
   "displayName": "Auth Sandbox",
   "sslRequired": "none",
   "registrationAllowed": false,
-  "loginWithEmailAllowed": false,
-  "duplicateEmailsAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": false,
   "editUsernameAllowed": false,
   "verifyEmail": false,
@@ -27,6 +27,14 @@
     "en"
   ],
   "defaultLocale": "ru",
+  "localizationTexts": {
+    "ru": {
+      "usernameOrEmail": "Телефон или почта"
+    },
+    "en": {
+      "usernameOrEmail": "Phone or email"
+    }
+  },
   "eventsEnabled": true,
   "eventsExpiration": 2592000,
   "adminEventsEnabled": true,
@@ -235,7 +243,8 @@
     {
       "username": "79990000001",
       "enabled": true,
-      "emailVerified": false,
+      "email": "customer@sandbox.test",
+      "emailVerified": true,
       "attributes": {
         "phone": [
           "+79990000001"
@@ -260,7 +269,8 @@
     {
       "username": "79990000002",
       "enabled": true,
-      "emailVerified": false,
+      "email": "customer-admin@sandbox.test",
+      "emailVerified": true,
       "attributes": {
         "phone": [
           "+79990000002"
@@ -286,7 +296,8 @@
     {
       "username": "79990000003",
       "enabled": true,
-      "emailVerified": false,
+      "email": "customer-manager@sandbox.test",
+      "emailVerified": true,
       "attributes": {
         "phone": [
           "+79990000003"
@@ -312,7 +323,8 @@
     {
       "username": "79990000004",
       "enabled": false,
-      "emailVerified": false,
+      "email": "blocked@sandbox.test",
+      "emailVerified": true,
       "attributes": {
         "phone": [
           "+79990000004"
@@ -337,7 +349,8 @@
     {
       "username": "1234567890",
       "enabled": true,
-      "emailVerified": false,
+      "email": "admin@sandbox.test",
+      "emailVerified": true,
       "attributes": {
         "phone": [
           "+71234567890"
@@ -363,7 +376,8 @@
     {
       "username": "0987654321",
       "enabled": true,
-      "emailVerified": false,
+      "email": "manager@sandbox.test",
+      "emailVerified": true,
       "attributes": {
         "phone": [
           "+70987654321"

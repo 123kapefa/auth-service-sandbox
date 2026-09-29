@@ -54,7 +54,13 @@ check "заблокированный не получает токен" "$(token
 check "неверный пароль отклонён" "$(curl -s -d grant_type=password -d client_id=dev-cli -d username=79990000001 -d password=wrong \
   "$KC/realms/$REALM/protocol/openid-connect/token" | claim error)" invalid_grant
 
-echo "5. Вход в приложение (клиент sandbox-bff)"
+echo "5. Способы входа"
+check "вход по почте — тот же пользователь" "$(token admin@sandbox.test | claim phone)" +71234567890
+check "вход по телефону по-прежнему работает" "$(token 1234567890 | claim phone)" +71234567890
+check "поле входа подписано «Телефон или почта»" \
+  "$(curl -s "$KC/realms/$REALM/protocol/openid-connect/auth?client_id=sandbox-bff&response_type=code&scope=openid&redirect_uri=http://localhost:8080/auth/callback&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256" | grep -c 'Телефон или почта' | tr -d ' ' | sed 's/^[1-9][0-9]*$/да/')" да
+
+echo "6. Вход в приложение (клиент sandbox-bff)"
 # authorize <redirect_uri> [pkce] → "<HTTP-код> <куда редирект>"
 authorize() {
   local pkce=""
