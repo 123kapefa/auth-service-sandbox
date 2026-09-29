@@ -64,6 +64,7 @@ LOGIN_PAGE=$(curl -s "$KC/realms/$REALM/protocol/openid-connect/auth?client_id=s
 SCRIPT=$(echo "$LOGIN_PAGE" | grep -o 'src="[^"]*phone-login.js"' | head -1 | cut -d'"' -f2)
 check "тема sandbox подключает скрипт телефона" "$([ -n "$SCRIPT" ] && echo да || echo нет)" да
 check "скрипт телефона отдаётся" "$(curl -s -o /dev/null -w '%{http_code}' "${SCRIPT/#\//$KC/}")" 200
+check "на странице входа есть «Забыли пароль?»" "$(echo "$LOGIN_PAGE" | grep -q 'reset-credentials' && echo да || echo нет)" да
 
 echo "6. Вход в приложение (клиент sandbox-bff)"
 # authorize <redirect_uri> [pkce] → "<HTTP-код> <куда редирект>"

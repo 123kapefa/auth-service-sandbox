@@ -25,10 +25,11 @@ docker compose up -d --wait keycloak
 scripts/keycloak/check-stand.sh
 ```
 
-Ожидается `Итого: 24 ✓, 0 ✗`.
+Ожидается `Итого: 25 ✓, 0 ✗`.
 
 | Что | Адрес | Доступ |
 |---|---|---|---|
+| Почта (Mailpit) — письма сброса пароля | http://localhost:8025 | — |
 | Админка Keycloak | http://localhost:8180/admin | `admin` / `admin`, слева выбрать realm **sandbox** |
 | Discovery | http://localhost:8180/realms/sandbox/.well-known/openid-configuration | — |
 | Личный кабинет пользователя | http://localhost:8180/realms/sandbox/account | тестовый пользователь |
@@ -43,6 +44,7 @@ scripts/keycloak/check-stand.sh
 | `79990000004` | `blocked@sandbox.test` | customer | заблокирован |
 | `1234567890` | `admin@sandbox.test` | customer, admin | сразу в режиме **admin** |
 | `0987654321` | `manager@sandbox.test` | customer, manager | сразу в режиме **manager** |
+| `79990000005` | `reset@sandbox.test` | customer | для проверки сброса пароля: после `check-login-methods.sh` пароль — новый, случайный |
 
 ## Этапы
 
@@ -67,7 +69,7 @@ scripts/keycloak/check-stand.sh
 | `compose.yaml` → `keycloak`, `keycloak-postgres` | Keycloak 26.4 и его отдельная БД |
 | `infra/keycloak/realm/sandbox-realm.json` | весь realm как код |
 | `infra/keycloak/themes/sandbox` | тема страницы входа: `+` у номера и приведение номера к цифрам |
-| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak |
+| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте и сброс пароля; `lib.sh` — общие помощники |
 | `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права — переиспользуемая библиотека |
 | `src/AuthService.Core/Authorization` | карта «роль → права» сервиса |
 | `src/AuthService.Core/Features/Auth` | вход, callback, refresh, выход; cookie и `return_to` |

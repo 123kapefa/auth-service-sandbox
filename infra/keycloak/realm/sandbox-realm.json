@@ -6,7 +6,7 @@
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
-  "resetPasswordAllowed": false,
+  "resetPasswordAllowed": true,
   "editUsernameAllowed": false,
   "verifyEmail": false,
   "bruteForceProtected": true,
@@ -28,6 +28,15 @@
   ],
   "defaultLocale": "ru",
   "loginTheme": "sandbox",
+  "smtpServer": {
+    "host": "mailpit",
+    "port": "1025",
+    "from": "no-reply@sandbox.test",
+    "fromDisplayName": "Auth Sandbox",
+    "auth": "false",
+    "ssl": "false",
+    "starttls": "false"
+  },
   "localizationTexts": {
     "ru": {
       "usernameOrEmail": "Телефон или почта"
@@ -398,6 +407,32 @@
         "sandbox-api": [
           "customer",
           "manager"
+        ]
+      }
+    },
+    {
+      "username": "79990000005",
+      "enabled": true,
+      "email": "reset@sandbox.test",
+      "emailVerified": true,
+      "attributes": {
+        "phone": [
+          "+79990000005"
+        ],
+        "active_mode": [
+          "customer"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test1234!",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "sandbox-api": [
+          "customer"
         ]
       }
     },
