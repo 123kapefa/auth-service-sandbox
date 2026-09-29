@@ -45,6 +45,7 @@ scripts/keycloak/check-stand.sh
 | `1234567890` | `admin@sandbox.test` | customer, admin | сразу в режиме **admin** |
 | `0987654321` | `manager@sandbox.test` | customer, manager | сразу в режиме **manager** |
 | `79990000005` | `reset@sandbox.test` | customer | для проверки сброса пароля: после `check-login-methods.sh` пароль — новый, случайный |
+| `79990000006` | `otp@sandbox.test` | customer | включена 2FA (OTP): после пароля спрашивают код. Секрет для приложения-аутентификатора (Base32): `ONQW4ZDCN54C233UOAWXIZLTOQWXGZLDOJSXI` |
 
 ## Этапы
 
@@ -69,7 +70,7 @@ scripts/keycloak/check-stand.sh
 | `compose.yaml` → `keycloak`, `keycloak-postgres` | Keycloak 26.4 и его отдельная БД |
 | `infra/keycloak/realm/sandbox-realm.json` | весь realm как код |
 | `infra/keycloak/themes/sandbox` | тема страницы входа: `+` у номера и приведение номера к цифрам |
-| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте и сброс пароля; `lib.sh` — общие помощники |
+| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `lib.sh` — общие помощники |
 | `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права — переиспользуемая библиотека |
 | `src/AuthService.Core/Authorization` | карта «роль → права» сервиса |
 | `src/AuthService.Core/Features/Auth` | вход, callback, refresh, выход; cookie и `return_to` |

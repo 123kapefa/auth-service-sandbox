@@ -57,6 +57,30 @@ reset_complete() {
   header "$h" location
 }
 
+# totp <секрет> — текущий 6-значный код (RFC 6238: HMAC-SHA1, шаг 30 с), как у приложения-аутентификатора
+totp() {
+  python3 -c '
+import hmac,hashlib,struct,sys,time
+digest = hmac.new(sys.argv[1].encode(), struct.pack(">Q", int(time.time()) // 30), hashlib.sha1).digest()
+offset = digest[-1] & 15
+print("%06d" % ((struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7fffffff) % 1000000))' "$1"
+}
+
+# otp_login <jar> <логин> <код> — вход логином, паролем и кодом 2FA; печатает, куда сервис вернул браузер
+otp_login() {
+  local jar=$1 h="$WORK/h" page="$WORK/page.html" url
+  curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" "$API/auth/login?return_to=/me/"
+  curl -s -o "$page" -b "$jar" -c "$jar" "$(header "$h" location)"
+  curl -s -o "$page" -D "$h" -b "$jar" -c "$jar" --data-urlencode "username=$2" --data-urlencode "password=$PASSWORD" \
+    "$(form_action "$page" kc-form-login)"
+  grep -q 'kc-otp-login-form' "$page" || { echo "код не спросили"; return; }
+  curl -s -o "$page" -D "$h" -b "$jar" -c "$jar" --data-urlencode "otp=$3" "$(form_action "$page" kc-otp-login-form)"
+  url=$(header "$h" location)
+  [ -n "$url" ] || { echo "keycloak: $(feedback "$page")"; return; }
+  curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" "$url"
+  header "$h" location
+}
+
 me_phone() { curl -s -b "$1" "$API/me/" | python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["phone"])'; }
 
 require_service
@@ -90,5 +114,17 @@ JAR="$WORK/jar4"; : > "$JAR"
 check "тот же ответ, что для существующего" "$(reset_request "$JAR" 79990009999)" "В ближайшее время Вы должны получить письмо с дальнейшими инструкциями."
 sleep 2
 check "письмо не отправлено" "$(curl -s "$MAILPIT/api/v1/messages" | python3 -c 'import json,sys; print(json.load(sys.stdin)["messages_count"])')" 1
+
+echo "4. 2FA по желанию пользователя"
+JAR="$WORK/jar5"; : > "$JAR"
+check "без настроенной 2FA код не спрашивают" "$(login "$JAR" /me/ 79990000001)" /me/
+status "$JAR" POST /auth/logout > /dev/null
+JAR="$WORK/jar6"; : > "$JAR"
+R=$(otp_login "$JAR" 79990000006 000000)
+check "с 2FA: неверный код отклонён — «$R»" "${R:0:9}" keycloak:
+JAR="$WORK/jar7"; : > "$JAR"
+check "с 2FA: после пароля спрашивают код, верный код → вход" "$(otp_login "$JAR" 79990000006 "$(totp sandbox-otp-test-secret)")" /me/
+check "вошёл пользователь с 2FA" "$(me_phone "$JAR")" +79990000006
+status "$JAR" POST /auth/logout > /dev/null
 
 summary

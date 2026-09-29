@@ -28,6 +28,108 @@
   ],
   "defaultLocale": "ru",
   "loginTheme": "sandbox",
+  "browserFlow": "sandbox browser",
+  "authenticationFlows": [
+    {
+      "alias": "sandbox browser",
+      "description": "Вход в браузере: как встроенный browser, но 2FA — OTP или код восстановления",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "userSetupAllowed": false,
+          "authenticator": "auth-cookie",
+          "priority": 10
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "userSetupAllowed": false,
+          "authenticator": "identity-provider-redirector",
+          "priority": 25
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "userSetupAllowed": false,
+          "priority": 30,
+          "flowAlias": "sandbox forms"
+        }
+      ]
+    },
+    {
+      "alias": "sandbox forms",
+      "description": "Логин и пароль, затем 2FA, если пользователь её включил",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "auth-username-password-form",
+          "priority": 10
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "userSetupAllowed": false,
+          "priority": 20,
+          "flowAlias": "sandbox conditional 2FA"
+        }
+      ]
+    },
+    {
+      "alias": "sandbox conditional 2FA",
+      "description": "2FA только для тех, кто её настроил; вошедшим по passkey не нужна",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "conditional-user-configured",
+          "priority": 10
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "conditional-credential",
+          "authenticatorConfig": "sandbox-conditional-credential",
+          "priority": 20
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "userSetupAllowed": false,
+          "authenticator": "auth-otp-form",
+          "priority": 30
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "userSetupAllowed": false,
+          "authenticator": "auth-recovery-authn-code-form",
+          "priority": 40
+        }
+      ]
+    }
+  ],
+  "authenticatorConfig": [
+    {
+      "alias": "sandbox-conditional-credential",
+      "config": {
+        "credentials": "webauthn-passwordless"
+      }
+    }
+  ],
   "smtpServer": {
     "host": "mailpit",
     "port": "1025",
@@ -428,6 +530,38 @@
           "type": "password",
           "value": "Test1234!",
           "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "sandbox-api": [
+          "customer"
+        ]
+      }
+    },
+    {
+      "username": "79990000006",
+      "enabled": true,
+      "email": "otp@sandbox.test",
+      "emailVerified": true,
+      "attributes": {
+        "phone": [
+          "+79990000006"
+        ],
+        "active_mode": [
+          "customer"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test1234!",
+          "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Тестовое приложение (секрет в репозитории)",
+          "secretData": "{\"value\":\"sandbox-otp-test-secret\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\"}"
         }
       ],
       "clientRoles": {
