@@ -25,7 +25,7 @@ docker compose up -d --wait keycloak
 scripts/keycloak/check-stand.sh
 ```
 
-Ожидается `Итого: 22 ✓, 0 ✗`.
+Ожидается `Итого: 24 ✓, 0 ✗`.
 
 | Что | Адрес | Доступ |
 |---|---|---|---|
@@ -66,6 +66,7 @@ scripts/keycloak/check-stand.sh
 |---|---|
 | `compose.yaml` → `keycloak`, `keycloak-postgres` | Keycloak 26.4 и его отдельная БД |
 | `infra/keycloak/realm/sandbox-realm.json` | весь realm как код |
+| `infra/keycloak/themes/sandbox` | тема страницы входа: `+` у номера и приведение номера к цифрам |
 | `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak |
 | `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права — переиспользуемая библиотека |
 | `src/AuthService.Core/Authorization` | карта «роль → права» сервиса |

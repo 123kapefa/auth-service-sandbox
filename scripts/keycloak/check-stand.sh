@@ -60,6 +60,11 @@ check "вход по телефону по-прежнему работает" "$
 check "поле входа подписано «Телефон или почта»" \
   "$(curl -s "$KC/realms/$REALM/protocol/openid-connect/auth?client_id=sandbox-bff&response_type=code&scope=openid&redirect_uri=http://localhost:8080/auth/callback&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256" | grep -c 'Телефон или почта' | tr -d ' ' | sed 's/^[1-9][0-9]*$/да/')" да
 
+LOGIN_PAGE=$(curl -s "$KC/realms/$REALM/protocol/openid-connect/auth?client_id=sandbox-bff&response_type=code&scope=openid&redirect_uri=http://localhost:8080/auth/callback&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256")
+SCRIPT=$(echo "$LOGIN_PAGE" | grep -o 'src="[^"]*phone-login.js"' | head -1 | cut -d'"' -f2)
+check "тема sandbox подключает скрипт телефона" "$([ -n "$SCRIPT" ] && echo да || echo нет)" да
+check "скрипт телефона отдаётся" "$(curl -s -o /dev/null -w '%{http_code}' "${SCRIPT/#\//$KC/}")" 200
+
 echo "6. Вход в приложение (клиент sandbox-bff)"
 # authorize <redirect_uri> [pkce] → "<HTTP-код> <куда редирект>"
 authorize() {

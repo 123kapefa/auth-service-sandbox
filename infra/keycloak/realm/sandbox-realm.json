@@ -27,6 +27,7 @@
     "en"
   ],
   "defaultLocale": "ru",
+  "loginTheme": "sandbox",
   "localizationTexts": {
     "ru": {
       "usernameOrEmail": "Телефон или почта"

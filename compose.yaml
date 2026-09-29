@@ -80,6 +80,8 @@ services:
       SANDBOX_BFF_CLIENT_SECRET: ${SANDBOX_BFF_CLIENT_SECRET}
     volumes:
       - ./infra/keycloak/realm:/opt/keycloak/data/import:ro
+      # Тема входа sandbox (loginTheme в realm). В start-dev кэш тем выключен — правки видны без перезапуска.
+      - ./infra/keycloak/themes/sandbox:/opt/keycloak/themes/sandbox:ro
     healthcheck:
       # В образе нет curl — спрашиваем management-порт 9000 через bash /dev/tcp.
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]
