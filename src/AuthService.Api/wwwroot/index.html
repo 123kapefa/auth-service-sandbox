@@ -60,8 +60,10 @@
       <a class="button primary" id="login" href="/auth/login?return_to=/">Войти</a>
       <button id="refresh">Обновить токен</button>
       <button id="logout">Выйти</button>
+      <a class="button" id="account" href="/auth/account">Настройки входа</a>
     </div>
     <dl id="me" hidden></dl>
+    <p class="hint">«Настройки входа» — личный кабинет Keycloak: пароль, 2FA (приложение-аутентификатор, коды восстановления) и ключ доступа (passkey).</p>
     <p class="hint">Токены лежат в httpOnly-cookie: страница их не видит и не может украсть — так и задумано.
       Тестовые пользователи и пароль — в <code>docs/keycloak/README.md</code>.</p>
   </section>
@@ -130,6 +132,7 @@
     $("status").textContent = signedIn ? "Вы вошли" : "Вы не вошли";
     $("login").hidden = signedIn;
     $("refresh").disabled = $("logout").disabled = !signedIn;
+    $("account").hidden = !signedIn;
     if (signedIn) { showMe(body.result); } else { $("me").hidden = true; }
     return signedIn;
   }

@@ -18,5 +18,19 @@ public sealed class DemoPageTests(AuthServiceWebFactory factory) : IClassFixture
         string html = await response.Content.ReadAsStringAsync();
         Assert.Contains("<title>Auth Sandbox</title>", html, StringComparison.Ordinal);
         Assert.Contains("/auth/login?return_to=/", html, StringComparison.Ordinal);
+        Assert.Contains("/auth/account", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AccountSettings_RedirectsToKeycloakAccountSigningIn()
+    {
+        using HttpClient browser = factory.CreateBrowserClient();
+
+        HttpResponseMessage response = await browser.GetAsync(new Uri("/auth/account", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(
+            new Uri($"{AuthServiceWebFactory.ISSUER}/account/account-security/signing-in"),
+            response.Headers.Location);
     }
 }

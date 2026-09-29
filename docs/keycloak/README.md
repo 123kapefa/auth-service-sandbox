@@ -25,7 +25,7 @@ docker compose up -d --wait keycloak
 scripts/keycloak/check-stand.sh
 ```
 
-Ожидается `Итого: 25 ✓, 0 ✗`.
+Ожидается `Итого: 28 ✓, 0 ✗`.
 
 | Что | Адрес | Доступ |
 |---|---|---|---|
@@ -54,7 +54,7 @@ scripts/keycloak/check-stand.sh
 | 1 | Стенд и realm | ✅ | [01-stand.md](01-stand.md) |
 | 2 | Токен и защищённый API | ✅ | [02-token-api.md](02-token-api.md) |
 | 3 | Вход в приложение (BFF: cookie, refresh, выход) | ✅ | [03-login.md](03-login.md) |
-| 3а | Способы входа: телефон или почта, сброс пароля, 2FA по желанию, passkey | ⬜ | — |
+| 3а | Способы входа: телефон или почта, сброс пароля, 2FA по желанию, passkey | ✅ | [03a-login-methods.md](03a-login-methods.md) |
 | 4 | Режимы, админка, события | ⬜ | — |
 | 5 | Спайк: вход по коду — SMS и почта (Java-плагин) | ⬜ | — |
 | 6 | Спайк: миграция пользователей с BCrypt | ⬜ | — |
