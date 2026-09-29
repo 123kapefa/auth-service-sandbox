@@ -50,9 +50,10 @@ scripts/keycloak/check-stand.sh
 |---|---|---|---|
 | 1 | Стенд и realm | ✅ | [01-stand.md](01-stand.md) |
 | 2 | Токен и защищённый API | ✅ | [02-token-api.md](02-token-api.md) |
-| 3 | Вход в приложение (BFF: cookie, refresh, выход) | ⬜ | — |
+| 3 | Вход в приложение (BFF: cookie, refresh, выход) | ✅ | [03-login.md](03-login.md) |
+| 3а | Способы входа: телефон или почта, сброс пароля, 2FA по желанию, passkey | ⬜ | — |
 | 4 | Режимы, админка, события | ⬜ | — |
-| 5 | Спайк: вход по SMS (Java-плагин) | ⬜ | — |
+| 5 | Спайк: вход по коду — SMS и почта (Java-плагин) | ⬜ | — |
 | 6 | Спайк: миграция пользователей с BCrypt | ⬜ | — |
 | 7 | Документация | идёт по ходу | — |
 | 8 | Выводы и ADR | ⬜ | — |
@@ -65,7 +66,10 @@ scripts/keycloak/check-stand.sh
 |---|---|
 | `compose.yaml` → `keycloak`, `keycloak-postgres` | Keycloak 26.4 и его отдельная БД |
 | `infra/keycloak/realm/sandbox-realm.json` | весь realm как код |
-| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа сервиса |
+| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak |
 | `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права — переиспользуемая библиотека |
 | `src/AuthService.Core/Authorization` | карта «роль → права» сервиса |
+| `src/AuthService.Core/Features/Auth` | вход, callback, refresh, выход; cookie и `return_to` |
+| `src/AuthService.Infrastructure.Keycloak` | клиент Keycloak: PKCE, обмен кода, refresh, выход |
+| `src/AuthService.Api/wwwroot` | демо-страница для тестов входа (`/`) |
 | `.env.example` → блок Keycloak | порты и dev-пароли |

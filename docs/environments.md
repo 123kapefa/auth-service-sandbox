@@ -44,6 +44,9 @@
 | `Authentication:MetadataAddress` | откуда брать ключи | — (из Authority) | `http://keycloak:8180/.../openid-configuration` | задать, если сервер входа доступен по внутреннему адресу |
 | `Authentication:Audience` | проверка токенов (`aud`) | `sandbox-api` (база) | так же | так же |
 | `Authentication:RequireHttpsMetadata` | https для discovery | `false` | `false` | `true` (по умолчанию) |
+| `Keycloak:ClientId` / `ClientSecret` | клиент входа `sandbox-bff` | `sandbox-bff` / dev-заглушка в файле | так же / из `.env` через compose | так же / только переменная `Keycloak__ClientSecret` |
+| `Cookies:Secure` / `Domain` | cookie входа | `false` / — | `false` / — | `true` / `.auth-sandbox.example` |
+| `ReturnUrls:AllowedOrigins` | куда вернуть после входа | `localhost:5080/3000/5173` | `localhost:8080/3000/5173` | приложения платформы |
 | `Logging:LogLevel` | ASP.NET Core | Debug | Debug для `AuthService`, фреймворк — Warning | Warning |
 
 ## Почему у Development и Docker разные адреса
