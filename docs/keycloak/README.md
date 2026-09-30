@@ -71,7 +71,7 @@ scripts/keycloak/check-stand.sh
 | `infra/keycloak/realm/sandbox-realm.json` | весь realm как код |
 | `infra/keycloak/themes/sandbox` | тема страницы входа: `+` у номера, кнопка «Войти по коду», экран ввода кода |
 | `infra/keycloak/providers/code-login` | плагин Keycloak (Java): форма входа с нормализацией номера, вход по коду; собирается в `infra/keycloak/Dockerfile` |
-| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS (код — из лога Keycloak); `lib.sh` — общие помощники |
+| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `lib.sh` — общие помощники |
 | `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права — переиспользуемая библиотека |
 | `src/AuthService.Core/Authorization` | карта «роль → права» сервиса |
 | `src/AuthService.Core/Features/Auth` | вход, callback, refresh, выход; cookie и `return_to` |

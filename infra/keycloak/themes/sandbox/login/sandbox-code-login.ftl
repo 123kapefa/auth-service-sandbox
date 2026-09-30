@@ -8,9 +8,10 @@
     <#if section = "header">
         ${msg("sandboxCodeTitle")}
     <#elseif section = "form">
-        <p id="sandbox-code-target">${msg("sandboxCodeSentTo", codeTarget)}</p>
+        <#assign byEmail = codeChannel == "EMAIL">
+        <p id="sandbox-code-target">${msg(byEmail?then("sandboxCodeSentToEmail", "sandboxCodeSentToSms"), codeTarget)}</p>
         <form id="sandbox-code-form" class="${properties.kcFormClass!}" action="${url.loginAction}" method="post" novalidate="novalidate">
-            <@field.input name="code" label=msg("sandboxCodeLabel") autocomplete="one-time-code" autofocus=true />
+            <@field.input name="code" label=msg(byEmail?then("sandboxCodeLabelEmail", "sandboxCodeLabelSms")) autocomplete="one-time-code" autofocus=true />
             <@buttons.actionGroup>
                 <@buttons.button id="kc-login" name="login" label="doLogIn" class=["kcButtonPrimaryClass", "kcButtonBlockClass"] />
             </@buttons.actionGroup>

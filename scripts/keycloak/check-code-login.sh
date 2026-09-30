@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# Проверка этапа 5 (docs/keycloak/05-code-login.md): вход по коду из SMS через страницу Keycloak.
-# Код «SMS» песочницы пишется в лог Keycloak — скрипт берёт его оттуда (нужен docker compose).
+# Проверка этапа 5 (docs/keycloak/05-code-login.md): вход по коду из SMS и из письма через страницу Keycloak.
+# Код «SMS» песочницы пишется в лог Keycloak — скрипт берёт его оттуда (нужен docker compose); письма — из Mailpit.
 # Запуск: сервис и Keycloak подняты, затем
 #   scripts/keycloak/check-code-login.sh                            # Docker: http://localhost:8080
 #   API=http://localhost:5080 scripts/keycloak/check-code-login.sh    # Development: dotnet run
-# Каждый прогон создаёт в realm двух новых покупателей со случайными номерами 7998XXXXXXX.
+# Каждый прогон создаёт в realm новых покупателей: два со случайными номерами 7998XXXXXXX и один с почтой new-*@sandbox.test.
 set -uo pipefail
 
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
+
+MAILPIT="${MAILPIT:-http://localhost:${MAILPIT_UI_PORT:-8025}}"
 
 # code_start <jar> <логин> — форма входа → «Войти по коду»; печатает текст экрана кода или ошибку.
 # Страница — в $WORK/page.html.
@@ -64,9 +66,29 @@ sms_count() { docker compose logs keycloak --since 10m 2>/dev/null | grep -c "\[
 # starts <текст> <начало> — печатает <начало>, если текст с него начинается, иначе весь текст (cut на macOS режет байты, не буквы)
 starts() { if [[ "$1" == "$2"* ]]; then echo "$2"; else echo "$1"; fi; }
 
+# mail_code <адрес> — код из последнего письма на адрес (Mailpit), ждём до 10 секунд
+mail_code() {
+  local i code
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    code=$(curl -s "$MAILPIT/api/v1/search?query=to:$1" | python3 -c '
+import json,sys,re,urllib.request
+messages = json.load(sys.stdin)["messages"]
+if messages:
+    body = json.load(urllib.request.urlopen(sys.argv[1] + "/api/v1/message/" + messages[0]["ID"]))
+    m = re.search(r"\b(\d{6})\b", body["Text"])
+    print(m.group(1) if m else "")' "$MAILPIT")
+    [ -n "$code" ] && { echo "$code"; return; }
+    sleep 1
+  done
+}
+
+# mail_subject <адрес> — тема последнего письма на адрес
+mail_subject() { curl -s "$MAILPIT/api/v1/search?query=to:$1" | python3 -c 'import json,sys; m=json.load(sys.stdin)["messages"]; print(m[0]["Subject"] if m else "")'; }
+
 me() { curl -s -b "$1" "$API/me/" | python3 -c 'import json,sys; r=json.load(sys.stdin)["result"]; v=r[sys.argv[1]]; print(",".join(v) if isinstance(v,list) else v)' "$2" 2>/dev/null; }
 
 require_service
+[ "$(curl -s -o /dev/null -w '%{http_code}' "$MAILPIT/api/v1/messages")" = 200 ] || { echo "Mailpit не отвечает на $MAILPIT"; exit 1; }
 docker compose ps keycloak --format '{{.State}}' 2>/dev/null | grep -q running || { echo "Keycloak не запущен в docker compose — код из лога не достать"; exit 1; }
 
 echo "1. На форме входа — кнопка «Войти по коду»"
@@ -109,9 +131,32 @@ JAR="$WORK/jar5"; : > "$JAR"
 check "новая попытка входа не обходит блокировку" "$(code_start "$JAR" "$LOCK" > /dev/null; starts "$(feedback "$WORK/page.html")" "Слишком много неверных попыток")" "Слишком много неверных попыток"
 check "SMS на заблокированный номер не отправлялось повторно" "$(sms_count "$LOCK")" 1
 
-echo "5. Отказы"
+echo "5. Вход по коду из письма"
+curl -s -o /dev/null -X DELETE "$MAILPIT/api/v1/messages"
+# Пауза перед повтором по почте от прошлого прогона — как и для номера.
+JAR="$WORK/jar8"; : > "$JAR"
+SCREEN=$(code_start "$JAR" " Customer@Sandbox.test ")
+if grep -q 'Код уже отправлен' "$WORK/page.html"; then
+  WAIT=$(grep -o 'через [0-9]* с' "$WORK/page.html" | head -1 | grep -o '[0-9]*')
+  echo "  … пауза перед повтором от прошлого прогона: ждём ${WAIT} с"; sleep "$((WAIT + 1))"; code_send_again "$JAR" > /dev/null
+fi
+check "экран кода: «$SCREEN»" "$SCREEN" "Отправили код письмом на customer@sandbox.test."
+check "письмо «Код для входа» пришло" "$(mail_subject customer@sandbox.test)" "Код для входа"
+check "верный код из письма → вход" "$(code_submit "$JAR" "$(mail_code customer@sandbox.test)")" /me/
+check "вошёл пользователь с этой почтой" "$(me "$JAR" phone)" +79990000001
+status "$JAR" POST /auth/logout > /dev/null
+
+NEW_EMAIL="new-$(date +%s)-$RANDOM@sandbox.test"
+JAR="$WORK/jar9"; : > "$JAR"
+check "неизвестная почта — такой же экран кода" "$(code_start "$JAR" "$NEW_EMAIL")" "Отправили код письмом на $NEW_EMAIL."
+check "верный код → вход" "$(code_submit "$JAR" "$(mail_code "$NEW_EMAIL")")" /me/
+check "создан покупатель без телефона" "$(me "$JAR" phone)" None
+check "роль customer" "$(me "$JAR" roles)" customer
+status "$JAR" POST /auth/logout > /dev/null
+
+echo "6. Отказы"
 JAR="$WORK/jar6"; : > "$JAR"
-check "почта вместо номера — просят номер" "$(code_start "$JAR" customer@sandbox.test)" "ошибка: Для входа по коду введите номер телефона."
+check "ни номер, ни почта — просят телефон или почту" "$(code_start "$JAR" abc)" "ошибка: Для входа по коду введите телефон или почту."
 JAR="$WORK/jar7"; : > "$JAR"
 code_start "$JAR" 79990000004 > /dev/null
 check "заблокированный пользователь — после кода вход не пускает" \

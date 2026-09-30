@@ -3,6 +3,7 @@ package sandbox.keycloak.codelogin;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.util.List;
+import java.util.Map;
 
 import org.keycloak.Config;
 import org.keycloak.authentication.Authenticator;
@@ -64,7 +65,10 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
     @Override
     public Authenticator create(KeycloakSession session) {
         Clock clock = Clock.systemUTC();
-        return new CodeLoginAuthenticator(new CodeRules(CodePolicy.PRODUCTION, clock, new SecureRandom()), new SmsToLogSender(), clock);
+        Map<CodeTarget.Channel, CodeSender> senders = Map.of(
+            CodeTarget.Channel.SMS, new SmsToLogSender(),
+            CodeTarget.Channel.EMAIL, new EmailCodeSender(CodePolicy.PRODUCTION));
+        return new CodeLoginAuthenticator(new CodeRules(CodePolicy.PRODUCTION, clock, new SecureRandom()), senders, clock);
     }
 
     @Override

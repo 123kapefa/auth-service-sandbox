@@ -3,6 +3,8 @@ package sandbox.keycloak.codelogin;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
+import java.util.Optional;
 
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
@@ -21,9 +23,9 @@ import org.keycloak.models.UserModel;
 import org.keycloak.services.messages.Messages;
 
 /**
- * Вход по одноразовому коду. Номер уже выбран на форме входа (заметка CodeLoginNotes.TARGET):
- * здесь — отправка кода, экран «Введите код», проверка и вход. Правила кода — CodeRules (без Keycloak).
- * Неизвестный номер: пользователь создаётся только после верного кода — как в боевом сервисе.
+ * Вход по одноразовому коду. Куда слать код, уже выбрано на форме входа (CodeLoginNotes): номер — SMS, почта — письмо.
+ * Здесь — отправка кода, экран «Введите код», проверка и вход. Правила кода — CodeRules (без Keycloak).
+ * Неизвестный номер или почта: пользователь создаётся только после верного кода — как в боевом сервисе.
  */
 public final class CodeLoginAuthenticator implements Authenticator {
 
@@ -35,33 +37,34 @@ public final class CodeLoginAuthenticator implements Authenticator {
     private static final String CUSTOMER_MODE = "customer";
 
     private final CodeRules rules;
-    private final CodeSender sender;
+    private final Map<CodeTarget.Channel, CodeSender> senders;
     private final Clock clock;
 
-    CodeLoginAuthenticator(CodeRules rules, CodeSender sender, Clock clock) {
+    CodeLoginAuthenticator(CodeRules rules, Map<CodeTarget.Channel, CodeSender> senders, Clock clock) {
         this.rules = rules;
-        this.sender = sender;
+        this.senders = senders;
         this.clock = clock;
     }
 
     @Override
     public void authenticate(AuthenticationFlowContext context) {
-        String target = target(context);
-        if (target == null) {
-            // Сюда попадают только через условие «выбран вход по коду»; без номера делать нечего.
+        Optional<CodeTarget> target = CodeLoginNotes.load(context.getAuthenticationSession());
+        if (target.isEmpty()) {
+            // Сюда попадают только через условие «выбран вход по коду»; без адресата делать нечего.
             context.attempted();
             return;
         }
-        send(context, target);
+        send(context, target.get());
     }
 
     @Override
     public void action(AuthenticationFlowContext context) {
-        String target = target(context);
-        if (target == null) {
+        Optional<CodeTarget> loaded = CodeLoginNotes.load(context.getAuthenticationSession());
+        if (loaded.isEmpty()) {
             context.attempted();
             return;
         }
+        CodeTarget target = loaded.get();
 
         MultivaluedMap<String, String> formData = context.getHttpRequest().getDecodedFormParameters();
         if (formData.containsKey(BUTTON_RESEND)) {
@@ -71,7 +74,7 @@ public final class CodeLoginAuthenticator implements Authenticator {
 
         CodeStore store = new CodeStore(context.getSession(), context.getRealm());
         CodeState current = store.load(target);
-        context.getEvent().detail(Details.USERNAME, target);
+        context.getEvent().detail(Details.USERNAME, target.value());
 
         switch (rules.verify(current, formData.getFirst(FIELD_CODE))) {
             case CodeRules.VerifyResult.Success success -> {
@@ -93,14 +96,18 @@ public final class CodeLoginAuthenticator implements Authenticator {
         }
     }
 
-    private void send(AuthenticationFlowContext context, String target) {
+    private void send(AuthenticationFlowContext context, CodeTarget target) {
         CodeStore store = new CodeStore(context.getSession(), context.getRealm());
         CodeState current = store.load(target);
 
         switch (rules.send(current)) {
             case CodeRules.SendResult.Sent sent -> {
+                // Сохраняем только отправленный код: иначе пауза перед повтором началась бы без письма.
+                if (!senders.get(target.channel()).send(context, target.value(), sent.code())) {
+                    context.challenge(form(context, target, current).setError("sandboxCodeSendFailed").createForm(FORM));
+                    return;
+                }
                 store.save(target, sent.state(), clock.instant());
-                sender.send(target, sent.code());
                 context.challenge(form(context, target, sent.state()).createForm(FORM));
             }
             case CodeRules.SendResult.TooEarly early -> context.challenge(
@@ -110,11 +117,8 @@ public final class CodeLoginAuthenticator implements Authenticator {
         }
     }
 
-    private void signIn(AuthenticationFlowContext context, String target, CodeState state) {
-        KeycloakSession session = context.getSession();
-        RealmModel realm = context.getRealm();
-
-        UserModel user = session.users().getUserByUsername(realm, target);
+    private void signIn(AuthenticationFlowContext context, CodeTarget target, CodeState state) {
+        UserModel user = findUser(context.getSession(), context.getRealm(), target);
         if (user == null) {
             user = createCustomer(context, target);
         }
@@ -128,34 +132,50 @@ public final class CodeLoginAuthenticator implements Authenticator {
         }
 
         context.setUser(user);
-        context.getEvent().detail(Details.AUTH_METHOD, "sms-code");
+        context.getEvent().detail(Details.AUTH_METHOD, method(target));
         context.success();
     }
 
-    // Новый покупатель: логин — номер цифрами, роль customer — из ролей по умолчанию realm.
-    private static UserModel createCustomer(AuthenticationFlowContext context, String target) {
-        UserModel user = context.getSession().users().addUser(context.getRealm(), target);
+    private static UserModel findUser(KeycloakSession session, RealmModel realm, CodeTarget target) {
+        return target.channel() == CodeTarget.Channel.SMS
+            ? session.users().getUserByUsername(realm, target.value())
+            : session.users().getUserByEmail(realm, target.value());
+    }
+
+    // Новый покупатель: логин — номер цифрами или почта; роль customer — из ролей по умолчанию realm.
+    private static UserModel createCustomer(AuthenticationFlowContext context, CodeTarget target) {
+        UserModel user = context.getSession().users().addUser(context.getRealm(), target.value());
         user.setEnabled(true);
-        user.setSingleAttribute("phone", PhoneNormalizer.toE164(target));
+        if (target.channel() == CodeTarget.Channel.SMS) {
+            user.setSingleAttribute("phone", target.display());
+        } else {
+            // Код из письма и есть подтверждение адреса.
+            user.setEmail(target.value());
+            user.setEmailVerified(true);
+        }
         user.setSingleAttribute("active_mode", CUSTOMER_MODE);
 
         context.getEvent().clone()
             .event(EventType.REGISTER)
             .user(user)
-            .detail(Details.USERNAME, target)
-            .detail(Details.REGISTER_METHOD, "sms-code")
+            .detail(Details.USERNAME, target.value())
+            .detail(Details.REGISTER_METHOD, method(target))
             .success();
-        LOG.infof("Новый покупатель по коду: %s", target);
+        LOG.infof("Новый покупатель по коду: %s", target.value());
         return user;
     }
 
-    private void fail(AuthenticationFlowContext context, String target, CodeState state, String message, Object... parameters) {
+    private static String method(CodeTarget target) {
+        return target.channel() == CodeTarget.Channel.SMS ? "sms-code" : "email-code";
+    }
+
+    private void fail(AuthenticationFlowContext context, CodeTarget target, CodeState state, String message, Object... parameters) {
         context.getEvent().error(Errors.INVALID_USER_CREDENTIALS);
         Response challenge = form(context, target, state).setError(message, parameters).createForm(FORM);
         context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challenge);
     }
 
-    private LoginFormsProvider form(AuthenticationFlowContext context, String target, CodeState state) {
+    private LoginFormsProvider form(AuthenticationFlowContext context, CodeTarget target, CodeState state) {
         Instant now = clock.instant();
         long resendAfter = state.resendAllowedAt() == null || !now.isBefore(state.resendAllowedAt())
             ? 0
@@ -163,12 +183,9 @@ public final class CodeLoginAuthenticator implements Authenticator {
 
         return context.form()
             .setExecution(context.getExecution().getId())
-            .setAttribute("codeTarget", PhoneNormalizer.toE164(target))
+            .setAttribute("codeChannel", target.channel().name())
+            .setAttribute("codeTarget", target.display())
             .setAttribute("codeResendAfter", Long.toString(resendAfter));
-    }
-
-    private static String target(AuthenticationFlowContext context) {
-        return context.getAuthenticationSession().getAuthNote(CodeLoginNotes.TARGET);
     }
 
     @Override

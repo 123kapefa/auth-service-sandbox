@@ -13,7 +13,7 @@ final class CodeRequestedCondition implements ConditionalAuthenticator {
 
     @Override
     public boolean matchCondition(AuthenticationFlowContext context) {
-        return context.getAuthenticationSession().getAuthNote(CodeLoginNotes.TARGET) != null;
+        return CodeLoginNotes.load(context.getAuthenticationSession()).isPresent();
     }
 
     @Override

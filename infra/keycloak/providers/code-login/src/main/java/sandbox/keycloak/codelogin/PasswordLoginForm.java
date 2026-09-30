@@ -19,7 +19,7 @@ import org.keycloak.services.validation.Validation;
  * на сервере: «+7 (999) 000-00-01», «8 999 000 00 01» и «9990000001» — один пользователь 79990000001.
  * Скрипт темы только показывает «+»; запрос в обход формы тоже найдёт пользователя.
  *
- * Кнопка «Войти по коду» (codeLogin) на той же форме: пароль не нужен, номер запоминается в сессии входа,
+ * Кнопка «Войти по коду» (codeLogin) на той же форме: пароль не нужен, номер или почта запоминается в сессии входа,
  * дальше — подсценарий «вход по коду» (CodeRequestedCondition → CodeLoginAuthenticator).
  */
 public final class PasswordLoginForm extends UsernamePasswordForm {
@@ -37,24 +37,24 @@ public final class PasswordLoginForm extends UsernamePasswordForm {
             requestCode(context, formData);
             return;
         }
-        context.getAuthenticationSession().removeAuthNote(CodeLoginNotes.TARGET);
+        CodeLoginNotes.clear(context.getAuthenticationSession());
         super.action(context);
     }
 
     private void requestCode(AuthenticationFlowContext context, MultivaluedMap<String, String> formData) {
-        Optional<String> phone = PhoneNormalizer.toLogin(formData.getFirst(AuthenticationManager.FORM_USERNAME));
-        if (phone.isEmpty()) {
+        Optional<CodeTarget> target = CodeTarget.parse(formData.getFirst(AuthenticationManager.FORM_USERNAME));
+        if (target.isEmpty()) {
             context.getEvent().error(Errors.USERNAME_MISSING);
             context.failureChallenge(AuthenticationFlowError.INVALID_USER,
-                challenge(context, "sandboxCodeLoginPhoneRequired", Validation.FIELD_USERNAME));
+                challenge(context, "sandboxCodeLoginTargetRequired", Validation.FIELD_USERNAME));
             return;
         }
 
         // Есть ли такой пользователь, здесь не проверяем и не показываем: экран кода — одинаковый для всех.
         context.clearUser();
-        context.getEvent().detail(Details.USERNAME, phone.get());
-        context.getAuthenticationSession().setAuthNote(ATTEMPTED_USERNAME, phone.get());
-        context.getAuthenticationSession().setAuthNote(CodeLoginNotes.TARGET, phone.get());
+        context.getEvent().detail(Details.USERNAME, target.get().value());
+        context.getAuthenticationSession().setAuthNote(ATTEMPTED_USERNAME, target.get().value());
+        CodeLoginNotes.save(context.getAuthenticationSession(), target.get());
         context.success();
     }
 

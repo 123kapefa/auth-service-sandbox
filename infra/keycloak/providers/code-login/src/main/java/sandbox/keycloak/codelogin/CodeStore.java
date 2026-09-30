@@ -8,7 +8,7 @@ import org.keycloak.models.SingleUseObjectProvider;
 
 /**
  * Состояние кода по номеру — в общем хранилище Keycloak (SingleUseObjectProvider; в кластере — общее для всех узлов).
- * Ключ — realm + номер: лимиты не зависят от попытки входа, браузера и вкладки.
+ * Ключ — realm + канал + номер или почта: лимиты не зависят от попытки входа, браузера и вкладки.
  */
 final class CodeStore {
 
@@ -22,15 +22,15 @@ final class CodeStore {
         this.realmId = realm.getId();
     }
 
-    CodeState load(String target) {
+    CodeState load(CodeTarget target) {
         return CodeState.fromNotes(store.get(key(target)));
     }
 
-    void save(String target, CodeState state, Instant now) {
+    void save(CodeTarget target, CodeState state, Instant now) {
         store.put(key(target), state.secondsToKeep(now), state.toNotes());
     }
 
-    private String key(String target) {
-        return PREFIX + realmId + ":" + target;
+    private String key(CodeTarget target) {
+        return PREFIX + realmId + ":" + target.channel() + ":" + target.value();
     }
 }
