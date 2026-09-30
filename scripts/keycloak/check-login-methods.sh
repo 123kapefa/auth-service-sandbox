@@ -57,15 +57,6 @@ reset_complete() {
   header "$h" location
 }
 
-# totp <секрет> — текущий 6-значный код (RFC 6238: HMAC-SHA1, шаг 30 с), как у приложения-аутентификатора
-totp() {
-  python3 -c '
-import hmac,hashlib,struct,sys,time
-digest = hmac.new(sys.argv[1].encode(), struct.pack(">Q", int(time.time()) // 30), hashlib.sha1).digest()
-offset = digest[-1] & 15
-print("%06d" % ((struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7fffffff) % 1000000))' "$1"
-}
-
 # otp_login <jar> <логин> <код> — вход логином, паролем и кодом 2FA; печатает, куда сервис вернул браузер
 otp_login() {
   local jar=$1 h="$WORK/h" page="$WORK/page.html" url
@@ -120,7 +111,7 @@ JAR="$WORK/jar6"; : > "$JAR"
 R=$(otp_login "$JAR" 79990000006 000000)
 check "с 2FA: неверный код отклонён — «$R»" "${R:0:9}" keycloak:
 JAR="$WORK/jar7"; : > "$JAR"
-check "с 2FA: после пароля спрашивают код, верный код → вход" "$(otp_login "$JAR" 79990000006 "$(totp sandbox-otp-test-secret)")" /me/
+check "с 2FA: после пароля спрашивают код, верный код → вход" "$(otp_login "$JAR" 79990000006 "$(fresh_totp sandbox-otp-test-secret)")" /me/
 check "вошёл пользователь с 2FA" "$(me_phone "$JAR")" +79990000006
 status "$JAR" POST /auth/logout > /dev/null
 

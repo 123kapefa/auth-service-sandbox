@@ -23,6 +23,20 @@ code_start() {
   code_screen "$page"
 }
 
+# code_start_fresh <jar> <логин> — как code_start, но если от прошлого прогона осталась пауза перед повтором (60 с),
+# дожидается её и отправляет код заново
+code_start_fresh() {
+  local screen wait
+  screen=$(code_start "$1" "$2")
+  if grep -q 'Код уже отправлен' "$WORK/page.html"; then
+    wait=$(grep -o 'через [0-9]* с' "$WORK/page.html" | head -1 | grep -o '[0-9]*')
+    echo "  … пауза перед повтором от прошлого прогона: ждём ${wait} с" >&2
+    sleep "$((wait + 1))"
+    code_send_again "$1" > /dev/null
+  fi
+  echo "$screen"
+}
+
 # code_screen <html> — «куда отправили» с экрана кода; иначе — ошибка со страницы
 code_screen() {
   python3 -c '
@@ -97,13 +111,8 @@ curl -s -o /dev/null -D "$WORK/h" -b "$JAR" -c "$JAR" "$API/auth/login?return_to
 check "кнопка на странице входа" "$(curl -s -b "$JAR" -c "$JAR" "$(header "$WORK/h" location)" | grep -q 'name="codeLogin"' && echo да || echo нет)" да
 
 echo "2. Вход по коду существующего пользователя (номер как набрали, без скрипта темы)"
-# Прошлый прогон мог оставить паузу перед повтором (60 с) — тогда ждём её.
 JAR="$WORK/jar2"; : > "$JAR"
-SCREEN=$(code_start "$JAR" "8 (999) 000-00-03")
-WAIT=$(grep -o 'через [0-9]* с' "$WORK/page.html" | head -1 | grep -o '[0-9]*')
-if grep -q 'Код уже отправлен' "$WORK/page.html"; then
-  echo "  … пауза перед повтором от прошлого прогона: ждём ${WAIT} с"; sleep "$((WAIT + 1))"; code_send_again "$JAR" > /dev/null
-fi
+SCREEN=$(code_start_fresh "$JAR" "8 (999) 000-00-03")
 check "экран кода: «$SCREEN»" "$SCREEN" "Отправили код в SMS на +79990000003."
 check "неверный код отклонён" "$(code_submit "$JAR" 000000)" "keycloak: Неверный код. Осталось попыток: 4."
 check "повтор раньше 60 с — не отправляется" "$(starts "$(code_send_again "$JAR")" "Код уже отправлен")" "Код уже отправлен"
@@ -133,13 +142,8 @@ check "SMS на заблокированный номер не отправля�
 
 echo "5. Вход по коду из письма"
 curl -s -o /dev/null -X DELETE "$MAILPIT/api/v1/messages"
-# Пауза перед повтором по почте от прошлого прогона — как и для номера.
 JAR="$WORK/jar8"; : > "$JAR"
-SCREEN=$(code_start "$JAR" " Customer@Sandbox.test ")
-if grep -q 'Код уже отправлен' "$WORK/page.html"; then
-  WAIT=$(grep -o 'через [0-9]* с' "$WORK/page.html" | head -1 | grep -o '[0-9]*')
-  echo "  … пауза перед повтором от прошлого прогона: ждём ${WAIT} с"; sleep "$((WAIT + 1))"; code_send_again "$JAR" > /dev/null
-fi
+SCREEN=$(code_start_fresh "$JAR" " Customer@Sandbox.test ")
 check "экран кода: «$SCREEN»" "$SCREEN" "Отправили код письмом на customer@sandbox.test."
 check "письмо «Код для входа» пришло" "$(mail_subject customer@sandbox.test)" "Код для входа"
 check "верный код из письма → вход" "$(code_submit "$JAR" "$(mail_code customer@sandbox.test)")" /me/
@@ -154,11 +158,27 @@ check "создан покупатель без телефона" "$(me "$JAR" p
 check "роль customer" "$(me "$JAR" roles)" customer
 status "$JAR" POST /auth/logout > /dev/null
 
-echo "6. Отказы"
+echo "6. 2FA после кода — только у тех, кто её включил"
+# У 79990000006 включена 2FA (OTP). Без 2FA после кода ничего не спрашивают — это разделы 2, 3 и 5.
+JAR="$WORK/jar11"; : > "$JAR"
+code_start_fresh "$JAR" 79990000006 > /dev/null
+code_submit "$JAR" "$(sms_code 79990000006)" > /dev/null
+check "после верного кода из SMS спрашивают код 2FA" "$(grep -q 'kc-otp-login-form' "$WORK/page.html" && echo да || echo нет)" да
+curl -s -o "$WORK/page.html" -b "$JAR" -c "$JAR" --data-urlencode "otp=000000" "$(form_action "$WORK/page.html" kc-otp-login-form)"
+check "неверный код 2FA отклонён" "$(grep -q 'kc-otp-login-form' "$WORK/page.html" && echo "форма осталась: $(feedback "$WORK/page.html")" || echo пустили)" "форма осталась: Неверный код аутентификатора."
+curl -s -o "$WORK/page.html" -D "$WORK/h" -b "$JAR" -c "$JAR" --data-urlencode "otp=$(fresh_totp sandbox-otp-test-secret)" \
+  "$(form_action "$WORK/page.html" kc-otp-login-form)"
+URL=$(header "$WORK/h" location)
+curl -s -o /dev/null -D "$WORK/h" -b "$JAR" -c "$JAR" "$URL"
+check "верный код 2FA → вход" "$(header "$WORK/h" location)" /me/
+check "вошёл пользователь с 2FA" "$(me "$JAR" phone)" +79990000006
+status "$JAR" POST /auth/logout > /dev/null
+
+echo "7. Отказы"
 JAR="$WORK/jar6"; : > "$JAR"
 check "ни номер, ни почта — просят телефон или почту" "$(code_start "$JAR" abc)" "ошибка: Для входа по коду введите телефон или почту."
 JAR="$WORK/jar7"; : > "$JAR"
-code_start "$JAR" 79990000004 > /dev/null
+code_start_fresh "$JAR" 79990000004 > /dev/null
 check "заблокированный пользователь — после кода вход не пускает" \
   "$(starts "$(code_submit "$JAR" "$(sms_code 79990000004)")" "keycloak: Учетная запись заблокирована")" "keycloak: Учетная запись заблокирована"
 

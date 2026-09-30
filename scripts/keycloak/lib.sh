@@ -50,6 +50,22 @@ login_until_done() {
   echo "$url"
 }
 
+# totp <секрет> — текущий 6-значный код (RFC 6238: HMAC-SHA1, шаг 30 с), как у приложения-аутентификатора
+totp() {
+  python3 -c '
+import hmac,hashlib,struct,sys,time
+digest = hmac.new(sys.argv[1].encode(), struct.pack(">Q", int(time.time()) // 30), hashlib.sha1).digest()
+offset = digest[-1] & 15
+print("%06d" % ((struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7fffffff) % 1000000))' "$1"
+}
+
+# fresh_totp <секрет> — код из следующего 30-секундного окна (ждёт его начала): Keycloak не принимает
+# один и тот же код дважды, а текущий мог уже использовать другой скрипт проверки
+fresh_totp() {
+  sleep "$((30 - $(date +%s) % 30 + 1))"
+  totp "$1"
+}
+
 # form_action <html> [id формы] — адрес отправки формы (html-экранирование снято)
 form_action() {
   python3 -c 'import re,sys,html; m=re.search(r"<form[^>]*" + (("id=\"" + sys.argv[2] + "\"[^>]*") if len(sys.argv) > 2 else "") + r"action=\"([^\"]+)\"", open(sys.argv[1]).read()); print(html.unescape(m.group(1)) if m else "")' "$@"
