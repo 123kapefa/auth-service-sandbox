@@ -1,5 +1,7 @@
 package sandbox.keycloak.codelogin;
 
+import java.security.SecureRandom;
+import java.time.Clock;
 import java.util.List;
 
 import org.keycloak.Config;
@@ -11,13 +13,13 @@ import org.keycloak.models.KeycloakSessionFactory;
 import org.keycloak.provider.ProviderConfigProperty;
 
 /**
- * Вход по одноразовому коду (SMS или почта). Пока заготовка: проверяем, что Keycloak загружает плагин.
+ * Вход по одноразовому коду (см. CodeLoginAuthenticator). Параметры кода — как в боевом сервисе (CodePolicy.PRODUCTION).
  */
 public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory {
 
     public static final String PROVIDER_ID = "sandbox-code-login";
 
-    private static final Requirement[] REQUIREMENTS = {Requirement.ALTERNATIVE, Requirement.DISABLED};
+    private static final Requirement[] REQUIREMENTS = {Requirement.REQUIRED, Requirement.DISABLED};
 
     @Override
     public String getId() {
@@ -61,7 +63,8 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
 
     @Override
     public Authenticator create(KeycloakSession session) {
-        return new CodeLoginAuthenticator();
+        Clock clock = Clock.systemUTC();
+        return new CodeLoginAuthenticator(new CodeRules(CodePolicy.PRODUCTION, clock, new SecureRandom()), new SmsToLogSender(), clock);
     }
 
     @Override

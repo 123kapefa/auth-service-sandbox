@@ -56,7 +56,7 @@ scripts/keycloak/check-stand.sh
 | 3 | Вход в приложение (BFF: cookie, refresh, выход) | ✅ | [03-login.md](03-login.md) |
 | 3а | Способы входа: телефон или почта, сброс пароля, 2FA по желанию, passkey | ✅ | [03a-login-methods.md](03a-login-methods.md) |
 | 4 | Режимы, админка, события | ⬜ | — |
-| 5 | Спайк: вход по коду — SMS и почта (Java-плагин) | ⬜ | — |
+| 5 | Спайк: вход по коду — SMS и почта (Java-плагин) | идёт | — |
 | 6 | Спайк: миграция пользователей с BCrypt | ⬜ | — |
 | 7 | Документация | идёт по ходу | — |
 | 8 | Выводы и ADR | ⬜ | — |
@@ -69,8 +69,9 @@ scripts/keycloak/check-stand.sh
 |---|---|
 | `compose.yaml` → `keycloak`, `keycloak-postgres` | Keycloak 26.4 и его отдельная БД |
 | `infra/keycloak/realm/sandbox-realm.json` | весь realm как код |
-| `infra/keycloak/themes/sandbox` | тема страницы входа: `+` у номера и приведение номера к цифрам |
-| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `lib.sh` — общие помощники |
+| `infra/keycloak/themes/sandbox` | тема страницы входа: `+` у номера, кнопка «Войти по коду», экран ввода кода |
+| `infra/keycloak/providers/code-login` | плагин Keycloak (Java): форма входа с нормализацией номера, вход по коду; собирается в `infra/keycloak/Dockerfile` |
+| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS (код — из лога Keycloak); `lib.sh` — общие помощники |
 | `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права — переиспользуемая библиотека |
 | `src/AuthService.Core/Authorization` | карта «роль → права» сервиса |
 | `src/AuthService.Core/Features/Auth` | вход, callback, refresh, выход; cookie и `return_to` |

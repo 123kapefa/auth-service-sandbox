@@ -63,7 +63,7 @@
     },
     {
       "alias": "sandbox forms",
-      "description": "Телефон или почта + пароль, затем 2FA, если пользователь её включил",
+      "description": "Телефон или почта + пароль (или «Войти по коду»), затем 2FA, если пользователь её включил",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
@@ -80,7 +80,37 @@
           "requirement": "CONDITIONAL",
           "userSetupAllowed": false,
           "priority": 20,
+          "flowAlias": "sandbox code login"
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "userSetupAllowed": false,
+          "priority": 30,
           "flowAlias": "sandbox conditional 2FA"
+        }
+      ]
+    },
+    {
+      "alias": "sandbox code login",
+      "description": "Вход по коду из SMS — только если на форме нажали «Войти по коду»",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "sandbox-condition-code-requested",
+          "priority": 10
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "sandbox-code-login",
+          "priority": 20
         }
       ]
     },
