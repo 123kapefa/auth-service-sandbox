@@ -55,7 +55,10 @@ services:
       - keycloak_postgres_data:/var/lib/postgresql/data
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.4
+    # Свой образ: Keycloak 26.4.7 + плагин «вход по коду» (собирается в Docker) + тема sandbox.
+    build:
+      context: ./infra/keycloak
+    image: auth_service-keycloak:26.4.7-sandbox
     # start-dev: http, без кэша тем, подробные ошибки. Realm импортируется из JSON,
     # только если его ещё нет в БД (изменили JSON → docker compose down -v).
     command: ["start-dev", "--import-realm"]
