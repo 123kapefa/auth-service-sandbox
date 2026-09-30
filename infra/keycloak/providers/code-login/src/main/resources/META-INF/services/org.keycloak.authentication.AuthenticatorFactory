@@ -1,1 +1,2 @@
 sandbox.keycloak.codelogin.CodeLoginAuthenticatorFactory
+sandbox.keycloak.codelogin.PasswordLoginFormFactory

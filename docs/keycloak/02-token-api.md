@@ -117,8 +117,8 @@ scripts/keycloak/check-api.sh
 | `79990000001` покупатель | 200 | 403 | 403 | 200 | 403 | 403 | 403 | 403 |
 | `79990000002` админ, режим customer | 200 | 403 | 403 | 200 | 403 | 403 | 403 | 403 |
 | `79990000003` менеджер, режим customer | 200 | 403 | 403 | 200 | 403 | 403 | 403 | 403 |
-| `1234567890` админ, режим admin | 200 | 200 | 200 | 200 | 200 | 200 | 200 | 200 |
-| `0987654321` менеджер, режим manager | 200 | 403 | 200 | 200 | 200 | 200 | 403 | 403 |
+| `71234567890` админ, режим admin | 200 | 200 | 200 | 200 | 200 | 200 | 200 | 200 |
+| `70987654321` менеджер, режим manager | 200 | 403 | 200 | 200 | 200 | 200 | 403 | 403 |
 | без токена | 401 | 401 | 401 | 401 | 401 | 401 | 401 | 401 |
 
 Для Development (`dotnet run --project src/AuthService.Api`) — `API=http://localhost:5080 scripts/keycloak/check-api.sh`.
@@ -126,7 +126,7 @@ scripts/keycloak/check-api.sh
 ### Руками
 
 ```bash
-TOKEN=$(curl -s -d grant_type=password -d client_id=dev-cli -d username=0987654321 -d 'password=Test1234!' http://localhost:8180/realms/sandbox/protocol/openid-connect/token | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+TOKEN=$(curl -s -d grant_type=password -d client_id=dev-cli -d username=70987654321 -d 'password=Test1234!' http://localhost:8180/realms/sandbox/protocol/openid-connect/token | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
 ```
 
 ```bash

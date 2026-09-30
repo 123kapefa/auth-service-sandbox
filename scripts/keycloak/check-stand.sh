@@ -39,9 +39,9 @@ check "manager: available_roles" "$(echo "$T" | claim available_roles)" customer
 check "нет служебных ролей Keycloak" "$(echo "$T" | claim realm_access)" None
 check "нет ролей клиентов Keycloak (resource_access)" "$(echo "$T" | claim resource_access)" None
 
-T=$(token 1234567890)
+T=$(token 71234567890)
 check "admin в режиме admin: active_mode" "$(echo "$T" | claim active_mode)" admin
-T=$(token 0987654321)
+T=$(token 70987654321)
 check "manager в режиме manager: active_mode" "$(echo "$T" | claim active_mode)" manager
 
 echo "3. Два адреса Keycloak"
@@ -57,11 +57,10 @@ check "неверный пароль отклонён" "$(curl -s -d grant_type=
 
 echo "5. Способы входа"
 check "вход по почте — тот же пользователь" "$(token admin@sandbox.test | claim phone)" +71234567890
-check "вход по телефону по-прежнему работает" "$(token 1234567890 | claim phone)" +71234567890
-check "поле входа подписано «Телефон или почта»" \
-  "$(curl -s "$KC/realms/$REALM/protocol/openid-connect/auth?client_id=sandbox-bff&response_type=code&scope=openid&redirect_uri=http://localhost:8080/auth/callback&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256" | grep -c 'Телефон или почта' | tr -d ' ' | sed 's/^[1-9][0-9]*$/да/')" да
-
-LOGIN_PAGE=$(curl -s "$KC/realms/$REALM/protocol/openid-connect/auth?client_id=sandbox-bff&response_type=code&scope=openid&redirect_uri=http://localhost:8080/auth/callback&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256")
+check "вход по телефону по-прежнему работает" "$(token 71234567890 | claim phone)" +71234567890
+AUTH_URL="$KC/realms/$REALM/protocol/openid-connect/auth?client_id=sandbox-bff&response_type=code&scope=openid&redirect_uri=http://localhost:8080/auth/callback&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256"
+LOGIN_PAGE=$(curl -s "$AUTH_URL")
+check "поле входа подписано «Телефон или почта»" "$(echo "$LOGIN_PAGE" | grep -q 'Телефон или почта' && echo да || echo нет)" да
 SCRIPT=$(echo "$LOGIN_PAGE" | grep -o 'src="[^"]*phone-login.js"' | head -1 | cut -d'"' -f2)
 check "тема sandbox подключает скрипт телефона" "$([ -n "$SCRIPT" ] && echo да || echo нет)" да
 check "скрипт телефона отдаётся" "$(curl -s -o /dev/null -w '%{http_code}' "${SCRIPT/#\//$KC/}")" 200

@@ -69,11 +69,8 @@ print("%06d" % ((struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7fffffff)
 # otp_login <jar> <логин> <код> — вход логином, паролем и кодом 2FA; печатает, куда сервис вернул браузер
 otp_login() {
   local jar=$1 h="$WORK/h" page="$WORK/page.html" url
-  curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" "$API/auth/login?return_to=/me/"
-  curl -s -o "$page" -b "$jar" -c "$jar" "$(header "$h" location)"
-  curl -s -o "$page" -D "$h" -b "$jar" -c "$jar" --data-urlencode "username=$2" --data-urlencode "password=$PASSWORD" \
-    "$(form_action "$page" kc-form-login)"
-  grep -q 'kc-otp-login-form' "$page" || { echo "код не спросили"; return; }
+  url=$(login_until_done "$jar" /me/ "$2" "$PASSWORD") && { echo "код не спросили"; return; }
+  grep -q 'kc-otp-login-form' "$page" || { echo "код не спросили ($url)"; return; }
   curl -s -o "$page" -D "$h" -b "$jar" -c "$jar" --data-urlencode "otp=$3" "$(form_action "$page" kc-otp-login-form)"
   url=$(header "$h" location)
   [ -n "$url" ] || { echo "keycloak: $(feedback "$page")"; return; }
@@ -81,7 +78,7 @@ otp_login() {
   header "$h" location
 }
 
-me_phone() { curl -s -b "$1" "$API/me/" | python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["phone"])'; }
+me_phone() { curl -s -b "$1" "$API/me/" | python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["phone"])' 2>/dev/null; }
 
 require_service
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$MAILPIT/api/v1/messages")" = 200 ] || { echo "Mailpit не отвечает на $MAILPIT"; exit 1; }
@@ -126,5 +123,16 @@ JAR="$WORK/jar7"; : > "$JAR"
 check "с 2FA: после пароля спрашивают код, верный код → вход" "$(otp_login "$JAR" 79990000006 "$(totp sandbox-otp-test-secret)")" /me/
 check "вошёл пользователь с 2FA" "$(me_phone "$JAR")" +79990000006
 status "$JAR" POST /auth/logout > /dev/null
+
+echo "5. Номер приводится к логину на сервере (форма получает номер как набрали, без скрипта темы)"
+for PHONE in "+7 (999) 000-00-01" "8 999 000 00 01" "9990000001"; do
+  JAR="$WORK/jar-phone"; : > "$JAR"
+  check "«$PHONE» → вход" "$(login "$JAR" /me/ "$PHONE")" /me/
+  check "«$PHONE» → пользователь 79990000001" "$(me_phone "$JAR")" +79990000001
+  status "$JAR" POST /auth/logout > /dev/null
+done
+JAR="$WORK/jar-unknown"; : > "$JAR"
+R=$(login "$JAR" /me/ "+7 999 000-99-99")
+check "неизвестный номер — ошибка входа — «$R»" "${R:0:9}" keycloak:
 
 summary

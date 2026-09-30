@@ -35,6 +35,17 @@ class PhoneNormalizerTest {
         assertTrue(PhoneNormalizer.toLogin(null).isEmpty());
     }
 
+    @ParameterizedTest(name = "поле «{0}» → логин {1}")
+    @CsvSource(delimiter = '|', value = {
+        "8 (999) 000-00-01          | 79990000001",
+        "1234567890                 | 71234567890",
+        "'  customer@sandbox.test ' | customer@sandbox.test",
+        "12345                      | 12345",   // не номер — ищем как есть
+    })
+    void normalizeLogin_phonesToDigits_restTrimmed(String input, String expected) {
+        assertEquals(expected, PhoneNormalizer.normalizeLogin(input));
+    }
+
     @Test
     void e164_addsPlus() {
         assertEquals("+79990000001", PhoneNormalizer.toE164("79990000001"));

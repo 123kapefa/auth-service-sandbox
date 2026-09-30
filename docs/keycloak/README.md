@@ -42,8 +42,8 @@ scripts/keycloak/check-stand.sh
 | `79990000002` | `customer-admin@sandbox.test` | customer, admin | может переключиться в режим admin |
 | `79990000003` | `customer-manager@sandbox.test` | customer, manager | может переключиться в режим manager |
 | `79990000004` | `blocked@sandbox.test` | customer | заблокирован |
-| `1234567890` | `admin@sandbox.test` | customer, admin | сразу в режиме **admin** |
-| `0987654321` | `manager@sandbox.test` | customer, manager | сразу в режиме **manager** |
+| `71234567890` | `admin@sandbox.test` | customer, admin | сразу в режиме **admin**; в форме можно ввести `1234567890` |
+| `70987654321` | `manager@sandbox.test` | customer, manager | сразу в режиме **manager**; в форме можно ввести `0987654321` |
 | `79990000005` | `reset@sandbox.test` | customer | для проверки сброса пароля: после `check-login-methods.sh` пароль — новый, случайный |
 | `79990000006` | `otp@sandbox.test` | customer | включена 2FA (OTP): после пароля спрашивают код. Секрет для приложения-аутентификатора (Base32): `ONQW4ZDCN54C233UOAWXIZLTOQWXGZLDOJSXI` |
 

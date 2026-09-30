@@ -33,6 +33,14 @@ public final class PhoneNormalizer {
         return digits.length() < MIN_DIGITS || digits.length() > MAX_DIGITS ? Optional.empty() : Optional.of(digits);
     }
 
+    /** Что ввели в поле «Телефон или почта» → логин для поиска: номер — цифрами, остальное (почта) — без пробелов по краям. */
+    public static String normalizeLogin(String input) {
+        if (input == null) {
+            return null;
+        }
+        return toLogin(input).orElse(input.trim());
+    }
+
     /** Для показа и claim phone: «+» и цифры логина. */
     public static String toE164(String login) {
         return "+" + login;
