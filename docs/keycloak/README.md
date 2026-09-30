@@ -18,8 +18,10 @@ cp .env.example .env
 ```
 
 ```bash
-docker compose up -d --wait keycloak
+docker compose up -d --build --wait keycloak
 ```
+
+Образ Keycloak собирается из `infra/keycloak/Dockerfile` (плагин входа по коду и тема); первая сборка — около минуты.
 
 ```bash
 scripts/keycloak/check-stand.sh
@@ -29,7 +31,7 @@ scripts/keycloak/check-stand.sh
 
 | Что | Адрес | Доступ |
 |---|---|---|---|
-| Почта (Mailpit) — письма сброса пароля | http://localhost:8025 | — |
+| Почта (Mailpit) — письма сброса пароля и коды входа | http://localhost:8025 | — |
 | Админка Keycloak | http://localhost:8180/admin | `admin` / `admin`, слева выбрать realm **sandbox** |
 | Discovery | http://localhost:8180/realms/sandbox/.well-known/openid-configuration | — |
 | Личный кабинет пользователя | http://localhost:8180/realms/sandbox/account | тестовый пользователь |
@@ -56,7 +58,7 @@ scripts/keycloak/check-stand.sh
 | 3 | Вход в приложение (BFF: cookie, refresh, выход) | ✅ | [03-login.md](03-login.md) |
 | 3а | Способы входа: телефон или почта, сброс пароля, 2FA по желанию, passkey | ✅ | [03a-login-methods.md](03a-login-methods.md) |
 | 4 | Режимы, админка, события | ⬜ | — |
-| 5 | Спайк: вход по коду — SMS и почта (Java-плагин) | идёт | — |
+| 5 | Спайк: вход по коду — SMS и почта (Java-плагин) | ✅ | [05-code-login.md](05-code-login.md) |
 | 6 | Спайк: миграция пользователей с BCrypt | ⬜ | — |
 | 7 | Документация | идёт по ходу | — |
 | 8 | Выводы и ADR | ⬜ | — |
