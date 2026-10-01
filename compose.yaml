@@ -17,6 +17,18 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  # Отметки мгновенного отзыва токенов (этап 4.8): пишет сервис входа, читают все сервисы платформы.
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # Порт наружу — для окружения Development (dotnet run на машине).
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
   mailpit:
     image: axllent/mailpit:v1.26
     ports:
@@ -34,8 +46,11 @@ services:
       ASPNETCORE_ENVIRONMENT: Docker
       ConnectionStrings__AuthDb: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       Keycloak__ClientSecret: ${SANDBOX_BFF_CLIENT_SECRET}
+      ConnectionStrings__Redis: redis:6379
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   # --- Keycloak (этап 1, docs/keycloak/01-stand.md) ---------------------------------

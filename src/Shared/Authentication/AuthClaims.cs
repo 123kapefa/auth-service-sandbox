@@ -16,6 +16,12 @@ public static class AuthClaims
 
     public const string PHONE = "phone";
 
+    /// <summary>Приложение (клиент), которому выдан токен.</summary>
+    public const string AUTHORIZED_PARTY = "azp";
+
+    /// <summary>Когда выдан токен (секунды Unix).</summary>
+    public const string ISSUED_AT = "iat";
+
     /// <summary>Id сессии сервера входа: какая из сессий пользователя — текущая.</summary>
     public const string SESSION_ID = "sid";
 

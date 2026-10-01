@@ -146,7 +146,7 @@ check "причина и время в карточке" "$(admin_get "$ADMIN" "
 check "повторная блокировка — тихий успех" "$(restrict "$MANAGER" "$ID_CUSTOMER" true)" "200 True"
 check "сессии завершены: refresh покупателя — 401" "$(status "$CUSTOMER" POST /auth/refresh)" 401
 check "новый вход не пускает" "$(starts "$(login "$WORK/blocked" /me/ 79990000001)" "keycloak: Учетная запись заблокирована")" "keycloak: Учетная запись заблокирована"
-echo "  ⓘ уже выданный access-токен заблокированного: $(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: accessToken=$OLD_ACCESS" "$API/me/") (живёт до 15 мин — мгновенный отзыв в шаге 4.8)"
+check "уже выданный access-токен заблокированного — 401 сразу" "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: accessToken=$OLD_ACCESS" "$API/me/")" 401
 check "менеджер не блокирует сотрудника — 403" "$(restrict "$MANAGER" "$ID_ADMIN" true)" "403 users.staff_forbidden"
 check "себя заблокировать нельзя — 403" "$(restrict "$ADMIN" "$ID_ADMIN" true)" "403 users.self_restriction"
 check "без флага restricted — 400" "$(curl -s -o /dev/null -w '%{http_code}' -b "$ADMIN" -X PUT -H 'Content-Type: application/json' -d '{}' "$API/auth/admin/users/$ID_CUSTOMER/restriction")" 400
@@ -185,8 +185,10 @@ APPS='",".join(a["clientId"] + ":" + str(a["hasAccess"]) for a in r)'
 check "приложения проекта и доступ" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER/apps" "$APPS")" "200 account-console:True,sandbox-bff:True"
 CUSTOMER="$WORK/customer4"; : > "$CUSTOMER"
 login "$CUSTOMER" /me/ 79990000001 > /dev/null
+OLD_ACCESS=$(cookie "$CUSTOMER" accessToken)
 check "менеджер закрывает покупателю демо-приложение" "$(app_access "$MANAGER" "$ID_CUSTOMER" sandbox-bff false)" "200 False"
 check "личный кабинет остаётся открыт" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER/apps" "$APPS")" "200 account-console:True,sandbox-bff:False"
+check "уже выданный access-токен демо-приложения — 401 сразу" "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: accessToken=$OLD_ACCESS" "$API/me/")" 401
 check "открытая сессия демо-приложения: refresh — 401" "$(status "$CUSTOMER" POST /auth/refresh)" 401
 check "новый вход в демо-приложение — «доступ закрыт»" \
   "$(starts "$(login "$WORK/denied" /me/ 79990000001)" "keycloak: Доступ к этому приложению для вас закрыт")" "keycloak: Доступ к этому приложению для вас закрыт"
@@ -207,9 +209,11 @@ login "$LAPTOP" /me/ 79990000003 > /dev/null
 CURRENT='[i["id"] for i in r["items"] if i["isCurrent"]][0]'
 PHONE_SID=$(my_sessions "$PHONE" "$CURRENT")
 LAPTOP_SID=$(my_sessions "$LAPTOP" "$CURRENT")
+LAPTOP_ACCESS=$(cookie "$LAPTOP" accessToken)
 check "в списке свои сессии, текущая отмечена" "$(my_sessions "$PHONE" 'str(sum(i["isCurrent"] for i in r["items"])) + " " + str(any(i["id"] == "'"$LAPTOP_SID"'" for i in r["items"]))')" "1 True"
 check "в сессии видно приложение" "$(my_sessions "$PHONE" '",".join([i for i in r["items"] if i["isCurrent"]][0]["apps"])')" sandbox-bff
 check "с телефона завершить сессию ноутбука" "$(post "$PHONE" "/security/sessions/$LAPTOP_SID/terminate" 'str(any(i["id"] == "'"$LAPTOP_SID"'" for i in r["items"]))')" "200 False"
+check "ноутбук: access-токен — 401 сразу" "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: accessToken=$LAPTOP_ACCESS" "$API/me/")" 401
 check "ноутбук: refresh — 401" "$(status "$LAPTOP" POST /auth/refresh)" 401
 check "телефон: refresh — 200" "$(status "$PHONE" POST /auth/refresh)" 200
 ADMIN_SID=$(my_sessions "$ADMIN" "$CURRENT")
@@ -220,9 +224,25 @@ check "ноутбук снова отключён" "$(status "$LAPTOP" POST /aut
 check "телефон работает" "$(status "$PHONE" POST /auth/refresh)" 200
 ID_MANAGER_CUSTOMER=$(curl -s -b "$ADMIN" "$API/auth/admin/users?search=79990000003" | python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["items"][0]["id"])')
 check "админ видит сессии пользователя" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_MANAGER_CUSTOMER/sessions" 'str(len(r["items"]) >= 1)')" "200 True"
+PHONE_ACCESS=$(cookie "$PHONE" accessToken)
 check "менеджеру «выйти везде» нельзя — 403" "$(status "$MANAGER" POST "/auth/admin/users/$ID_MANAGER_CUSTOMER/logout")" 403
 check "админ: «выйти везде»" "$(post "$ADMIN" "/auth/admin/users/$ID_MANAGER_CUSTOMER/logout" 'str(len(r["items"]))')" "200 0"
-check "телефон отключён" "$(status "$PHONE" POST /auth/refresh)" 401
+check "access-токен телефона — 401 сразу" "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: accessToken=$PHONE_ACCESS" "$API/me/")" 401
+check "телефон: refresh — 401" "$(status "$PHONE" POST /auth/refresh)" 401
+
+echo "7. Сессию завершили в самом Keycloak — сервис узнаёт об этом (back-channel logout)"
+TABLET="$WORK/tablet"; : > "$TABLET"
+login "$TABLET" /me/ 79990000003 > /dev/null
+TABLET_SID=$(my_sessions "$TABLET" "$CURRENT")
+check "до: access-токен работает" "$(status "$TABLET" GET /me/)" 200
+# Мастер-админка Keycloak удаляет сессию напрямую, мимо нашего API; Keycloak шлёт logout_token на /auth/backchannel-logout.
+KC="${KC:-http://localhost:${KEYCLOAK_PORT:-8180}}"
+ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-$(grep -s '^KEYCLOAK_ADMIN_PASSWORD=' "$(dirname "$0")/../../.env" | cut -d= -f2)}"
+MASTER=$(curl -s -d grant_type=password -d client_id=admin-cli -d "username=${KEYCLOAK_ADMIN:-admin}" --data-urlencode "password=$ADMIN_PASSWORD" \
+  "$KC/realms/master/protocol/openid-connect/token" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("access_token",""))')
+check "сессия удалена в админке Keycloak" "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer $MASTER" "$KC/admin/realms/sandbox/sessions/$TABLET_SID")" 204
+sleep 1
+check "после: access-токен — 401 (Keycloak сообщил сервису)" "$(status "$TABLET" GET /me/)" 401
 for JAR in "$ADMIN" "$MANAGER"; do status "$JAR" POST /auth/logout > /dev/null; done
 
 summary

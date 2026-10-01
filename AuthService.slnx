@@ -9,6 +9,7 @@
   </Folder>
   <Folder Name="/src/Shared/">
     <Project Path="src/Shared/Authentication/Authentication.csproj" />
+    <Project Path="src/Shared/Authentication.Redis/Authentication.Redis.csproj" />
     <Project Path="src/Shared/Framework/Framework.csproj" />
     <Project Path="src/Shared/SharedKernel/SharedKernel.csproj" />
     <Project Path="src/Shared/Validation/Validation.csproj" />

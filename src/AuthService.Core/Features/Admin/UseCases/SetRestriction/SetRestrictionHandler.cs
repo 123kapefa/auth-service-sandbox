@@ -12,14 +12,15 @@ namespace AuthService.Core.Features.Admin.UseCases.SetRestriction;
 
 /// <summary>
 /// Блокировка аккаунта целиком (во всём проекте): выключить пользователя в Keycloak, записать причину и время,
-/// завершить все его сессии — refresh и новый вход больше не работают. Уже выданный access-токен доживает свой
-/// срок (до 15 минут) — мгновенный отзыв в шаге 4.8. Правила боевого сервиса: менеджер — только покупателей,
+/// завершить все его сессии — refresh и новый вход больше не работают; уже выданные access-токены отзываются сразу
+/// (отметка в Redis, проверка в Shared/Authentication). Правила боевого сервиса: менеджер — только покупателей,
 /// себя — нельзя, повторная блокировка — тихий успех.
 /// </summary>
 public sealed class SetRestrictionHandler(
     IIdentityAdmin identityAdmin,
     IValidator<SetRestrictionRequest> validator,
     AdminTargets targets,
+    AccessRevoker revoker,
     TimeProvider timeProvider,
     GetUserHandler getUser)
 {
@@ -76,7 +77,13 @@ public sealed class SetRestrictionHandler(
             }),
             cancellationToken);
 
-        return disabled.IsFailure ? disabled : await identityAdmin.LogoutUserAsync(user.Id, cancellationToken);
+        if (disabled.IsFailure)
+        {
+            return disabled;
+        }
+
+        // Сессии завершаются, а уже выданные access-токены — недействительны сразу, а не через 15 минут.
+        return await revoker.EndAllSessionsAsync(user.Id, cancellationToken);
     }
 
     private async Task<UnitResult<Error>> UnblockAsync(IdentityUser user, CancellationToken cancellationToken) =>

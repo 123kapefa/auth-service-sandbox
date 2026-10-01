@@ -8,6 +8,7 @@ using CSharpFunctionalExtensions;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
@@ -115,6 +116,45 @@ internal sealed partial class KeycloakIdentityProvider(
         return message.IsSuccessStatusCode ? UnitResult.Success<Error>() : await ToErrorAsync(message, cancellationToken);
     }
 
+    public async Task<Result<LogoutNotice, Error>> ValidateLogoutTokenAsync(string logoutToken, CancellationToken cancellationToken)
+    {
+        Result<OpenIdConnectConfiguration, Error> configuration = await GetConfigurationAsync(cancellationToken);
+        if (configuration.IsFailure)
+        {
+            return configuration.Error;
+        }
+
+        TokenValidationResult validation = await new JsonWebTokenHandler().ValidateTokenAsync(
+            logoutToken,
+            new TokenValidationParameters
+            {
+                ValidIssuer = configuration.Value.Issuer,
+                ValidAudience = _options.ClientId,
+                IssuerSigningKeys = configuration.Value.SigningKeys,
+                ValidAlgorithms = [SecurityAlgorithms.RsaSha256],
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.FromMinutes(1),
+            });
+        if (!validation.IsValid || validation.SecurityToken is not JsonWebToken token)
+        {
+            LogLogoutTokenRejected(logger, validation.Exception);
+            return IdentityProviderErrors.LogoutTokenInvalid();
+        }
+
+        // OIDC Back-Channel Logout 1.0: обязательно событие backchannel-logout, nonce быть не должно, нужен sid или sub.
+        bool isLogoutEvent = token.TryGetPayloadValue("events", out Dictionary<string, object>? events)
+            && events is not null
+            && events.ContainsKey("http://schemas.openid.net/event/backchannel-logout");
+        token.TryGetPayloadValue("sid", out string? sessionId);
+        if (!isLogoutEvent || token.TryGetPayloadValue("nonce", out string? _) || (sessionId is null && token.Subject is null))
+        {
+            LogLogoutTokenRejected(logger, null);
+            return IdentityProviderErrors.LogoutTokenInvalid();
+        }
+
+        return new LogoutNotice(token.Subject, sessionId);
+    }
+
     private async Task<Result<TokenSet, Error>> RequestTokensAsync(
         Dictionary<string, string> form,
         CancellationToken cancellationToken)
@@ -215,6 +255,9 @@ internal sealed partial class KeycloakIdentityProvider(
 
     private static string CodeChallenge(string codeVerifier) =>
         Base64UrlEncoder.Encode(SHA256.HashData(Encoding.ASCII.GetBytes(codeVerifier)));
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Back-channel logout token rejected")]
+    private static partial void LogLogoutTokenRejected(ILogger logger, Exception? exception);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Keycloak discovery failed")]
     private static partial void LogDiscoveryFailed(ILogger logger, Exception exception);

@@ -1,6 +1,7 @@
 using AuthService.Core.Authorization;
 using AuthService.Infrastructure.Keycloak;
 using PlatformAuth;
+using PlatformAuth.Redis;
 
 namespace AuthService.Api.Configuration;
 
@@ -12,6 +13,7 @@ public static class AuthenticationConfiguration
         IConfiguration configuration)
     {
         services.AddPlatformJwtAuthentication(configuration);
+        services.AddPlatformTokenRevocation(configuration);
         services.AddPlatformAuthorization();
         services.AddPlatformPermissions<AuthServiceRolePermissions>();
         services.AddInfrastructureKeycloak(configuration);

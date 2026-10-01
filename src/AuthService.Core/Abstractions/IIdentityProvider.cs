@@ -23,7 +23,16 @@ public interface IIdentityProvider
 
     /// <summary>Завершение сессии на сервере входа: refresh-токен и SSO-сессия больше не работают.</summary>
     Task<UnitResult<Error>> LogoutAsync(string refreshToken, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Проверка logout_token (OIDC back-channel logout): подпись ключами realm, издатель, адресат — наш клиент,
+    /// событие backchannel-logout. Сервер входа сообщает так о сессиях, завершённых у него самого.
+    /// </summary>
+    Task<Result<LogoutNotice, Error>> ValidateLogoutTokenAsync(string logoutToken, CancellationToken cancellationToken);
 }
+
+/// <summary>Какая сессия завершена на сервере входа: sid (если есть) и пользователь.</summary>
+public sealed record LogoutNotice(string? Subject, string? SessionId);
 
 /// <summary>Начало входа: куда отправить браузер и что запомнить до его возврата.</summary>
 /// <param name="Url">Адрес страницы входа со всеми параметрами.</param>

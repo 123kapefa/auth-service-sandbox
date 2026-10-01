@@ -22,6 +22,9 @@ public sealed class FakeIdentityProvider : IIdentityProvider
 
     public UnitResult<Error> LogoutResult { get; set; } = UnitResult.Success<Error>();
 
+    /// <summary>Ответ на проверку logout_token: по умолчанию — недействителен.</summary>
+    public Result<LogoutNotice, Error> LogoutNoticeResult { get; set; } = IdentityProviderErrors.LogoutTokenInvalid();
+
     public static TokenSet Tokens(string access, string refresh) =>
         new(access, AccessExpires, refresh, DateTimeOffset.UtcNow.AddDays(30));
 
@@ -33,6 +36,7 @@ public sealed class FakeIdentityProvider : IIdentityProvider
         Logouts.Clear();
         TokenResult = Tokens("access-1", "refresh-1");
         LogoutResult = UnitResult.Success<Error>();
+        LogoutNoticeResult = IdentityProviderErrors.LogoutTokenInvalid();
     }
 
     public Task<Result<AuthorizationRequest, Error>> CreateAuthorizationRequestAsync(
@@ -60,6 +64,9 @@ public sealed class FakeIdentityProvider : IIdentityProvider
         Refreshes.Add(refreshToken);
         return Task.FromResult(TokenResult);
     }
+
+    public Task<Result<LogoutNotice, Error>> ValidateLogoutTokenAsync(string logoutToken, CancellationToken cancellationToken) =>
+        Task.FromResult(LogoutNoticeResult);
 
     public Task<UnitResult<Error>> LogoutAsync(string refreshToken, CancellationToken cancellationToken)
     {

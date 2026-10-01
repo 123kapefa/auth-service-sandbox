@@ -2,15 +2,16 @@ using AuthService.Contracts.Security;
 using AuthService.Core.Abstractions;
 using CSharpFunctionalExtensions;
 using SharedKernel;
+using PlatformAuth.Revocation;
 
 namespace AuthService.Core.Features.Security;
 
 /// <summary>
 /// Сессии пользователя на сервере входа (Keycloak): список, завершить одну, завершить все остальные.
-/// Текущая сессия — по claim sid токена. Завершённая сессия больше не обновляет токены; уже выданный access-токен
-/// доживает свой срок (мгновенный отзыв — шаг 4.8).
+/// Текущая сессия — по claim sid токена. Завершённая сессия больше не обновляет токены, а её уже выданные
+/// access-токены отзываются сразу (отметка по sid).
 /// </summary>
-public sealed class SessionsHandler(IIdentityAdmin identityAdmin)
+public sealed class SessionsHandler(IIdentityAdmin identityAdmin, ITokenRevocationStore revocations)
 {
     public async Task<Result<SessionsResponse, Error>> ListAsync(Guid userId, string? currentSessionId, CancellationToken cancellationToken)
     {
@@ -39,7 +40,13 @@ public sealed class SessionsHandler(IIdentityAdmin identityAdmin)
         }
 
         UnitResult<Error> deleted = await identityAdmin.DeleteSessionAsync(sessionId, cancellationToken);
-        return deleted.IsFailure ? deleted.Error : await ListAsync(userId, currentSessionId, cancellationToken);
+        if (deleted.IsFailure)
+        {
+            return deleted.Error;
+        }
+
+        await revocations.RevokeSessionAsync(sessionId, cancellationToken);
+        return await ListAsync(userId, currentSessionId, cancellationToken);
     }
 
     public async Task<Result<TerminatedResponse, Error>> TerminateOthersAsync(
@@ -62,6 +69,7 @@ public sealed class SessionsHandler(IIdentityAdmin identityAdmin)
                 return deleted.Error;
             }
 
+            await revocations.RevokeSessionAsync(session.Id, cancellationToken);
             terminated++;
         }
 

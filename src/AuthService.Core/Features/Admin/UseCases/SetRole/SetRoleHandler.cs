@@ -24,6 +24,7 @@ public sealed class SetRoleHandler(
     IIdentityAdmin identityAdmin,
     IValidator<SetRoleRequest> validator,
     IOptions<JwtAuthenticationOptions> authentication,
+    AccessRevoker revoker,
     TimeProvider timeProvider,
     GetUserHandler getUser)
 {
@@ -116,6 +117,7 @@ public sealed class SetRoleHandler(
             }
         }
 
-        return await identityAdmin.LogoutUserAsync(user.Id, cancellationToken);
+        // Сессии завершаются, токены со старыми ролями — недействительны сразу.
+        return await revoker.EndAllSessionsAsync(user.Id, cancellationToken);
     }
 }

@@ -5,6 +5,7 @@ using AuthService.Core.Features.Admin.UseCases.GetUsers;
 using AuthService.Core.Features.Admin.UseCases.SetRestriction;
 using AuthService.Core.Features.Admin.UseCases.SetRole;
 using AuthService.Core.Features.Auth.Cookies;
+using AuthService.Core.Features.Auth.UseCases.BackchannelLogout;
 using AuthService.Core.Features.Auth.ReturnUrls;
 using AuthService.Core.Features.Auth.UseCases.Callback;
 using AuthService.Core.Features.Auth.UseCases.Login;
@@ -39,6 +40,7 @@ public static class Registration
         services.AddScoped<CallbackHandler>();
         services.AddScoped<RefreshHandler>();
         services.AddScoped<LogoutHandler>();
+        services.AddScoped<BackchannelLogoutHandler>();
         services.AddScoped<SwitchModeHandler>();
         services.AddScoped<GetUsersHandler>();
         services.AddScoped<GetUserHandler>();
@@ -46,6 +48,7 @@ public static class Registration
         services.AddScoped<SetRoleHandler>();
         services.AddScoped<AppAccessHandler>();
         services.AddScoped<AdminTargets>();
+        services.AddScoped<AccessRevoker>();
         services.AddScoped<SessionsHandler>();
 
         return services;

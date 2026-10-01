@@ -5,6 +5,7 @@ using FluentValidation;
 using FluentValidation.Results;
 using SharedKernel;
 using Validation;
+using PlatformAuth.Revocation;
 
 namespace AuthService.Core.Features.Admin.UseCases.AppAccess;
 
@@ -16,7 +17,9 @@ namespace AuthService.Core.Features.Admin.UseCases.AppAccess;
 public sealed class AppAccessHandler(
     IIdentityAdmin identityAdmin,
     IValidator<SetAppAccessRequest> validator,
-    AdminTargets targets)
+    AdminTargets targets,
+    ITokenRevocationStore revocations,
+    TimeProvider timeProvider)
 {
     public async Task<Result<IReadOnlyList<AppAccessResponse>, Error>> GetAsync(
         Guid userId,
@@ -79,6 +82,12 @@ public sealed class AppAccessHandler(
             if (changed.IsFailure)
             {
                 return changed.Error;
+            }
+
+            if (!hasAccess)
+            {
+                // Токены этого приложения (azp) — недействительны сразу; токены остальных приложений не трогаем.
+                await revocations.RevokeAppAsync(clientId, userId.ToString(), timeProvider.GetUtcNow(), cancellationToken);
             }
         }
 

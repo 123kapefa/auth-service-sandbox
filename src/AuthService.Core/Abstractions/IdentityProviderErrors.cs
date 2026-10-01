@@ -12,6 +12,10 @@ public static class IdentityProviderErrors
     public static Error Unavailable() =>
         Error.Failure("auth.provider.unavailable", "Сервер входа временно недоступен.").AsTransient();
 
+    /// <summary>logout_token не прошёл проверку (подпись, издатель, адресат, событие).</summary>
+    public static Error LogoutTokenInvalid() =>
+        Error.Validation("auth.logout_token.invalid", "logout_token недействителен.");
+
     /// <summary>Пользователя с таким id нет.</summary>
     public static Error UserNotFound() =>
         Error.NotFound("users.not_found", "Пользователь не найден.");

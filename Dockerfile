@@ -10,6 +10,7 @@ COPY src/AuthService.Infrastructure.Keycloak/AuthService.Infrastructure.Keycloak
 COPY src/AuthService.Infrastructure.Postgres/AuthService.Infrastructure.Postgres.csproj src/AuthService.Infrastructure.Postgres/
 # Shared-проекты: без их .csproj restore не увидит их пакеты, и publish --no-restore упадёт.
 COPY src/Shared/Authentication/Authentication.csproj src/Shared/Authentication/
+COPY src/Shared/Authentication.Redis/Authentication.Redis.csproj src/Shared/Authentication.Redis/
 COPY src/Shared/Framework/Framework.csproj src/Shared/Framework/
 COPY src/Shared/SharedKernel/SharedKernel.csproj src/Shared/SharedKernel/
 COPY src/Shared/Validation/Validation.csproj src/Shared/Validation/

@@ -534,7 +534,10 @@
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:8080/*##http://localhost:5080/*"
+        "post.logout.redirect.uris": "http://localhost:8080/*##http://localhost:5080/*",
+        "backchannel.logout.url": "http://auth-service:8080/auth/backchannel-logout",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false"
       },
       "fullScopeAllowed": true,
       "defaultClientScopes": [

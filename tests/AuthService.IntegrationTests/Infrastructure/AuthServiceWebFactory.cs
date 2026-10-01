@@ -12,6 +12,7 @@ using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using PlatformAuth;
+using PlatformAuth.Revocation;
 
 namespace AuthService.IntegrationTests.Infrastructure;
 
@@ -36,6 +37,9 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
     /// <summary>Подставной сервер входа вместо Keycloak.</summary>
     public FakeIdentityProvider IdentityProvider { get; } = new();
 
+    /// <summary>Отметки об отзыве в памяти вместо Redis.</summary>
+    public InMemoryTokenRevocations Revocations { get; } = new();
+
     /// <summary>Подставной Admin API вместо Keycloak.</summary>
     public FakeIdentityAdmin IdentityAdmin { get; } = new();
 
@@ -55,18 +59,32 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
         return client;
     }
 
-    public string CreateToken(TestUser user, DateTimeOffset? authenticatedAt = null, string? sessionId = null)
+    /// <summary>Клиент с заранее выпущенным токеном (например, «старым» — до отзыва).</summary>
+    public HttpClient CreateClientWithToken(string token)
+    {
+        HttpClient client = CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        return client;
+    }
+
+    public string CreateToken(
+        TestUser user,
+        DateTimeOffset? authenticatedAt = null,
+        string? sessionId = null,
+        DateTimeOffset? issuedAt = null,
+        string authorizedParty = "sandbox-bff")
     {
         ArgumentNullException.ThrowIfNull(user);
 
-        DateTime now = DateTime.UtcNow;
+        DateTime now = (issuedAt ?? DateTimeOffset.UtcNow).UtcDateTime;
         return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {
             Issuer = ISSUER,
             Audience = AUDIENCE,
             IssuedAt = now,
             NotBefore = now,
-            Expires = now.AddMinutes(5),
+            Expires = now.AddMinutes(15), // как access-токен Keycloak
             SigningCredentials = new SigningCredentials(_signingKey, SecurityAlgorithms.RsaSha256),
             Claims = new Dictionary<string, object>(StringComparer.Ordinal)
             {
@@ -77,6 +95,7 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
                 [AuthClaims.ACTIVE_MODE] = user.ActiveMode,
                 [AuthClaims.AUTH_TIME] = (authenticatedAt ?? DateTimeOffset.UtcNow).ToUnixTimeSeconds(),
                 [AuthClaims.SESSION_ID] = sessionId ?? $"session-{user.Id:N}",
+                [AuthClaims.AUTHORIZED_PARTY] = authorizedParty,
             },
         });
     }
@@ -84,6 +103,8 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("ConnectionStrings:AuthDb", UNREACHABLE_DATABASE);
+        // Проверка отзыва без кэша: тест проверяет запрос сразу после отметки.
+        builder.UseSetting("TokenRevocation:LocalCache", "00:00:00");
         builder.ConfigureTestServices(services =>
         {
             services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
@@ -94,6 +115,8 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
             });
             services.RemoveAll<IIdentityProvider>();
             services.AddSingleton<IIdentityProvider>(IdentityProvider);
+            services.RemoveAll<ITokenRevocationStore>();
+            services.AddSingleton<ITokenRevocationStore>(Revocations);
             services.RemoveAll<IIdentityAdmin>();
             services.AddSingleton<IIdentityAdmin>(IdentityAdmin);
         });

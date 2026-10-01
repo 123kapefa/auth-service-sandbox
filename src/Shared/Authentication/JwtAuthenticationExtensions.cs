@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
+using PlatformAuth.Revocation;
 
 namespace PlatformAuth;
 
@@ -56,7 +57,24 @@ public static class JwtAuthenticationExtensions
             RoleClaimType = AuthClaims.ROLE,
         };
 
-        bearer.Events = new JwtBearerEvents { OnMessageReceived = context => ReadTokenFromCookie(context, settings) };
+        bearer.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context => ReadTokenFromCookie(context, settings),
+            OnTokenValidated = RejectRevokedAsync,
+        };
+    }
+
+    // Мгновенный отзыв: подпись и срок токена в порядке, но его отозвали (блокировка, завершённая сессия, закрытый
+    // доступ к приложению). Проверка есть, только если сервис подключил хранилище отзывов (AddPlatformTokenRevocation).
+    private static async Task RejectRevokedAsync(TokenValidatedContext context)
+    {
+        ITokenRevocationChecker? checker = context.HttpContext.RequestServices.GetService<ITokenRevocationChecker>();
+        if (checker is not null
+            && context.Principal is not null
+            && await checker.IsRevokedAsync(context.Principal, context.HttpContext.RequestAborted))
+        {
+            context.Fail("The token has been revoked.");
+        }
     }
 
     // Заголовок Authorization главнее: явно переданный токен (например, от другого сервиса)

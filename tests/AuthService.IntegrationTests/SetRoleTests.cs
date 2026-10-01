@@ -22,6 +22,7 @@ public sealed class SetRoleTests : IClassFixture<AuthServiceWebFactory>
         _factory = factory;
         _keycloak = factory.IdentityAdmin;
         _keycloak.Reset();
+        factory.Revocations.Reset();
         _keycloak.Add(TestUser.Customer, []);
         _keycloak.Add(TestUser.AdminInAdminMode, [AuthModes.ADMIN]);
         _keycloak.Add(_otherAdmin, [AuthModes.ADMIN]);

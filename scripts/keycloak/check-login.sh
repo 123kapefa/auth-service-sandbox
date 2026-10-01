@@ -39,7 +39,8 @@ check "refresh после выхода → 401" \
   "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Cookie: refreshToken=$LAST_REFRESH" "$API/auth/refresh")" 401
 check "сессия Keycloak закрыта — снова нужна форма" \
   "$(login "$JAR" / 0987654321 wrong-password | cut -c1-9)" keycloak:
-echo "  ⓘ старый access-токен после выхода до истечения срока: $(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: accessToken=$OLD_ACCESS" "$API/me/") (JWT проверяется без Keycloak — известное ограничение, этап 4)"
+check "старый access-токен после выхода — 401 сразу (мгновенный отзыв)" \
+  "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: accessToken=$OLD_ACCESS" "$API/me/")" 401
 
 echo "5. Отказы"
 JAR2="$WORK/jar2"; : > "$JAR2"

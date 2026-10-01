@@ -44,7 +44,7 @@ public sealed class UserSessionsEndpoints : IEndpoint
     private static async Task<EndpointResult<SessionsResponse>> LogoutAsync(
         Guid userId,
         [FromServices] AdminTargets targets,
-        [FromServices] IIdentityAdmin identityAdmin,
+        [FromServices] AccessRevoker revoker,
         [FromServices] SessionsHandler sessions,
         CancellationToken cancellationToken)
     {
@@ -54,7 +54,7 @@ public sealed class UserSessionsEndpoints : IEndpoint
             return Result.Failure<SessionsResponse, Error>(user.Error);
         }
 
-        UnitResult<Error> loggedOut = await identityAdmin.LogoutUserAsync(userId, cancellationToken);
+        UnitResult<Error> loggedOut = await revoker.EndAllSessionsAsync(userId, cancellationToken);
         return loggedOut.IsFailure
             ? Result.Failure<SessionsResponse, Error>(loggedOut.Error)
             : await sessions.ListAsync(userId, currentSessionId: null, cancellationToken);
