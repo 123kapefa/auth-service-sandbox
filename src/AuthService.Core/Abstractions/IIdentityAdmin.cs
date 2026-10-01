@@ -25,6 +25,17 @@ public interface IIdentityAdmin
     /// </summary>
     Task<Result<IReadOnlyList<string>, Error>> GetClientRolesAsync(Guid userId, string clientId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Выдать и снять роли пользователя в клиенте (приложении). Служебной учётке нужно точечное право на этот клиент
+    /// (view и map-roles в FGAP v2) — без доступа к остальным клиентам и их секретам.
+    /// </summary>
+    Task<UnitResult<Error>> SetClientRolesAsync(
+        Guid userId,
+        string clientId,
+        IReadOnlyCollection<string> grant,
+        IReadOnlyCollection<string> revoke,
+        CancellationToken cancellationToken);
+
     /// <summary>Задан ли пароль (пользователь мог войти только по коду).</summary>
     Task<Result<bool, Error>> HasPasswordAsync(Guid userId, CancellationToken cancellationToken);
 

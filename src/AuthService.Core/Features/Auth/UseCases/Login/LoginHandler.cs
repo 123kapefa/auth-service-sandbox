@@ -12,10 +12,14 @@ public sealed record LoginStart(Uri RedirectTo, LoginState State);
 /// <summary>Начало входа: адрес страницы входа с PKCE и проверенный return_to.</summary>
 public sealed class LoginHandler(IIdentityProvider identityProvider, ReturnUrlValidator returnUrls)
 {
-    public async Task<Result<LoginStart, Error>> Handle(string? returnTo, Uri callbackUrl, CancellationToken cancellationToken)
+    public async Task<Result<LoginStart, Error>> Handle(
+        string? returnTo,
+        bool reauthenticate,
+        Uri callbackUrl,
+        CancellationToken cancellationToken)
     {
         Result<AuthorizationRequest, Error> request =
-            await identityProvider.CreateAuthorizationRequestAsync(callbackUrl, cancellationToken);
+            await identityProvider.CreateAuthorizationRequestAsync(callbackUrl, reauthenticate, cancellationToken);
         if (request.IsFailure)
         {
             return request.Error;

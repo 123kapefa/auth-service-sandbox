@@ -29,7 +29,7 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
     [Fact]
     public async Task AuthorizationRequest_PointsBrowserToExternalLoginPageWithPkce()
     {
-        AuthorizationRequest request = (await CreateProvider().CreateAuthorizationRequestAsync(_callback, default)).Value;
+        AuthorizationRequest request = (await CreateProvider().CreateAuthorizationRequestAsync(_callback, forceLogin: false, default)).Value;
 
         Assert.StartsWith($"{EXTERNAL}/auth?", request.Url.ToString(), StringComparison.Ordinal);
         Dictionary<string, StringValues> query = QueryHelpers.ParseQuery(request.Url.Query);
@@ -41,6 +41,15 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
         Assert.Equal("S256", query["code_challenge_method"]);
         Assert.Equal(Challenge(request.CodeVerifier), query["code_challenge"]);
         Assert.False(query.ContainsKey("code_verifier"));
+        Assert.False(query.ContainsKey("prompt"));
+    }
+
+    [Fact]
+    public async Task ForceLogin_AsksKeycloakToLoginAgain()
+    {
+        AuthorizationRequest request = (await CreateProvider().CreateAuthorizationRequestAsync(_callback, forceLogin: true, default)).Value;
+
+        Assert.Equal("login", QueryHelpers.ParseQuery(request.Url.Query)["prompt"]);
     }
 
     [Fact]
@@ -48,8 +57,8 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
     {
         IIdentityProvider provider = CreateProvider();
 
-        AuthorizationRequest first = (await provider.CreateAuthorizationRequestAsync(_callback, default)).Value;
-        AuthorizationRequest second = (await provider.CreateAuthorizationRequestAsync(_callback, default)).Value;
+        AuthorizationRequest first = (await provider.CreateAuthorizationRequestAsync(_callback, forceLogin: false, default)).Value;
+        AuthorizationRequest second = (await provider.CreateAuthorizationRequestAsync(_callback, forceLogin: false, default)).Value;
 
         Assert.NotEqual(first.State, second.State);
         Assert.NotEqual(first.CodeVerifier, second.CodeVerifier);

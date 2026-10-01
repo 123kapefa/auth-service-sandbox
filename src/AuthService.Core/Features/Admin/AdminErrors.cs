@@ -11,4 +11,14 @@ public static class AdminErrors
     /// <summary>Свою учётную запись блокировать и разблокировать нельзя.</summary>
     public static Error SelfRestriction() =>
         Error.Authorization("users.self_restriction", "Нельзя заблокировать или разблокировать себя.");
+
+    /// <summary>Свою роль менять нельзя: так админ не отнимет права у себя по ошибке.</summary>
+    public static Error SelfRole() =>
+        Error.Authorization("users.self_role", "Нельзя менять свою роль.");
+
+    /// <summary>Выдача admin — только после недавнего входа: украденная сессия не раздаст права.</summary>
+    public static Error ReauthenticationRequired() =>
+        Error.Authorization(
+            "auth.reauthentication_required",
+            "Подтвердите, что это вы: войдите заново (GET /auth/login?reauth=true) и повторите действие.");
 }

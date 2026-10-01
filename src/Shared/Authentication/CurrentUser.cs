@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 
@@ -21,6 +22,12 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor, IPermi
     public string? ActiveMode => Principal.FindFirstValue(AuthClaims.ACTIVE_MODE);
 
     public IReadOnlyList<string> Roles => [.. Principal.FindAll(AuthClaims.ROLE).Select(claim => claim.Value)];
+
+    /// <summary>Когда пользователь вошёл (claim auth_time). null — claim нет.</summary>
+    public DateTimeOffset? AuthenticatedAt =>
+        long.TryParse(Principal.FindFirstValue(AuthClaims.AUTH_TIME), NumberStyles.Integer, CultureInfo.InvariantCulture, out long seconds)
+            ? DateTimeOffset.FromUnixTimeSeconds(seconds)
+            : null;
 
     public IReadOnlyList<string> AvailableModes => [.. Principal.FindAll(AuthClaims.AVAILABLE_ROLES).Select(claim => claim.Value)];
 

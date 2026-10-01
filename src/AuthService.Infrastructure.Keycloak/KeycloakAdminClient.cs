@@ -88,6 +88,80 @@ internal sealed partial class KeycloakAdminClient(
         return Result.Success<IReadOnlyList<string>, Error>(roles);
     }
 
+    public async Task<UnitResult<Error>> SetClientRolesAsync(
+        Guid userId,
+        string clientId,
+        IReadOnlyCollection<string> grant,
+        IReadOnlyCollection<string> revoke,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(grant);
+        ArgumentNullException.ThrowIfNull(revoke);
+
+        Result<string, Error> client = await FindClientIdAsync(clientId, cancellationToken);
+        if (client.IsFailure)
+        {
+            return client.Error;
+        }
+
+        string path = $"users/{userId}/role-mappings/clients/{client.Value}";
+        if (grant.Count > 0)
+        {
+            // Роль выдаётся по id и имени: берём их из ролей, доступных этому пользователю.
+            Result<RoleRepresentation[], Error> available = await GetJsonAsync<RoleRepresentation[]>($"{path}/available", cancellationToken);
+            if (available.IsFailure)
+            {
+                return available.Error;
+            }
+
+            UnitResult<Error> granted = await SendExpectingSuccessAsync(
+                HttpMethod.Post, path, cancellationToken, JsonContent.Create(available.Value.Where(role => grant.Contains(role.Name))));
+            if (granted.IsFailure)
+            {
+                return granted;
+            }
+        }
+
+        if (revoke.Count > 0)
+        {
+            Result<RoleRepresentation[], Error> assigned = await GetJsonAsync<RoleRepresentation[]>(path, cancellationToken);
+            if (assigned.IsFailure)
+            {
+                return assigned.Error;
+            }
+
+            return await SendExpectingSuccessAsync(
+                HttpMethod.Delete, path, cancellationToken, JsonContent.Create(assigned.Value.Where(role => revoke.Contains(role.Name))));
+        }
+
+        return UnitResult.Success<Error>();
+    }
+
+    // Внутренний id клиента по clientId. Служебная учётка видит только клиенты, на которые ей дано право (FGAP v2).
+    private async Task<Result<string, Error>> FindClientIdAsync(string clientId, CancellationToken cancellationToken)
+    {
+        Result<ClientRepresentation[], Error> clients = await GetJsonAsync<ClientRepresentation[]>(
+            QueryHelpers.AddQueryString("clients", new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["clientId"] = clientId,
+                ["search"] = "true",
+            }),
+            cancellationToken);
+        if (clients.IsFailure)
+        {
+            return clients.Error;
+        }
+
+        ClientRepresentation? client = clients.Value.FirstOrDefault(found => string.Equals(found.ClientId, clientId, StringComparison.Ordinal));
+        if (client is null)
+        {
+            LogClientNotVisible(logger, clientId);
+            return IdentityProviderErrors.Unavailable();
+        }
+
+        return client.Id;
+    }
+
     public async Task<Result<bool, Error>> HasPasswordAsync(Guid userId, CancellationToken cancellationToken)
     {
         Result<Credential[], Error> credentials = await GetJsonAsync<Credential[]>($"users/{userId}/credentials", cancellationToken);
@@ -230,6 +304,9 @@ internal sealed partial class KeycloakAdminClient(
     [LoggerMessage(Level = LogLevel.Warning, Message = "Keycloak Admin API is unreachable")]
     private static partial void LogUnreachable(ILogger logger, Exception exception);
 
+    [LoggerMessage(Level = LogLevel.Error, Message = "Client {ClientId} is not visible to the service account: grant view and map-roles on it (admin permissions)")]
+    private static partial void LogClientNotVisible(ILogger logger, string clientId);
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "Unexpected Keycloak Admin API response: {StatusCode}")]
     private static partial void LogUnexpectedResponse(ILogger logger, int statusCode);
 
@@ -238,7 +315,13 @@ internal sealed partial class KeycloakAdminClient(
 
     private sealed record ClientMapping([property: JsonPropertyName("mappings")] RoleRepresentation[] Mappings);
 
-    private sealed record RoleRepresentation([property: JsonPropertyName("name")] string Name);
+    private sealed record RoleRepresentation(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("name")] string Name);
+
+    private sealed record ClientRepresentation(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("clientId")] string ClientId);
 
     private sealed record Credential([property: JsonPropertyName("type")] string Type);
 

@@ -6,8 +6,14 @@ namespace AuthService.Core.Abstractions;
 /// <summary>Сервер входа (Keycloak) глазами сервиса: вход по коду с PKCE, обновление и завершение сессии.</summary>
 public interface IIdentityProvider
 {
-    /// <summary>Куда отправить браузер на вход; state и code verifier нужно сохранить до возврата.</summary>
-    Task<Result<AuthorizationRequest, Error>> CreateAuthorizationRequestAsync(Uri redirectUri, CancellationToken cancellationToken);
+    /// <summary>
+    /// Куда отправить браузер на вход; state и code verifier нужно сохранить до возврата.
+    /// forceLogin — войти заново даже при живой SSO-сессии (повторный вход перед опасным действием).
+    /// </summary>
+    Task<Result<AuthorizationRequest, Error>> CreateAuthorizationRequestAsync(
+        Uri redirectUri,
+        bool forceLogin,
+        CancellationToken cancellationToken);
 
     /// <summary>Обмен кода из callback на токены.</summary>
     Task<Result<TokenSet, Error>> ExchangeCodeAsync(string code, string codeVerifier, Uri redirectUri, CancellationToken cancellationToken);

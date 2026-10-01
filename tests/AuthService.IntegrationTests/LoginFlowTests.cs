@@ -41,6 +41,18 @@ public sealed class LoginFlowTests : IClassFixture<AuthServiceWebFactory>
     }
 
     [Fact]
+    public async Task Reauth_AsksLoginPageToLoginAgain()
+    {
+        using HttpClient browser = _factory.CreateBrowserClient();
+
+        HttpResponseMessage plain = await browser.GetAsync(new Uri("/auth/login?return_to=/", UriKind.Relative));
+        HttpResponseMessage reauth = await browser.GetAsync(new Uri("/auth/login?return_to=/&reauth=true", UriKind.Relative));
+
+        Assert.False(QueryHelpers.ParseQuery(plain.Headers.Location!.Query).ContainsKey("prompt"));
+        Assert.Equal("login", QueryHelpers.ParseQuery(reauth.Headers.Location!.Query)["prompt"]);
+    }
+
+    [Fact]
     public async Task Callback_ExchangesCodeWithVerifier_SetsCookies_AndReturnsToApp()
     {
         (HttpClient browser, string loginCookie) = await StartLoginAsync("/me/");

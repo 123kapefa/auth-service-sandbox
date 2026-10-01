@@ -46,6 +46,17 @@ d=json.load(open(sys.argv[1])); r=d.get("result")
 print(r["isRestricted"] if r is not None else d["error"]["messages"][0]["code"])' "$WORK/admin.json"
 }
 
+# role <jar> <id> <роль> — PUT …/role; печатает «<код> <role или код ошибки>»
+role() {
+  curl -s -o "$WORK/admin.json" -w '%{http_code}' -b "$1" -X PUT -H 'Content-Type: application/json' \
+    -d "{\"role\":\"$3\"}" "$API/auth/admin/users/$2/role"
+  printf ' '
+  python3 -c '
+import json,sys
+d=json.load(open(sys.argv[1])); r=d.get("result")
+print(r["role"] if r is not None else d["error"]["messages"][0]["code"])' "$WORK/admin.json"
+}
+
 me() { curl -s -b "$1" "$API/me/" | python3 -c 'import json,sys; v=json.load(sys.stdin)["result"][sys.argv[1]]; print(",".join(v) if isinstance(v,list) else v)' "$2" 2>/dev/null; }
 
 require_service
@@ -119,6 +130,30 @@ check "админ разблокирует" "$(restrict "$ADMIN" "$ID_CUSTOMER" 
 check "причина очищена" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER" 'str(r["restrictionReason"])')" "200 None"
 check "вход снова работает" "$(login "$WORK/unblocked" /me/ 79990000001)" /me/
 status "$WORK/unblocked" POST /auth/logout > /dev/null
+
+echo "4. Смена роли (право users.roles.manage)"
+ADMIN="$WORK/admin2"; : > "$ADMIN"
+login "$ADMIN" /me/ 1234567890 > /dev/null   # свежий вход — можно выдавать admin
+role "$ADMIN" "$ID_CUSTOMER" customer > /dev/null   # на случай прошлого упавшего прогона
+CUSTOMER="$WORK/customer3"; : > "$CUSTOMER"
+login "$CUSTOMER" /me/ 79990000001 > /dev/null
+check "покупатель → manager" "$(role "$ADMIN" "$ID_CUSTOMER" manager)" "200 manager"
+check "сессии покупателя завершены — refresh 401" "$(status "$CUSTOMER" POST /auth/refresh)" 401
+: > "$CUSTOMER"; login "$CUSTOMER" /me/ 79990000001 > /dev/null
+check "после входа доступен режим manager" "$(me "$CUSTOMER" availableModes | tr ',' '\n' | sort | paste -sd, -)" "customer,manager"
+check "та же роль — без изменений" "$(role "$ADMIN" "$ID_CUSTOMER" manager)" "200 manager"
+check "refresh после «той же роли» работает" "$(status "$CUSTOMER" POST /auth/refresh)" 200
+check "выдача admin при свежем входе" "$(role "$ADMIN" "$ID_CUSTOMER" admin)" "200 admin"
+check "обратно в покупатели" "$(role "$ADMIN" "$ID_CUSTOMER" customer)" "200 customer"
+check "неизвестная роль — 400" "$(role "$ADMIN" "$ID_CUSTOMER" courier)" "400 value.is.invalid"
+check "свою роль менять нельзя — 403" "$(role "$ADMIN" "$ID_ADMIN" customer)" "403 users.self_role"
+check "менеджеру нельзя — 403" "$(curl -s -o /dev/null -w '%{http_code}' -b "$MANAGER" -X PUT -H 'Content-Type: application/json' -d '{"role":"manager"}' "$API/auth/admin/users/$ID_CUSTOMER/role")" 403
+# Повторный вход: при живой SSO-сессии обычный вход проходит без формы, reauth=true — снова форма (пароль, 2FA).
+curl -s -o /dev/null -D "$WORK/h" -b "$ADMIN" -c "$ADMIN" "$API/auth/login?return_to=/"
+check "обычный вход при живой сессии — без формы" "$(curl -s -o /dev/null -w '%{http_code}' -b "$ADMIN" -c "$ADMIN" "$(header "$WORK/h" location)")" 302
+curl -s -o /dev/null -D "$WORK/h" -b "$ADMIN" -c "$ADMIN" "$API/auth/login?return_to=/&reauth=true"
+check "reauth=true — Keycloak снова показывает форму" "$(curl -s -b "$ADMIN" -c "$ADMIN" "$(header "$WORK/h" location)" | grep -q 'id="kc-form-login"' && echo форма || echo нет)" форма
+status "$CUSTOMER" POST /auth/logout > /dev/null
 for JAR in "$ADMIN" "$MANAGER"; do status "$JAR" POST /auth/logout > /dev/null; done
 
 summary

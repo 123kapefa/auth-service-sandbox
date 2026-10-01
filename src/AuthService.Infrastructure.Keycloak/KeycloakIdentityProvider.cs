@@ -31,6 +31,7 @@ internal sealed partial class KeycloakIdentityProvider(
 
     public async Task<Result<AuthorizationRequest, Error>> CreateAuthorizationRequestAsync(
         Uri redirectUri,
+        bool forceLogin,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(redirectUri);
@@ -43,7 +44,7 @@ internal sealed partial class KeycloakIdentityProvider(
 
         string state = RandomToken();
         string codeVerifier = RandomToken();
-        string url = QueryHelpers.AddQueryString(configuration.Value.AuthorizationEndpoint, new Dictionary<string, string?>(StringComparer.Ordinal)
+        var parameters = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             ["client_id"] = _options.ClientId,
             ["response_type"] = "code",
@@ -53,7 +54,14 @@ internal sealed partial class KeycloakIdentityProvider(
             ["state"] = state,
             ["code_challenge"] = CodeChallenge(codeVerifier),
             ["code_challenge_method"] = "S256",
-        });
+        };
+        if (forceLogin)
+        {
+            // OIDC prompt=login: Keycloak заново спрашивает вход (пароль, 2FA — если включена), auth_time обновляется.
+            parameters["prompt"] = "login";
+        }
+
+        string url = QueryHelpers.AddQueryString(configuration.Value.AuthorizationEndpoint, parameters);
 
         return new AuthorizationRequest(new Uri(url), state, codeVerifier);
     }

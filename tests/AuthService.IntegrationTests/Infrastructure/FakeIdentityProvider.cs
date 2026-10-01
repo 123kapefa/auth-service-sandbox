@@ -35,11 +35,15 @@ public sealed class FakeIdentityProvider : IIdentityProvider
         LogoutResult = UnitResult.Success<Error>();
     }
 
-    public Task<Result<AuthorizationRequest, Error>> CreateAuthorizationRequestAsync(Uri redirectUri, CancellationToken cancellationToken)
+    public Task<Result<AuthorizationRequest, Error>> CreateAuthorizationRequestAsync(
+        Uri redirectUri,
+        bool forceLogin,
+        CancellationToken cancellationToken)
     {
         string state = Guid.NewGuid().ToString("N");
+        string prompt = forceLogin ? "&prompt=login" : string.Empty;
         LastAuthorization = new AuthorizationRequest(
-            new Uri($"http://keycloak.test/auth?state={state}&redirect_uri={Uri.EscapeDataString(redirectUri.ToString())}"),
+            new Uri($"http://keycloak.test/auth?state={state}&redirect_uri={Uri.EscapeDataString(redirectUri.ToString())}{prompt}"),
             state,
             $"verifier-{state}");
         return Task.FromResult(Result.Success<AuthorizationRequest, Error>(LastAuthorization));

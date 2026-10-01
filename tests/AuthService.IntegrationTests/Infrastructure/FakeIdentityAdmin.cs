@@ -15,6 +15,9 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     /// <summary>Записанные атрибуты (удаления — со значением null).</summary>
     public Collection<(Guid UserId, string Name, string? Value)> AttributeChanges { get; } = [];
 
+    /// <summary>Выданные и снятые роли клиента: (пользователь, выдать, снять).</summary>
+    public Collection<(Guid UserId, string[] Grant, string[] Revoke)> RoleChanges { get; } = [];
+
     /// <summary>У кого сервис завершил все сессии.</summary>
     public Collection<Guid> Logouts { get; } = [];
 
@@ -36,6 +39,7 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         _accounts.Clear();
         AttributeChanges.Clear();
         Logouts.Clear();
+        RoleChanges.Clear();
         Searches.Clear();
     }
 
@@ -94,6 +98,23 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         }
 
         _accounts[userId] = account with { User = user };
+        return Task.FromResult(UnitResult.Success<Error>());
+    }
+
+    public Task<UnitResult<Error>> SetClientRolesAsync(
+        Guid userId,
+        string clientId,
+        IReadOnlyCollection<string> grant,
+        IReadOnlyCollection<string> revoke,
+        CancellationToken cancellationToken)
+    {
+        if (!_accounts.TryGetValue(userId, out Account? account))
+        {
+            return Task.FromResult(UnitResult.Failure(IdentityProviderErrors.UserNotFound()));
+        }
+
+        RoleChanges.Add((userId, [.. grant], [.. revoke]));
+        _accounts[userId] = account with { ClientRoles = [.. account.ClientRoles.Except(revoke).Union(grant)] };
         return Task.FromResult(UnitResult.Success<Error>());
     }
 

@@ -1,6 +1,7 @@
 using AuthService.Core.Features.Admin.UseCases.GetUser;
 using AuthService.Core.Features.Admin.UseCases.GetUsers;
 using AuthService.Core.Features.Admin.UseCases.SetRestriction;
+using AuthService.Core.Features.Admin.UseCases.SetRole;
 using AuthService.Core.Features.Auth.Cookies;
 using AuthService.Core.Features.Auth.ReturnUrls;
 using AuthService.Core.Features.Auth.UseCases.Callback;
@@ -39,6 +40,7 @@ public static class Registration
         services.AddScoped<GetUsersHandler>();
         services.AddScoped<GetUserHandler>();
         services.AddScoped<SetRestrictionHandler>();
+        services.AddScoped<SetRoleHandler>();
 
         return services;
     }

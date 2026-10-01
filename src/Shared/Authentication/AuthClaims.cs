@@ -15,4 +15,7 @@ public static class AuthClaims
     public const string ACTIVE_MODE = "active_mode";
 
     public const string PHONE = "phone";
+
+    /// <summary>Когда пользователь вошёл (секунды Unix): для действий, требующих недавнего входа.</summary>
+    public const string AUTH_TIME = "auth_time";
 }

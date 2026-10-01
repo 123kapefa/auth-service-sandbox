@@ -43,19 +43,19 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
     public HttpClient CreateBrowserClient() =>
         CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
 
-    /// <summary>Клиент с access-токеном пользователя; null — анонимный клиент.</summary>
-    public HttpClient CreateClientFor(TestUser? user)
+    /// <summary>Клиент с access-токеном пользователя; null — анонимный клиент. authenticatedAt — когда «вошёл» (по умолчанию — только что).</summary>
+    public HttpClient CreateClientFor(TestUser? user, DateTimeOffset? authenticatedAt = null)
     {
         HttpClient client = CreateClient();
         if (user is not null)
         {
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateToken(user));
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateToken(user, authenticatedAt));
         }
 
         return client;
     }
 
-    public string CreateToken(TestUser user)
+    public string CreateToken(TestUser user, DateTimeOffset? authenticatedAt = null)
     {
         ArgumentNullException.ThrowIfNull(user);
 
@@ -75,6 +75,7 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
                 [AuthClaims.ROLE] = user.Roles.ToArray(),
                 [AuthClaims.AVAILABLE_ROLES] = user.Roles.ToArray(),
                 [AuthClaims.ACTIVE_MODE] = user.ActiveMode,
+                [AuthClaims.AUTH_TIME] = (authenticatedAt ?? DateTimeOffset.UtcNow).ToUnixTimeSeconds(),
             },
         });
     }
