@@ -7,11 +7,15 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using PlatformAuth;
 using SharedKernel;
 
 namespace AuthService.Core.Features.Auth.UseCases.Refresh;
 
-/// <summary>POST /auth/refresh — новые токены в cookie. Refresh не принят → cookie удаляются, 401.</summary>
+/// <summary>
+/// POST /auth/refresh — новые токены в cookie. Refresh не принят → cookie удаляются, 401. Умный рефреш: в ответе —
+/// что изменилось в доступе по сравнению с прошлым токеном (после 401 access_changed).
+/// </summary>
 public sealed class RefreshEndpoint : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app) => app.MapPost("/auth/refresh", Handle);
@@ -33,7 +37,9 @@ public sealed class RefreshEndpoint : IEndpoint
             return Result.Failure<RefreshResponse, Error>(tokens.Error);
         }
 
+        httpContext.Request.Cookies.TryGetValue(AuthCookies.ACCESS_TOKEN, out string? previous);
         cookies.SetTokens(httpContext.Response, tokens.Value);
-        return Result.Success<RefreshResponse, Error>(new RefreshResponse(tokens.Value.AccessTokenExpiresAt));
+        return Result.Success<RefreshResponse, Error>(
+            new RefreshResponse(tokens.Value.AccessTokenExpiresAt, AccessDiff.Between(previous, tokens.Value.AccessToken)));
     }
 }

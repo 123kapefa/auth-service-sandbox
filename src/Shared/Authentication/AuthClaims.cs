@@ -28,6 +28,12 @@ public static class AuthClaims
     /// <summary>Id сессии сервера входа: какая из сессий пользователя — текущая.</summary>
     public const string SESSION_ID = "sid";
 
+    /// <summary>Версия доступа пользователя: меняется, когда ему выдали или сняли роль (умный рефреш).</summary>
+    public const string ACCESS_VERSION = "access_version";
+
+    /// <summary>Версия роли активного режима: меняется, когда меняется состав роли (умный рефреш).</summary>
+    public const string MODE_VERSION = "mode_version";
+
     /// <summary>Когда пользователь вошёл (секунды Unix): для действий, требующих недавнего входа.</summary>
     public const string AUTH_TIME = "auth_time";
 }

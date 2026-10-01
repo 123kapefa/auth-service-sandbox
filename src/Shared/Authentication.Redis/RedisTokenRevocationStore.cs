@@ -6,29 +6,30 @@ using StackExchange.Redis;
 namespace PlatformAuth.Redis;
 
 /// <summary>
-/// Отметки об отзыве в Redis. Ключи (неймспейс auth:revoked):
-/// user:{sub} = T, session:{sid} = 1, app:{azp}:{sub} = T — T в секундах Unix; живут TokenLifetime.
-/// Чтение — одним MGET на три ключа.
+/// Отметки в Redis. Отзыв (неймспейс auth:revoked): user:{sub} = T, session:{sid} = 1, app:{azp}:{sub} = T —
+/// T в секундах Unix. Доступ изменился (неймспейс auth:changed): user:{sub} = версия, mode:{клиент}:{роль} = версия.
+/// Все живут TokenLifetime: дольше старые токены не живут сами. Чтение — одним MGET.
 /// </summary>
 internal sealed class RedisTokenRevocationStore(IConnectionMultiplexer redis, IOptions<TokenRevocationOptions> options)
     : ITokenRevocationStore
 {
     private const string PREFIX = "auth:revoked:";
+    private const string CHANGED = "auth:changed:";
 
-    public async Task<RevocationMarks> GetAsync(
-        string subject,
-        string? sessionId,
-        string? authorizedParty,
-        CancellationToken cancellationToken)
+    public async Task<RevocationMarks> GetAsync(TokenKey key, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(key);
+
         RedisValue[] values = await redis.GetDatabase().StringGetAsync(
         [
-            UserKey(subject),
-            sessionId is null ? PREFIX + "session:-" : SessionKey(sessionId),
-            authorizedParty is null ? PREFIX + "app:-" : AppKey(authorizedParty, subject),
+            UserKey(key.Subject),
+            key.SessionId is null ? PREFIX + "session:-" : SessionKey(key.SessionId),
+            key.AuthorizedParty is null ? PREFIX + "app:-" : AppKey(key.AuthorizedParty, key.Subject),
+            AccessKey(key.Subject),
+            key.RolesClient is null || key.ActiveMode is null ? CHANGED + "mode:-" : ModeKey(key.RolesClient, key.ActiveMode),
         ]);
 
-        return new RevocationMarks(Seconds(values[0]), values[1].HasValue, Seconds(values[2]));
+        return new RevocationMarks(Number(values[0]), values[1].HasValue, Number(values[2]), Number(values[3]), Number(values[4]));
     }
 
     public Task RevokeUserAsync(string subject, DateTimeOffset at, CancellationToken cancellationToken) =>
@@ -40,6 +41,12 @@ internal sealed class RedisTokenRevocationStore(IConnectionMultiplexer redis, IO
     public Task RevokeAppAsync(string authorizedParty, string subject, DateTimeOffset at, CancellationToken cancellationToken) =>
         SetAsync(AppKey(authorizedParty, subject), at.ToUnixTimeSeconds());
 
+    public Task MarkAccessChangedAsync(string subject, long version, CancellationToken cancellationToken) =>
+        SetAsync(AccessKey(subject), version);
+
+    public Task MarkModeChangedAsync(string rolesClient, string role, long version, CancellationToken cancellationToken) =>
+        SetAsync(ModeKey(rolesClient, role), version);
+
     private Task SetAsync(RedisKey key, long value) =>
         redis.GetDatabase().StringSetAsync(key, value, options.Value.TokenLifetime);
 
@@ -49,8 +56,12 @@ internal sealed class RedisTokenRevocationStore(IConnectionMultiplexer redis, IO
 
     private static RedisKey AppKey(string authorizedParty, string subject) => PREFIX + "app:" + authorizedParty + ":" + subject;
 
-    private static long? Seconds(RedisValue value) =>
-        value.HasValue && long.TryParse(value.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out long seconds)
-            ? seconds
+    private static RedisKey AccessKey(string subject) => CHANGED + "user:" + subject;
+
+    private static RedisKey ModeKey(string rolesClient, string role) => CHANGED + "mode:" + rolesClient + ":" + role;
+
+    private static long? Number(RedisValue value) =>
+        value.HasValue && long.TryParse(value.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out long number)
+            ? number
             : null;
 }

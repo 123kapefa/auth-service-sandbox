@@ -26,6 +26,10 @@ public static class AdminErrors
     public static Error SelfAccess() =>
         Error.Authorization("users.self_access", "Нельзя менять свой доступ к приложению.");
 
+    /// <summary>Нет права на это приложение: ни в токене (админ проекта), ни среди ролей в самом приложении.</summary>
+    public static Error AppForbidden() =>
+        Error.Authorization("apps.forbidden", "Нет права управлять этим приложением.");
+
     /// <summary>Нет такого приложения (или служебной учётке не дано право на его клиента).</summary>
     public static Error AppNotFound() =>
         Error.NotFound("apps.not_found", "Приложение не найдено.");
@@ -49,6 +53,10 @@ public static class AdminErrors
     /// <summary>Таких прав нет в каталоге приложения.</summary>
     public static Error UnknownPermissions(IEnumerable<string> names) =>
         Error.Validation("roles.unknown_permission", $"Нет таких прав: {string.Join(", ", names)}.", "permissions");
+
+    /// <summary>Таких ролей нет в приложении.</summary>
+    public static Error UnknownRoles(IEnumerable<string> names) =>
+        Error.Validation("roles.unknown_role", $"Нет таких ролей: {string.Join(", ", names)}.", "roles");
 
     /// <summary>Это право, а не роль.</summary>
     public static Error NotRole(string name) =>

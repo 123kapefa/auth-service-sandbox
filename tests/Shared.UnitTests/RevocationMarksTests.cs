@@ -26,4 +26,25 @@ public sealed class RevocationMarksTests
 
     [Fact]
     public void Session_AllItsTokens() => Assert.True(new RevocationMarks(null, true, null).Revokes(MARK + 1000));
+
+    [Theory]
+    [InlineData(null, true)]        // токен без версии — старый
+    [InlineData(MARK - 1, true)]
+    [InlineData(MARK, false)]       // выдан уже с текущей версией
+    [InlineData(MARK + 1, false)]
+    public void AccessVersion_OlderTokensChanged(long? tokenVersion, bool changed) =>
+        Assert.Equal(changed, new RevocationMarks(null, false, null, AccessVersion: MARK).AccessChanged(tokenVersion, null));
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData(MARK - 1, true)]
+    [InlineData(MARK, false)]
+    public void ModeVersion_OlderTokensChanged(long? tokenVersion, bool changed) =>
+        Assert.Equal(changed, new RevocationMarks(null, false, null, ModeVersion: MARK).AccessChanged(null, tokenVersion));
+
+    [Fact]
+    public void NoVersions_NothingChanged() => Assert.False(RevocationMarks.None.AccessChanged(null, null));
+
+    [Fact]
+    public void AccessChange_IsNotRevocation() => Assert.False(new RevocationMarks(null, false, null, MARK, MARK).Revokes(0));
 }

@@ -17,6 +17,7 @@ public sealed class PermissionsHandler(
     IIdentityAdmin identityAdmin,
     AppCatalog catalog,
     IValidator<CreatePermissionRequest> validator,
+    AccessChanges accessChanges,
     AdminAudit audit)
 {
     public async Task<Result<IReadOnlyList<PermissionResponse>, Error>> ListAsync(string clientId, CancellationToken cancellationToken)
@@ -90,10 +91,35 @@ public sealed class PermissionsHandler(
             return AdminErrors.SystemPermission(name);
         }
 
+        // Роли, в составе которых право: после удаления их токены устарели (умный рефреш).
+        List<AppRole> holders = [];
+        foreach (AppRole role in roles.Value.Where(AppCatalog.IsRole))
+        {
+            Result<IReadOnlyList<string>, Error> composites = await identityAdmin.GetRoleCompositesAsync(clientId, role.Name, cancellationToken);
+            if (composites.IsFailure)
+            {
+                return composites.Error;
+            }
+
+            if (composites.Value.Contains(name, StringComparer.Ordinal))
+            {
+                holders.Add(role);
+            }
+        }
+
         UnitResult<Error> deleted = await identityAdmin.DeleteAppRoleAsync(clientId, name, cancellationToken);
         if (deleted.IsFailure)
         {
             return deleted.Error;
+        }
+
+        foreach (AppRole role in holders)
+        {
+            UnitResult<Error> changed = await accessChanges.RoleChangedAsync(clientId, role, cancellationToken);
+            if (changed.IsFailure)
+            {
+                return changed.Error;
+            }
         }
 
         await audit.RecordAsync(

@@ -90,7 +90,7 @@ admin_api() { curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $
 check "читает пользователей (view-users)" "$(admin_api 'users?username=79990000001&exact=true')" 200
 check "читает события входа (view-events)" "$(admin_api 'events?max=1')" 200
 # Точечные права (FGAP v2): из клиентов — только клиенты приложений (выдавать их роли), чужие клиенты и их секреты не видны.
-check "из клиентов видит только клиенты приложений" "$(curl -s -H "Authorization: Bearer $SA" "$KC/admin/realms/$REALM/clients" | python3 -c 'import json,sys; print(",".join(sorted(c["clientId"] for c in json.load(sys.stdin))))')" account-console,sandbox-api,sandbox-bff
+check "из клиентов видит только клиенты приложений" "$(curl -s -H "Authorization: Bearer $SA" "$KC/admin/realms/$REALM/clients" | python3 -c 'import json,sys; print(",".join(sorted(c["clientId"] for c in json.load(sys.stdin))))')" account-console,manager-1c,sandbox-api,sandbox-bff
 check "чужой клиент (broker) даже не находит" "$(curl -s -H "Authorization: Bearer $SA" "$KC/admin/realms/$REALM/clients?clientId=broker&search=true")" "[]"
 # Настоящий id broker — мастер-админкой (логин и пароль — из .env), чтобы проверить сам запрет на секрет.
 ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-$(grep -s '^KEYCLOAK_ADMIN_PASSWORD=' "$(dirname "$0")/../../.env" | cut -d= -f2)}"

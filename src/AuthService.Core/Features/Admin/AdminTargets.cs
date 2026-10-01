@@ -1,5 +1,4 @@
 using AuthService.Core.Abstractions;
-using AuthService.Core.Authorization;
 using CSharpFunctionalExtensions;
 using Microsoft.Extensions.Options;
 using PlatformAuth;
@@ -8,7 +7,7 @@ using SharedKernel;
 namespace AuthService.Core.Features.Admin;
 
 /// <summary>С кем работает админка: пользователь существует (иначе 404), менеджеру — только покупатели (иначе 403).</summary>
-public sealed class AdminTargets(IIdentityAdmin identityAdmin, IOptions<JwtAuthenticationOptions> authentication)
+public sealed class AdminTargets(IIdentityAdmin identityAdmin, UserAppRoles userRoles, IOptions<JwtAuthenticationOptions> authentication)
 {
     public async Task<Result<IdentityUser, Error>> FindAsync(Guid userId, bool onlyCustomers, CancellationToken cancellationToken)
     {
@@ -18,13 +17,12 @@ public sealed class AdminTargets(IIdentityAdmin identityAdmin, IOptions<JwtAuthe
             return user;
         }
 
-        Result<IReadOnlyList<string>, Error> roles =
-            await identityAdmin.GetClientRolesAsync(userId, authentication.Value.Audience, cancellationToken);
+        Result<UserRoles, Error> roles = await userRoles.LoadAsync(userId, authentication.Value.Audience, cancellationToken);
         if (roles.IsFailure)
         {
             return roles.Error;
         }
 
-        return StaffRoles.Of(roles.Value).Count > 0 ? AdminErrors.StaffNotAllowed() : user;
+        return roles.Value.Assigned.Count > 0 ? AdminErrors.StaffNotAllowed() : user;
     }
 }

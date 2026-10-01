@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Проверка этапа 4а (docs/keycloak/04a-roles.md): роли и права приложений в Keycloak.
+# Проверка этапа 4а (docs/keycloak/04a-roles.md): роли и права приложений в Keycloak, роли пользователей.
 # Запуск: сервис и Keycloak подняты, затем
 #   scripts/keycloak/check-roles.sh                            # Docker: http://localhost:8080
 #   API=http://localhost:5080 scripts/keycloak/check-roles.sh    # Development: dotnet run
@@ -26,10 +26,30 @@ r=d.get("result")
 print(eval(sys.argv[2]) if d.get("error") is None else d["error"]["messages"][0]["code"])' "$WORK/r.json" "$expr"
 }
 
+# mode <jar> <режим> — POST /auth/mode с сохранением новых cookie; печатает «<HTTP-код> <activeMode или код ошибки>»
+mode() {
+  curl -s -o "$WORK/r.json" -w '%{http_code}' -b "$1" -c "$1" -H 'Content-Type: application/json' -d "{\"activeMode\":\"$2\"}" "$API/auth/mode"
+  printf ' '
+  python3 -c '
+import json,sys
+d=json.load(open(sys.argv[1]))
+print(d["result"]["activeMode"] if d.get("error") is None else d["error"]["messages"][0]["code"])' "$WORK/r.json"
+}
+
+# app_token <логин> <python-выражение над claims c> — токен «Менеджера 1С» (ТОЛЬКО DEV: клиент manager-1c-cli) и его claims
+app_token() {
+  curl -s -d grant_type=password -d client_id=manager-1c-cli -d "username=$1" -d 'password=Test1234!' \
+    "${KC:-http://localhost:8180}/realms/sandbox/protocol/openid-connect/token" | python3 -c '
+import base64,json,sys
+t=json.load(sys.stdin).get("access_token")
+if not t: print("—"); sys.exit()
+p=t.split(".")[1]; c=json.loads(base64.urlsafe_b64decode(p + "=" * (-len(p) % 4)))
+print(eval(sys.argv[1]))' "$2"
+}
+
 require_service
 ADMIN="$WORK/admin"; MANAGER="$WORK/manager"; : > "$ADMIN"; : > "$MANAGER"
 login "$ADMIN" /me/ 1234567890 > /dev/null
-login "$MANAGER" /me/ 0987654321 > /dev/null
 PERMS=/auth/admin/apps/sandbox-api/permissions
 ROLES=/auth/admin/apps/sandbox-api/roles
 MANAGER_PERMS='["profile.view","users.block","users.view"]'
@@ -39,6 +59,16 @@ MANAGER_BODY="{\"description\":\"Менеджер\",\"permissions\":$MANAGER_PER
 call "$ADMIN" DELETE "$ROLES/support" > /dev/null
 call "$ADMIN" PUT "$ROLES/manager" "$MANAGER_BODY" > /dev/null
 call "$ADMIN" DELETE "$PERMS/reports.export" > /dev/null
+CUSTOMER_ID=$(call "$ADMIN" GET '/auth/admin/users?search=79990000001' '' 'r["items"][0]["id"]' | cut -d' ' -f2)
+ADMIN_ID=$(call "$ADMIN" GET '/auth/admin/users?search=71234567890' '' 'r["items"][0]["id"]' | cut -d' ' -f2)
+USER_ROLES="/auth/admin/apps/sandbox-api/users/$CUSTOMER_ID/roles"
+call "$ADMIN" PUT "/auth/admin/users/$CUSTOMER_ID/role" '{"role":"customer"}' > /dev/null
+OPERATOR_ID=$(call "$ADMIN" GET '/auth/admin/users?search=79990000008' '' 'r["items"][0]["id"]' | cut -d' ' -f2)
+call "$ADMIN" PUT "/auth/admin/apps/manager-1c/users/$OPERATOR_ID/roles" '{"roles":[]}' > /dev/null
+call "$ADMIN" PUT "/auth/admin/apps/manager-1c/users/$OPERATOR_ID/roles" '{"roles":["operator"]}' > /dev/null   # и режим 1С — operator
+call "$ADMIN" DELETE "/auth/admin/apps/manager-1c/roles/logist" > /dev/null
+call "$ADMIN" DELETE "/auth/admin/apps/manager-1c/permissions/orders.export" > /dev/null
+login "$MANAGER" /me/ 0987654321 > /dev/null   # после очистки: состав manager уже не изменится до раздела 2
 
 echo "1. Каталог прав: системные из кода и свои из админки"
 check "системные права приложения (из кода, source=code)" \
@@ -82,7 +112,84 @@ check "в журнале — создание, изменение и удале�
 check "состав manager — обратно" \
   "$(call "$ADMIN" PUT "$ROLES/manager" "$MANAGER_BODY" "$(printf "$ROLE_PERMS" manager)")" \
   "200 profile.view,users.block,users.view"
+# Состав роли менялся — токены в режиме manager устарели: 401 access_changed, сессия жива, refresh — новые права.
+check "токен менеджера — 401 access_changed" \
+  "$(curl -s -o /dev/null -D "$WORK/h" -w '%{http_code}' -b "$MANAGER" "$API/me/") $(grep -io 'access_changed' "$WORK/h" | head -1)" "401 access_changed"
+check "умный рефреш менеджера — без перелогина" "$(status "$MANAGER" POST /auth/refresh)" 200
+check "права manager в новом токене" "$(call "$MANAGER" GET /me/ '' '",".join(r["permissions"])')" "200 profile.view,users.block,users.view"
 check "менеджеру нельзя — 403" "$(status "$MANAGER" GET "$ROLES")" 403
 
-for JAR in "$ADMIN" "$MANAGER"; do status "$JAR" POST /auth/logout > /dev/null; done
+echo "3. Роли пользователя: несколько ролей, роль = режим"
+CUSTOMER="$WORK/customer"; : > "$CUSTOMER"
+# роли|режимы|активный режим
+USER_ROLES_OF='",".join(r["roles"]) + "|" + ",".join(r["modes"]) + "|" + str(r["activeMode"])'
+call "$ADMIN" POST "$ROLES" '{"name":"support","description":"Поддержка","permissions":["users.view","profile.view"]}' > /dev/null
+check "у покупателя — только роль по умолчанию" "$(call "$ADMIN" GET "$USER_ROLES" '' "$USER_ROLES_OF")" "200 |customer|customer"
+check "выдать две роли" \
+  "$(call "$ADMIN" PUT "$USER_ROLES" '{"roles":["manager","Support"]}' "$USER_ROLES_OF")" "200 manager,support|customer,manager,support|customer"
+login "$CUSTOMER" /me/ 79990000001 > /dev/null
+check "в токене — все роли режимами" "$(call "$CUSTOMER" GET /me/ '' '",".join(r["availableModes"])')" "200 customer,manager,support"
+check "режим — своя роль support" "$(mode "$CUSTOMER" support)" "200 support"
+check "права режима support в токене" "$(call "$CUSTOMER" GET /me/ '' '",".join(r["permissions"])')" "200 profile.view,users.view"
+check "в режиме support — список пользователей (users.view)" "$(status "$CUSTOMER" GET /auth/admin/users)" 200
+check "в режиме support — смена ролей недоступна" "$(status "$CUSTOMER" GET "$USER_ROLES")" 403
+check "снять роль активного режима — режим сброшен на customer" \
+  "$(call "$ADMIN" PUT "$USER_ROLES" '{"roles":["manager"]}' "$USER_ROLES_OF")" "200 manager|customer,manager|customer"
+check "роли изменились — старый токен 401 access_changed" \
+  "$(curl -s -o /dev/null -D "$WORK/h" -w '%{http_code}' -b "$CUSTOMER" "$API/me/") $(grep -io 'access_changed' "$WORK/h" | head -1)" "401 access_changed"
+check "умный рефреш: снята роль support, режим — customer" \
+  "$(curl -s -o "$WORK/refresh.json" -w '%{http_code}' -b "$CUSTOMER" -c "$CUSTOMER" -X POST "$API/auth/refresh") $(python3 -c '
+import json,sys; c=json.load(open(sys.argv[1]))["result"]["changes"]; print(",".join(c["removedRoles"]) + "|" + c["activeMode"])' "$WORK/refresh.json")" \
+  "200 support|customer"
+check "после рефреша — права customer" "$(call "$CUSTOMER" GET /me/ '' '",".join(r["permissions"])')" "200 profile.view"
+check "нет такой роли — 400" "$(call "$ADMIN" PUT "$USER_ROLES" '{"roles":["courier"]}')" "400 roles.unknown_role"
+check "право — не роль (400)" "$(call "$ADMIN" PUT "$USER_ROLES" '{"roles":["users.view"]}')" "400 roles.unknown_role"
+check "свои роли менять нельзя — 403" "$(call "$ADMIN" PUT "/auth/admin/apps/sandbox-api/users/$ADMIN_ID/roles" '{"roles":[]}')" "403 users.self_role"
+check "не приложение (sandbox-bff) — 404" "$(call "$ADMIN" GET "/auth/admin/apps/sandbox-bff/users/$CUSTOMER_ID/roles")" "404 apps.not_found"
+check "старый PUT …/role — одна роль, как в боевом" "$(call "$ADMIN" PUT "/auth/admin/users/$CUSTOMER_ID/role" '{"role":"customer"}' 'r["role"]')" "200 customer"
+check "после него — только роль по умолчанию" "$(call "$ADMIN" GET "$USER_ROLES" '' "$USER_ROLES_OF")" "200 |customer|customer"
+check "менеджеру нельзя — 403" "$(status "$MANAGER" GET "$USER_ROLES")" 403
+call "$ADMIN" DELETE "$ROLES/support" > /dev/null
+
+echo "4. Второе приложение «Менеджер 1С» и его админ"
+APP_ADMIN="$WORK/app-admin"; : > "$APP_ADMIN"
+APP=/auth/admin/apps/manager-1c
+APP_ADMIN_ID=$(call "$ADMIN" GET '/auth/admin/users?search=79990000007' '' 'r["items"][0]["id"]' | cut -d' ' -f2)
+SECTION_STARTED=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+check "токен 1С: свой audience, роль и права режима" \
+  "$(app_token 79990000008 'c["aud"] + "|" + ",".join(c["role"]) + "|" + ",".join(c["permissions"]) + "|" + c["active_mode"]')" \
+  "manager-1c|operator|orders.edit,orders.view|operator"
+login "$APP_ADMIN" /me/ 79990000007 > /dev/null
+check "админ 1С в сервисе — покупатель" "$(call "$APP_ADMIN" GET /me/ '' '",".join(r["permissions"])')" "200 profile.view"
+check "админ 1С видит роли своего приложения" \
+  "$(call "$APP_ADMIN" GET "$APP/roles" '' '",".join(sorted(x["name"] for x in r))')" "200 accountant,admin,operator"
+check "роли приложения сервиса — 403" "$(call "$APP_ADMIN" GET /auth/admin/apps/sandbox-api/roles)" "403 apps.forbidden"
+check "пользователи проекта — 403" "$(status "$APP_ADMIN" GET /auth/admin/users)" 403
+check "блокировка аккаунта — 403" "$(curl -s -o /dev/null -w '%{http_code}' -b "$APP_ADMIN" -X PUT -H 'Content-Type: application/json' -d '{"restricted":true}' "$API/auth/admin/users/$OPERATOR_ID/restriction")" 403
+check "поиск пользователя с ролями в 1С" \
+  "$(call "$APP_ADMIN" GET "$APP/users?search=79990000008" '' '",".join(r["items"][0]["roles"])')" "200 operator"
+check "своё право приложения" \
+  "$(call "$APP_ADMIN" POST "$APP/permissions" '{"name":"orders.export","description":"Выгрузка заказов"}' '[p["source"] for p in r if p["name"] == "orders.export"][0]')" "200 admin"
+check "своя роль приложения" \
+  "$(call "$APP_ADMIN" POST "$APP/roles" '{"name":"logist","permissions":["orders.view","orders.export"]}' "$(printf "$ROLE_PERMS" logist)")" \
+  "200 orders.export,orders.view"
+check "выдать оператору роль logist" \
+  "$(call "$APP_ADMIN" PUT "$APP/users/$OPERATOR_ID/roles" '{"roles":["operator","logist"]}' "$USER_ROLES_OF")" "200 logist,operator|logist,operator|operator"
+check "новый токен 1С: обе роли и версия доступа" \
+  "$(app_token 79990000008 '",".join(c["available_roles"]) + "|" + str(c.get("access_version") is not None)')" "logist,operator|True"
+check "снять роль активного режима — режим 1С: оставшаяся logist" \
+  "$(call "$APP_ADMIN" PUT "$APP/users/$OPERATOR_ID/roles" '{"roles":["logist"]}' "$USER_ROLES_OF") $(app_token 79990000008 'c["active_mode"] + "|" + ",".join(c["permissions"])')" \
+  "200 logist|logist|logist logist|orders.export,orders.view"
+check "свои роли в 1С менять нельзя — 403" \
+  "$(call "$APP_ADMIN" PUT "$APP/users/$APP_ADMIN_ID/roles" '{"roles":[]}')" \
+  "403 users.self_role"
+check "в журнале — 4 действия админа 1С" \
+  "$(call "$ADMIN" GET "/auth/admin/audit?actorId=$APP_ADMIN_ID&from=$SECTION_STARTED&pageSize=50" '' '",".join(sorted(i["action"] for i in r["items"]))')" \
+  "200 PermissionCreated,RoleCreated,UserRoleChanged,UserRoleChanged"
+check "админ проекта управляет любым приложением" "$(call "$ADMIN" GET "$APP/roles" '' 'str(len(r) > 0)')" "200 True"
+call "$ADMIN" PUT "$APP/users/$OPERATOR_ID/roles" '{"roles":["operator"]}' > /dev/null
+call "$ADMIN" DELETE "$APP/roles/logist" > /dev/null
+call "$ADMIN" DELETE "$APP/permissions/orders.export" > /dev/null
+
+for JAR in "$ADMIN" "$MANAGER" "$CUSTOMER" "$APP_ADMIN"; do status "$JAR" POST /auth/logout > /dev/null; done
 summary

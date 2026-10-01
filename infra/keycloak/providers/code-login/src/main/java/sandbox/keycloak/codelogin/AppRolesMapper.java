@@ -21,6 +21,8 @@ import org.keycloak.representations.IDToken;
  * Роли и права приложения в токене. role и available_roles — только роли (режимы) клиента приложения, без прав
  * (стандартный маппер ролей клиента положил бы и права: роли составные). permissions — права активного режима:
  * админ в режиме покупателя получает права покупателя. Сервисы читают права из токена — карта в их коде не нужна.
+ * access_version и mode_version — версии доступа пользователя и роли активного режима: по ним сервисы узнают, что
+ * доступ изменился, и просят клиента обновить токен (умный рефреш).
  */
 public final class AppRolesMapper extends AbstractOIDCProtocolMapper
     implements OIDCAccessTokenMapper, UserInfoTokenMapper, TokenIntrospectionTokenMapper {
@@ -29,6 +31,8 @@ public final class AppRolesMapper extends AbstractOIDCProtocolMapper
     public static final String ROLES_CLIENT = "roles.client";
     public static final String MODE_ATTRIBUTE = "mode.attribute";
     private static final String DEFAULT_MODE_ATTRIBUTE = "active_mode";
+    static final String ACCESS_VERSION = "access_version";
+    static final String MODE_VERSION = "mode_version";
 
     private static final List<ProviderConfigProperty> CONFIG = new ArrayList<>();
 
@@ -87,6 +91,22 @@ public final class AppRolesMapper extends AbstractOIDCProtocolMapper
         String modeAttribute = mapping.getConfig().getOrDefault(MODE_ATTRIBUTE, DEFAULT_MODE_ATTRIBUTE);
         token.getOtherClaims().put("role", roles);
         token.getOtherClaims().put("available_roles", roles);
-        token.getOtherClaims().put("permissions", AppRoles.permissionsOf(client, user, user.getFirstAttribute(modeAttribute)));
+        String activeMode = user.getFirstAttribute(modeAttribute);
+        token.getOtherClaims().put("permissions", AppRoles.permissionsOf(client, user, activeMode));
+        putVersion(token, ACCESS_VERSION, user.getFirstAttribute(ACCESS_VERSION));
+        putVersion(token, MODE_VERSION, AppRoles.versionOf(client, user, activeMode));
+    }
+
+    // Версия — число (миллисекунды); нет или не число — claim не кладётся (сервис считает её нулём).
+    private static void putVersion(IDToken token, String claim, String value) {
+        if (value == null) {
+            return;
+        }
+
+        try {
+            token.getOtherClaims().put(claim, Long.parseLong(value));
+        } catch (NumberFormatException ignored) {
+            // чужое значение атрибута — без версии
+        }
     }
 }

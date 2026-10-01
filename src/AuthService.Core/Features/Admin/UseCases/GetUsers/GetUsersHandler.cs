@@ -19,6 +19,7 @@ namespace AuthService.Core.Features.Admin.UseCases.GetUsers;
 /// </summary>
 public sealed partial class GetUsersHandler(
     IIdentityAdmin identityAdmin,
+    AppCatalog catalog,
     IValidator<UsersQuery> validator,
     IOptions<JwtAuthenticationOptions> authentication)
 {
@@ -51,6 +52,12 @@ public sealed partial class GetUsersHandler(
             return found.Error;
         }
 
+        Result<IReadOnlyList<AppRole>, Error> appRoles = await catalog.LoadAsync(authentication.Value.Audience, cancellationToken);
+        if (appRoles.IsFailure)
+        {
+            return appRoles.Error;
+        }
+
         IdentityUser[] users = [.. found.Value.Take(pageSize)];
         Result<IReadOnlyList<string>, Error>[] roles = await Task.WhenAll(users.Select(user =>
             identityAdmin.GetClientRolesAsync(user.Id, authentication.Value.Audience, cancellationToken)));
@@ -62,7 +69,7 @@ public sealed partial class GetUsersHandler(
         UserListItemResponse[] items =
         [
             .. users
-                .Select((user, index) => (User: user, Staff: StaffRoles.Of(roles[index].Value)))
+                .Select((user, index) => (User: user, Staff: StaffRoles.Of(roles[index].Value, appRoles.Value)))
                 .Where(row => !onlyCustomers || row.Staff.Count == 0)
                 .Select(row => new UserListItemResponse(
                     row.User.Id,
@@ -80,7 +87,7 @@ public sealed partial class GetUsersHandler(
     }
 
     // Логин-телефон хранится цифрами: «+7 (999) 000» ищем как «7999000». Почту и прочее — как ввели.
-    private static string? SearchText(string? search)
+    internal static string? SearchText(string? search)
     {
         if (string.IsNullOrWhiteSpace(search))
         {

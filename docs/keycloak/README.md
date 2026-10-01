@@ -27,7 +27,9 @@ docker compose up -d --build --wait keycloak
 scripts/keycloak/check-stand.sh
 ```
 
-Ожидается `Итого: 44 ✓, 0 ✗`.
+Ожидается `Итого: 44 ✓, 0 ✗`. Остальные проверки (сервис поднят: `docker compose up -d --build --wait`):
+`check-api.sh` 48, `check-login.sh` 16, `check-login-methods.sh` 21, `check-code-login.sh` 28, `check-admin.sh` 95,
+`check-roles.sh` 60; .NET-тестов — 294.
 
 | Что | Адрес | Доступ |
 |---|---|---|---|
@@ -48,6 +50,8 @@ scripts/keycloak/check-stand.sh
 | `70987654321` | `manager@sandbox.test` | customer, manager | сразу в режиме **manager**; в форме можно ввести `0987654321` |
 | `79990000005` | `reset@sandbox.test` | customer | для проверки сброса пароля: после `check-login-methods.sh` пароль — новый, случайный |
 | `79990000006` | `otp@sandbox.test` | customer | включена 2FA (OTP): после пароля спрашивают код. Секрет для приложения-аутентификатора (Base32): `ONQW4ZDCN54C233UOAWXIZLTOQWXGZLDOJSXI` |
+| `79990000007` | `1c-admin@sandbox.test` | customer; в «Менеджере 1С» — admin | админ приложения «Менеджер 1С»: управляет только его ролями |
+| `79990000008` | `1c-operator@sandbox.test` | customer; в «Менеджере 1С» — operator | токен 1С — клиент `manager-1c-cli` (ТОЛЬКО DEV) |
 
 ## Этапы
 
@@ -58,7 +62,7 @@ scripts/keycloak/check-stand.sh
 | 3 | Вход в приложение (BFF: cookie, refresh, выход) | ✅ | [03-login.md](03-login.md) |
 | 3а | Способы входа: телефон или почта, сброс пароля, 2FA по желанию, passkey | ✅ | [03a-login-methods.md](03a-login-methods.md) |
 | 4 | Режимы, API администрирования, события, мгновенный отзыв доступа | ✅ | [04-admin.md](04-admin.md) |
-| 4а | Динамические роли и права в Keycloak, «умный рефреш» | ⬜ | — |
+| 4а | Динамические роли и права в Keycloak, «умный рефреш», второе приложение и его админ | ✅ | [04a-roles.md](04a-roles.md) |
 | 4б | Своя админка доступа (UI): админ проекта и админ приложения | ⬜ | — |
 | 4в | Свой интерфейс входа (Keycloakify): страницы входа и письма | ⬜ | — |
 | 5 | Спайк: вход по коду — SMS и почта (Java-плагин) | ✅ | [05-code-login.md](05-code-login.md) |
@@ -83,9 +87,9 @@ Keycloak; проекты друг друга не видят. **Приложен
 | `infra/keycloak/realm/sandbox-realm.json` | весь realm как код |
 | `infra/keycloak/themes/sandbox` | тема страницы входа: `+` у номера, кнопка «Войти по коду», экран ввода кода |
 | `infra/keycloak/providers/code-login` | плагин Keycloak (Java): форма входа с нормализацией номера, вход по коду; собирается в `infra/keycloak/Dockerfile` |
-| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал; `check-roles.sh` — роли и права приложений (этап 4а); `lib.sh` — общие помощники |
-| `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права, хук мгновенного отзыва — переиспользуемая библиотека |
-| `src/Shared/Authentication.Redis` | отметки отзыва в Redis, кэш проверки, `AddPlatformTokenRevocation` |
+| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал; `check-roles.sh` — роли и права приложений, роли пользователей, умный рефреш, «Менеджер 1С» (этап 4а); `lib.sh` — общие помощники |
+| `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права из токена, хук мгновенного отзыва и умного рефреша (`access_changed`) — переиспользуемая библиотека |
+| `src/Shared/Authentication.Redis` | отметки отзыва и версии доступа в Redis, кэш проверки, `AddPlatformTokenRevocation` |
 | `src/AuthService.Core/Authorization` | константы прав сервиса (сам состав ролей — в Keycloak, с этапа 4а) |
 | `src/AuthService.Core/Features/Auth` | вход, callback, refresh, выход, режим, back-channel logout; cookie и `return_to` |
 | `src/AuthService.Core/Features/Admin`, `Features/Security` | API администрирования и своих сессий |

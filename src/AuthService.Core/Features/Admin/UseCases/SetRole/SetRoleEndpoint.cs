@@ -1,5 +1,6 @@
 using AuthService.Contracts.Admin;
 using AuthService.Core.Authorization;
+using AuthService.Core.Features.Admin.UseCases.AppUserRoles;
 using CSharpFunctionalExtensions;
 using Framework.Endpoints;
 using Microsoft.AspNetCore.Builder;

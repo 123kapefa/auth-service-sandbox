@@ -503,6 +503,147 @@
           "composite": false,
           "clientRole": true
         }
+      ],
+      "manager-1c": [
+        {
+          "name": "operator",
+          "description": "Оператор",
+          "composite": true,
+          "clientRole": true,
+          "composites": {
+            "client": {
+              "manager-1c": [
+                "orders.view",
+                "orders.edit"
+              ]
+            }
+          },
+          "attributes": {
+            "kind": [
+              "role"
+            ],
+            "builtin": [
+              "true"
+            ]
+          }
+        },
+        {
+          "name": "accountant",
+          "description": "Бухгалтер",
+          "composite": true,
+          "clientRole": true,
+          "composites": {
+            "client": {
+              "manager-1c": [
+                "orders.view",
+                "reports.view"
+              ]
+            }
+          },
+          "attributes": {
+            "kind": [
+              "role"
+            ],
+            "builtin": [
+              "true"
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "description": "Администратор приложения",
+          "composite": true,
+          "clientRole": true,
+          "composites": {
+            "client": {
+              "manager-1c": [
+                "orders.view",
+                "orders.edit",
+                "reports.view",
+                "users.roles.manage",
+                "roles.manage"
+              ]
+            }
+          },
+          "attributes": {
+            "kind": [
+              "role"
+            ],
+            "builtin": [
+              "true"
+            ]
+          }
+        },
+        {
+          "name": "orders.view",
+          "description": "Заказы: просмотр",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "orders.edit",
+          "description": "Заказы: изменение",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "reports.view",
+          "description": "Отчёты",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "users.roles.manage",
+          "description": "Выдача ролей приложения пользователям",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "roles.manage",
+          "description": "Роли и права приложения",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        }
       ]
     }
   },
@@ -571,6 +712,75 @@
           "consentRequired": false,
           "config": {
             "included.custom.audience": "sandbox-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "manager-1c-contract",
+      "protocol": "openid-connect",
+      "description": "Контракт токена «Менеджера 1С»: role, available_roles, permissions, active_mode (свой режим в приложении), phone, aud",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "роли приложения (role, available_roles, permissions)",
+          "protocol": "openid-connect",
+          "protocolMapper": "sandbox-app-roles",
+          "consentRequired": false,
+          "config": {
+            "roles.client": "manager-1c",
+            "mode.attribute": "active_mode.manager-1c",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "active_mode",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "active_mode.manager-1c",
+            "claim.name": "active_mode",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true",
+            "multivalued": "false"
+          }
+        },
+        {
+          "name": "phone",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "phone",
+            "claim.name": "phone",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true",
+            "multivalued": "false"
+          }
+        },
+        {
+          "name": "audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "manager-1c",
             "access.token.claim": "true",
             "id.token.claim": "false",
             "introspection.token.claim": "true"
@@ -653,6 +863,16 @@
       "directAccessGrantsEnabled": false
     },
     {
+      "id": "5e0c1b7a-1c00-4d1c-9a11-3c1c0000a1c1",
+      "clientId": "manager-1c",
+      "name": "Менеджер 1С (второе демо-приложение: носитель ролей и audience)",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    },
+    {
       "id": "7d0f5b8e-3c2a-4f51-9a6e-2b8d41c0e7a1",
       "clientId": "sandbox-bff",
       "name": "BFF: вход, cookie, refresh, logout, Admin API",
@@ -694,6 +914,20 @@
       "fullScopeAllowed": true,
       "defaultClientScopes": [
         "sandbox-contract",
+        "openid-min"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "manager-1c-cli",
+      "name": "ТОЛЬКО DEV: токен «Менеджера 1С» по логину/паролю для отладки",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "manager-1c-contract",
         "openid-min"
       ],
       "optionalClientScopes": []
@@ -956,6 +1190,29 @@
                 "name": "map-roles-composite"
               }
             ]
+          },
+          {
+            "name": "5e0c1b7a-1c00-4d1c-9a11-3c1c0000a1c1",
+            "ownerManagedAccess": false,
+            "attributes": {},
+            "uris": [],
+            "scopes": [
+              {
+                "name": "view"
+              },
+              {
+                "name": "map-roles-client-scope"
+              },
+              {
+                "name": "map-roles"
+              },
+              {
+                "name": "manage"
+              },
+              {
+                "name": "map-roles-composite"
+              }
+            ]
           }
         ],
         "policies": [
@@ -980,14 +1237,14 @@
             }
           },
           {
-            "name": "Клиент приложения с ролями: view, map-roles, manage, map-roles-composite",
-            "description": "sandbox-api: роли и права приложения — читать, выдавать, создавать, менять и собирать состав ролей (секрета у клиента нет)",
+            "name": "Клиенты приложений с ролями: view, map-roles, manage, map-roles-composite",
+            "description": "sandbox-api и manager-1c: роли и права приложений — читать, выдавать, создавать, менять и собирать состав ролей (секретов у клиентов нет)",
             "type": "scope",
             "logic": "POSITIVE",
             "decisionStrategy": "AFFIRMATIVE",
             "config": {
               "defaultResourceType": "Clients",
-              "resources": "[\"2631bc45-b176-4774-927a-b6dd4e310582\"]",
+              "resources": "[\"2631bc45-b176-4774-927a-b6dd4e310582\", \"5e0c1b7a-1c00-4d1c-9a11-3c1c0000a1c1\"]",
               "scopes": "[\"view\",\"map-roles\",\"manage\",\"map-roles-composite\"]",
               "applyPolicies": "[\"sandbox-bff service account\",\"клиент sandbox-bff\"]"
             }
@@ -1137,11 +1394,6 @@
           "temporary": false
         }
       ],
-      "clientRoles": {
-        "sandbox-api": [
-          "customer"
-        ]
-      },
       "realmRoles": [
         "default-roles-sandbox"
       ]
@@ -1168,7 +1420,6 @@
       ],
       "clientRoles": {
         "sandbox-api": [
-          "customer",
           "admin"
         ]
       },
@@ -1198,7 +1449,6 @@
       ],
       "clientRoles": {
         "sandbox-api": [
-          "customer",
           "manager"
         ]
       },
@@ -1226,11 +1476,6 @@
           "temporary": false
         }
       ],
-      "clientRoles": {
-        "sandbox-api": [
-          "customer"
-        ]
-      },
       "realmRoles": [
         "default-roles-sandbox"
       ]
@@ -1257,7 +1502,6 @@
       ],
       "clientRoles": {
         "sandbox-api": [
-          "customer",
           "admin"
         ]
       },
@@ -1287,7 +1531,6 @@
       ],
       "clientRoles": {
         "sandbox-api": [
-          "customer",
           "manager"
         ]
       },
@@ -1315,11 +1558,6 @@
           "temporary": false
         }
       ],
-      "clientRoles": {
-        "sandbox-api": [
-          "customer"
-        ]
-      },
       "realmRoles": [
         "default-roles-sandbox"
       ]
@@ -1350,9 +1588,68 @@
           "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\"}"
         }
       ],
-      "clientRoles": {
-        "sandbox-api": [
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
+    },
+    {
+      "username": "79990000007",
+      "enabled": true,
+      "email": "1c-admin@sandbox.test",
+      "emailVerified": true,
+      "attributes": {
+        "phone": [
+          "+79990000007"
+        ],
+        "active_mode": [
           "customer"
+        ],
+        "active_mode.manager-1c": [
+          "admin"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test1234!",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "manager-1c": [
+          "admin"
+        ]
+      },
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
+    },
+    {
+      "username": "79990000008",
+      "enabled": true,
+      "email": "1c-operator@sandbox.test",
+      "emailVerified": true,
+      "attributes": {
+        "phone": [
+          "+79990000008"
+        ],
+        "active_mode": [
+          "customer"
+        ],
+        "active_mode.manager-1c": [
+          "operator"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test1234!",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "manager-1c": [
+          "operator"
         ]
       },
       "realmRoles": [

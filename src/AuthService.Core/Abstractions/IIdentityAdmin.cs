@@ -26,6 +26,12 @@ public interface IIdentityAdmin
     Task<Result<IReadOnlyList<string>, Error>> GetClientRolesAsync(Guid userId, string clientId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Действующие роли пользователя в клиенте: выданные напрямую, по умолчанию realm (customer) и через составные роли —
+    /// вместе с правами в их составе. Нет такого клиента или нет права на него — NotFound.
+    /// </summary>
+    Task<Result<IReadOnlyList<string>, Error>> GetEffectiveClientRolesAsync(Guid userId, string clientId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Выдать и снять роли пользователя в клиенте (приложении). Служебной учётке нужно точечное право на этот клиент
     /// (view и map-roles в FGAP v2) — без доступа к остальным клиентам и их секретам.
     /// </summary>
@@ -110,6 +116,7 @@ public sealed record UserChanges(bool? Enabled, IReadOnlyDictionary<string, stri
 /// <param name="CreatedAt">Когда создан.</param>
 /// <param name="RestrictionReason">Причина блокировки, если указана.</param>
 /// <param name="RestrictedAt">Когда заблокирован.</param>
+/// <param name="AppModes">Активные режимы в других приложениях: clientId → режим (атрибуты active_mode.{clientId}).</param>
 public sealed record IdentityUser(
     Guid Id,
     string Username,
@@ -119,7 +126,8 @@ public sealed record IdentityUser(
     bool Enabled,
     DateTimeOffset CreatedAt,
     string? RestrictionReason = null,
-    DateTimeOffset? RestrictedAt = null);
+    DateTimeOffset? RestrictedAt = null,
+    IReadOnlyDictionary<string, string>? AppModes = null);
 
 /// <summary>Сессия пользователя на сервере входа.</summary>
 /// <param name="Id">Id сессии (claim sid в токенах этой сессии).</param>
@@ -168,7 +176,8 @@ public static class LoginEventTypes
 /// <param name="Kind">AppRoleKinds: role или permission.</param>
 /// <param name="Source">Откуда право: code (константа в коде сервиса) или admin (создано в админке).</param>
 /// <param name="Builtin">Встроенная роль — защищена от удаления.</param>
-public sealed record AppRole(Guid? Id, string Name, string? Description, string Kind, string? Source, bool Builtin);
+/// <param name="Version">Версия состава роли (меняется с составом) — в токене mode_version; null — не менялась.</param>
+public sealed record AppRole(Guid? Id, string Name, string? Description, string Kind, string? Source, bool Builtin, long? Version = null);
 
 /// <summary>Атрибуты ролей клиента приложения в Keycloak.</summary>
 public static class AppRoleKinds
@@ -176,6 +185,7 @@ public static class AppRoleKinds
     public const string ATTRIBUTE_KIND = "kind";
     public const string ATTRIBUTE_SOURCE = "source";
     public const string ATTRIBUTE_BUILTIN = "builtin";
+    public const string ATTRIBUTE_VERSION = "version";
 
     public const string ROLE = "role";
     public const string PERMISSION = "permission";
@@ -201,4 +211,12 @@ public static class UserAttributes
 {
     public const string RESTRICTION_REASON = "restriction_reason";
     public const string RESTRICTED_AT = "restricted_at";
+
+    /// <summary>Версия доступа: меняется со сменой ролей — в токене access_version.</summary>
+    public const string ACCESS_VERSION = "access_version";
+
+    /// <summary>Режим в другом приложении — атрибут active_mode.{clientId} (маппер ролей этого приложения, mode.attribute).</summary>
+    public const string APP_MODE_PREFIX = "active_mode.";
+
+    public static string AppModeOf(string clientId) => APP_MODE_PREFIX + clientId;
 }

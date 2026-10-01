@@ -29,7 +29,7 @@ public sealed class SetRoleTests : IClassFixture<AuthServiceWebFactory>
     }
 
     [Fact]
-    public async Task CustomerBecomesManager_SessionsEnded()
+    public async Task CustomerBecomesManager_AccessChanged_SessionsKept()
     {
         JsonElement card = await ResultAsync(await PutAsync(TestUser.Customer, "Manager"));
 
@@ -38,7 +38,9 @@ public sealed class SetRoleTests : IClassFixture<AuthServiceWebFactory>
         Assert.Equal(TestUser.Customer.Id, user);
         Assert.Equal(["manager"], grant);
         Assert.Empty(revoke);
-        Assert.Equal(TestUser.Customer.Id, Assert.Single(_keycloak.Logouts));
+        Assert.Empty(_keycloak.Logouts); // умный рефреш вместо выхода
+        Assert.NotNull(_factory.Revocations.AccessVersion(TestUser.Customer.Id));
+        Assert.Contains(_keycloak.AttributeChanges, change => change.UserId == TestUser.Customer.Id && change.Name == "access_version");
     }
 
     [Fact]
@@ -56,7 +58,7 @@ public sealed class SetRoleTests : IClassFixture<AuthServiceWebFactory>
 
         await AssertErrorAsync(response, HttpStatusCode.Forbidden, "auth.reauthentication_required");
         Assert.Empty(_keycloak.RoleChanges);
-        Assert.Empty(_keycloak.Logouts);
+        Assert.Null(_factory.Revocations.AccessVersion(TestUser.Customer.Id));
     }
 
     [Fact]
@@ -79,7 +81,8 @@ public sealed class SetRoleTests : IClassFixture<AuthServiceWebFactory>
         Assert.Empty(grant);
         Assert.Equal(["admin"], revoke);
         Assert.Contains((_otherAdmin.Id, "active_mode", "customer"), _keycloak.AttributeChanges);
-        Assert.Equal(_otherAdmin.Id, Assert.Single(_keycloak.Logouts));
+        Assert.Empty(_keycloak.Logouts);
+        Assert.NotNull(_factory.Revocations.AccessVersion(_otherAdmin.Id));
     }
 
     [Fact]
@@ -89,7 +92,7 @@ public sealed class SetRoleTests : IClassFixture<AuthServiceWebFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Empty(_keycloak.RoleChanges);
-        Assert.Empty(_keycloak.Logouts);
+        Assert.Null(_factory.Revocations.AccessVersion(_otherAdmin.Id));
     }
 
     [Fact]

@@ -162,9 +162,13 @@ role "$ADMIN" "$ID_CUSTOMER" customer > /dev/null   # на случай прош
 CUSTOMER="$WORK/customer3"; : > "$CUSTOMER"
 login "$CUSTOMER" /me/ 79990000001 > /dev/null
 check "покупатель → manager" "$(role "$ADMIN" "$ID_CUSTOMER" manager)" "200 manager"
-check "сессии покупателя завершены — refresh 401" "$(status "$CUSTOMER" POST /auth/refresh)" 401
-: > "$CUSTOMER"; login "$CUSTOMER" /me/ 79990000001 > /dev/null
-check "после входа доступен режим manager" "$(me "$CUSTOMER" availableModes | tr ',' '\n' | sort | paste -sd, -)" "customer,manager"
+# Умный рефреш (а не выход, как в боевом): старый токен — 401 access_changed, сессия жива, refresh отдаёт разницу.
+check "старый токен покупателя — 401 access_changed" \
+  "$(curl -s -o /dev/null -D "$WORK/h" -w '%{http_code}' -b "$CUSTOMER" "$API/me/") $(grep -io 'access_changed' "$WORK/h" | head -1)" "401 access_changed"
+check "умный рефреш без перелогина: добавилась роль manager" \
+  "$(curl -s -o "$WORK/refresh.json" -w '%{http_code}' -b "$CUSTOMER" -c "$CUSTOMER" -X POST "$API/auth/refresh") $(python3 -c 'import json,sys; print(",".join(json.load(open(sys.argv[1]))["result"]["changes"]["addedRoles"]))' "$WORK/refresh.json")" \
+  "200 manager"
+check "после рефреша доступен режим manager" "$(me "$CUSTOMER" availableModes | tr ',' '\n' | sort | paste -sd, -)" "customer,manager"
 check "та же роль — без изменений" "$(role "$ADMIN" "$ID_CUSTOMER" manager)" "200 manager"
 check "refresh после «той же роли» работает" "$(status "$CUSTOMER" POST /auth/refresh)" 200
 check "выдача admin при свежем входе" "$(role "$ADMIN" "$ID_CUSTOMER" admin)" "200 admin"

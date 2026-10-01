@@ -44,6 +44,9 @@
     ol#log { margin: 0; padding-left: 20px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; }
     .hint { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
     .table-wrap { overflow-x: auto; }
+    .notice { border: 1px solid var(--accent); border-radius: 8px; padding: 10px 12px; margin-top: 12px; }
+    .notice .added { color: var(--ok); }
+    .notice .removed { color: var(--deny); }
   </style>
 </head>
 <body>
@@ -62,6 +65,7 @@
       <button id="logout">Выйти</button>
       <a class="button" id="account" href="/auth/account">Настройки входа</a>
     </div>
+    <div class="notice" id="changes" hidden></div>
     <dl id="me" hidden></dl>
     <div class="row" id="modes" hidden style="margin-top:12px"><span>Режим:</span></div>
     <p class="hint">«Настройки входа» — личный кабинет Keycloak: пароль, 2FA (приложение-аутентификатор, коды восстановления) и ключ доступа (passkey).</p>
@@ -108,11 +112,40 @@
     $("log").prepend(item);
   }
 
-  async function call(method, path) {
+  async function send(method, path) {
     const response = await fetch(path, { method, credentials: "same-origin", headers: { Accept: "application/json" } });
     let body = null;
     try { body = await response.json(); } catch { /* 401/403 приходят без тела */ }
-    return { code: response.status, body };
+    return { code: response.status, body, response };
+  }
+
+  // Умный рефреш: 401 с error_description="access_changed" — доступ изменился (роли или состав роли), сессия жива.
+  // Обновляем токен без перелогина, показываем, что изменилось, и повторяем запрос.
+  async function call(method, path) {
+    const first = await send(method, path);
+    const changed = first.code === 401 && (first.response.headers.get("WWW-Authenticate") ?? "").includes("access_changed");
+    if (!changed) { return first; }
+    log(`${method} ${path}: доступ изменился`, 401);
+    const refreshed = await send("POST", "/auth/refresh");
+    log("POST /auth/refresh (умный рефреш)", refreshed.code);
+    if (refreshed.code !== 200) { return first; }
+    showChanges(refreshed.body.result.changes);
+    const retried = await send(method, path);
+    if (path !== "/me/") { await loadSession(); } // роли и режимы на странице — из нового токена
+    return retried;
+  }
+
+  // Плашка «стало доступно / больше недоступно» по ответу /auth/refresh.
+  function showChanges(changes) {
+    if (!changes) { return; }
+    const part = (title, items, css) => items.length ? `<div class="${css}">${title}: ${items.join(", ")}</div>` : "";
+    $("changes").innerHTML = "<strong>Ваш доступ изменился</strong>"
+      + part("Стало доступно", changes.addedPermissions, "added")
+      + part("Больше недоступно", changes.removedPermissions, "removed")
+      + part("Новые роли", changes.addedRoles, "added")
+      + part("Сняты роли", changes.removedRoles, "removed")
+      + `<div>Режим: ${changes.activeMode ?? "—"}</div>`;
+    $("changes").hidden = false;
   }
 
   function showMe(me) {
@@ -161,7 +194,7 @@
     $("login").hidden = signedIn;
     $("refresh").disabled = $("logout").disabled = !signedIn;
     $("account").hidden = !signedIn;
-    if (signedIn) { showMe(body.result); } else { $("me").hidden = $("modes").hidden = true; }
+    if (signedIn) { showMe(body.result); } else { $("me").hidden = $("modes").hidden = $("changes").hidden = true; }
     return signedIn;
   }
 
@@ -176,8 +209,9 @@
   }
 
   $("refresh").addEventListener("click", async () => {
-    const { code } = await call("POST", "/auth/refresh");
+    const { code, body } = await send("POST", "/auth/refresh");
     log("POST /auth/refresh", code);
+    if (code === 200) { showChanges(body.result.changes); }
     await loadSession();
     await checkAccess();
   });

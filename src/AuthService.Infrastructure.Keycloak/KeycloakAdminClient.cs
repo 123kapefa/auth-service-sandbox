@@ -88,6 +88,24 @@ internal sealed partial class KeycloakAdminClient(
         return Result.Success<IReadOnlyList<string>, Error>(roles);
     }
 
+    public async Task<Result<IReadOnlyList<string>, Error>> GetEffectiveClientRolesAsync(
+        Guid userId,
+        string clientId,
+        CancellationToken cancellationToken)
+    {
+        Result<string, Error> client = await FindClientIdAsync(clientId, cancellationToken);
+        if (client.IsFailure)
+        {
+            return IdentityProviderErrors.AppNotFound();
+        }
+
+        Result<RoleRepresentation[], Error> roles = await GetJsonAsync<RoleRepresentation[]>(
+            $"users/{userId}/role-mappings/clients/{client.Value}/composite", cancellationToken);
+        return roles.IsFailure
+            ? roles.Error
+            : Result.Success<IReadOnlyList<string>, Error>([.. roles.Value.Select(role => role.Name)]);
+    }
+
     public async Task<UnitResult<Error>> SetClientRolesAsync(
         Guid userId,
         string clientId,
@@ -357,7 +375,10 @@ internal sealed partial class KeycloakAdminClient(
             role.Description,
             First(role.Attributes, AppRoleKinds.ATTRIBUTE_KIND) ?? AppRoleKinds.ROLE,
             First(role.Attributes, AppRoleKinds.ATTRIBUTE_SOURCE),
-            string.Equals(First(role.Attributes, AppRoleKinds.ATTRIBUTE_BUILTIN), "true", StringComparison.Ordinal));
+            string.Equals(First(role.Attributes, AppRoleKinds.ATTRIBUTE_BUILTIN), "true", StringComparison.Ordinal),
+            long.TryParse(First(role.Attributes, AppRoleKinds.ATTRIBUTE_VERSION), NumberStyles.Integer, CultureInfo.InvariantCulture, out long version)
+                ? version
+                : null);
 
     private static Dictionary<string, object?> ToRepresentation(AppRole role)
     {
@@ -370,6 +391,11 @@ internal sealed partial class KeycloakAdminClient(
         if (role.Builtin)
         {
             attributes[AppRoleKinds.ATTRIBUTE_BUILTIN] = ["true"];
+        }
+
+        if (role.Version is { } version)
+        {
+            attributes[AppRoleKinds.ATTRIBUTE_VERSION] = [version.ToString(CultureInfo.InvariantCulture)];
         }
 
         return new Dictionary<string, object?>(StringComparer.Ordinal)
@@ -538,7 +564,10 @@ internal sealed partial class KeycloakAdminClient(
             Attribute(user, UserAttributes.RESTRICTION_REASON),
             DateTimeOffset.TryParse(Attribute(user, UserAttributes.RESTRICTED_AT), CultureInfo.InvariantCulture, out DateTimeOffset restrictedAt)
                 ? restrictedAt
-                : null);
+                : null,
+            (user.Attributes ?? [])
+                .Where(attribute => attribute.Key.StartsWith(UserAttributes.APP_MODE_PREFIX, StringComparison.Ordinal) && attribute.Value.Length > 0)
+                .ToDictionary(attribute => attribute.Key[UserAttributes.APP_MODE_PREFIX.Length..], attribute => attribute.Value[0], StringComparer.Ordinal));
 
     private static string? Attribute(UserRepresentation user, string name) =>
         user.Attributes is not null && user.Attributes.TryGetValue(name, out string[]? values) && values.Length > 0 ? values[0] : null;

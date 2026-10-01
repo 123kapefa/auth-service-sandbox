@@ -3,11 +3,11 @@ using PlatformAuth.Revocation;
 
 namespace PlatformAuth.Redis;
 
-/// <summary>Отметка записана — свой кэш проверки по этому пользователю или сессии сбрасывается сразу.</summary>
+/// <summary>Отметка записана — свой кэш проверки по этому пользователю, сессии или роли сбрасывается сразу.</summary>
 internal sealed class CacheInvalidatingRevocationStore(RedisTokenRevocationStore inner, HybridCache cache) : ITokenRevocationStore
 {
-    public Task<RevocationMarks> GetAsync(string subject, string? sessionId, string? authorizedParty, CancellationToken cancellationToken) =>
-        inner.GetAsync(subject, sessionId, authorizedParty, cancellationToken);
+    public Task<RevocationMarks> GetAsync(TokenKey key, CancellationToken cancellationToken) =>
+        inner.GetAsync(key, cancellationToken);
 
     public async Task RevokeUserAsync(string subject, DateTimeOffset at, CancellationToken cancellationToken)
     {
@@ -25,5 +25,17 @@ internal sealed class CacheInvalidatingRevocationStore(RedisTokenRevocationStore
     {
         await inner.RevokeAppAsync(authorizedParty, subject, at, cancellationToken);
         await cache.RemoveByTagAsync(RevocationCacheTags.User(subject), cancellationToken);
+    }
+
+    public async Task MarkAccessChangedAsync(string subject, long version, CancellationToken cancellationToken)
+    {
+        await inner.MarkAccessChangedAsync(subject, version, cancellationToken);
+        await cache.RemoveByTagAsync(RevocationCacheTags.User(subject), cancellationToken);
+    }
+
+    public async Task MarkModeChangedAsync(string rolesClient, string role, long version, CancellationToken cancellationToken)
+    {
+        await inner.MarkModeChangedAsync(rolesClient, role, version, cancellationToken);
+        await cache.RemoveByTagAsync(RevocationCacheTags.Mode(rolesClient, role), cancellationToken);
     }
 }

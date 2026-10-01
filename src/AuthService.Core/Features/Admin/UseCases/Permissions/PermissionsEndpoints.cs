@@ -20,7 +20,7 @@ public sealed class PermissionsEndpoints : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         RouteGroupBuilder permissions = app.MapGroup("/auth/admin/apps/{clientId}/permissions")
-            .RequirePermissions(AuthServicePermissions.Roles.MANAGE);
+            .RequireAppPermission(AuthServicePermissions.Roles.MANAGE);
         permissions.MapGet(string.Empty, ListAsync);
         permissions.MapPost(string.Empty, CreateAsync);
         permissions.MapDelete("/{name}", DeleteAsync);

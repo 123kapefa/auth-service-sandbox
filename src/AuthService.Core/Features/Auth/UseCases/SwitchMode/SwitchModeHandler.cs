@@ -1,6 +1,7 @@
 using AuthService.Contracts.Auth;
 using AuthService.Core.Abstractions;
 using AuthService.Core.Authorization;
+using AuthService.Core.Features.Admin;
 using CSharpFunctionalExtensions;
 using FluentValidation;
 using FluentValidation.Results;
@@ -15,12 +16,13 @@ namespace AuthService.Core.Features.Auth.UseCases.SwitchMode;
 public sealed record ModeSwitched(SwitchModeResponse Response, TokenSet? Tokens);
 
 /// <summary>
-/// Переключение активного режима. Доступные режимы — по свежим ролям из Keycloak, а не по токену: в токене
+/// Переключение активного режима (роль = режим: любая роль пользователя в приложении). Доступные режимы — по свежим ролям из Keycloak, а не по токену: в токене
 /// могут остаться снятые роли. Режим — атрибут active_mode пользователя; refresh выдаёт токен уже с новым режимом.
 /// </summary>
 public sealed class SwitchModeHandler(
     IIdentityAdmin identityAdmin,
     IIdentityProvider identityProvider,
+    UserAppRoles userRoles,
     IValidator<SwitchModeRequest> validator,
     IOptions<JwtAuthenticationOptions> authentication)
 {
@@ -43,13 +45,6 @@ public sealed class SwitchModeHandler(
             return validation.ToError();
         }
 
-        string? mode = AuthModes.All.FirstOrDefault(
-            known => string.Equals(known, request.ActiveMode!.Trim(), StringComparison.OrdinalIgnoreCase));
-        if (mode is null)
-        {
-            return AuthErrors.ModeNotAvailable();
-        }
-
         Result<IdentityUser, Error> user = await identityAdmin.GetUserAsync(id, cancellationToken);
         if (user.IsFailure)
         {
@@ -62,16 +57,16 @@ public sealed class SwitchModeHandler(
             return AuthErrors.UserBlocked();
         }
 
-        Result<IReadOnlyList<string>, Error> roles =
-            await identityAdmin.GetClientRolesAsync(id, authentication.Value.Audience, cancellationToken);
+        Result<UserRoles, Error> roles = await userRoles.LoadAsync(id, authentication.Value.Audience, cancellationToken);
         if (roles.IsFailure)
         {
             return roles.Error;
         }
 
-        IReadOnlyList<string> staffRoles = StaffRoles.Of(roles.Value);
-        string[] available = [AuthModes.CUSTOMER, .. staffRoles];
-        if (!available.Contains(mode, StringComparer.Ordinal))
+        // Роль = режим: режим — любая роль пользователя в приложении.
+        string? mode = roles.Value.Modes.FirstOrDefault(
+            available => string.Equals(available, request.ActiveMode!.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (mode is null)
         {
             return AuthErrors.ModeNotAvailable();
         }
@@ -109,8 +104,8 @@ public sealed class SwitchModeHandler(
         var response = new SwitchModeResponse(
             id,
             user.Value.Phone,
-            StaffRoles.Describe(staffRoles),
-            available,
+            StaffRoles.Describe(roles.Value.Assigned),
+            roles.Value.Modes,
             mode,
             hasPassword.Value);
         return new ModeSwitched(response, tokens);

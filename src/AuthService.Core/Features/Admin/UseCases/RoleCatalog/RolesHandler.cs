@@ -20,6 +20,7 @@ public sealed class RolesHandler(
     AppCatalog catalog,
     IValidator<CreateRoleRequest> createValidator,
     IValidator<UpdateRoleRequest> updateValidator,
+    AccessChanges accessChanges,
     AdminAudit audit)
 {
     public async Task<Result<IReadOnlyList<RoleResponse>, Error>> ListAsync(string clientId, CancellationToken cancellationToken)
@@ -85,6 +86,14 @@ public sealed class RolesHandler(
             return composed.Error;
         }
 
+        // Версия с самого начала: роль с этим именем могли удалить раньше, и отметка удаления ещё лежит в Redis —
+        // без версии токены нового режима считались бы устаревшими.
+        UnitResult<Error> versioned = await accessChanges.RoleChangedAsync(clientId, role, cancellationToken);
+        if (versioned.IsFailure)
+        {
+            return versioned.Error;
+        }
+
         await RecordAsync(clientId, AuditActions.ROLE_CREATED, role.Name, new { app = clientId, permissions = wanted }, cancellationToken);
         return await ListAsync(clientId, cancellationToken);
     }
@@ -138,22 +147,32 @@ public sealed class RolesHandler(
         string[] add = [.. wanted.Except(before, StringComparer.Ordinal)];
         string[] remove = [.. before.Except(wanted, StringComparer.Ordinal)];
         string? description = request.Description?.Trim();
+        AppRole described = role.Value with { Description = description };
+        bool composeChanges = add.Length > 0 || remove.Length > 0;
 
-        if (!string.Equals(description, role.Value.Description, StringComparison.Ordinal))
+        // Состав изменился — описание запишется вместе с новой версией роли.
+        if (!composeChanges && !string.Equals(description, role.Value.Description, StringComparison.Ordinal))
         {
-            UnitResult<Error> described = await identityAdmin.UpdateAppRoleAsync(clientId, role.Value with { Description = description }, cancellationToken);
-            if (described.IsFailure)
+            UnitResult<Error> saved = await identityAdmin.UpdateAppRoleAsync(clientId, described, cancellationToken);
+            if (saved.IsFailure)
             {
-                return described.Error;
+                return saved.Error;
             }
         }
 
-        if (add.Length > 0 || remove.Length > 0)
+        if (composeChanges)
         {
             UnitResult<Error> composed = await identityAdmin.SetRoleCompositesAsync(clientId, name, add, remove, cancellationToken);
             if (composed.IsFailure)
             {
                 return composed.Error;
+            }
+
+            // Токены в этом режиме устарели: клиенты обновят их без перелогина и получат новые права.
+            UnitResult<Error> changed = await accessChanges.RoleChangedAsync(clientId, described, cancellationToken);
+            if (changed.IsFailure)
+            {
+                return changed.Error;
             }
 
             await RecordAsync(clientId, AuditActions.ROLE_UPDATED, name,
@@ -181,6 +200,8 @@ public sealed class RolesHandler(
         {
             return deleted.Error;
         }
+
+        await accessChanges.RoleDeletedAsync(clientId, name, cancellationToken);
 
         await RecordAsync(clientId, AuditActions.ROLE_DELETED, name, new { app = clientId }, cancellationToken, role.Value.Id);
         return await ListAsync(clientId, cancellationToken);

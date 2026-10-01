@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -10,6 +11,11 @@ namespace PlatformAuth;
 
 public static class JwtAuthenticationExtensions
 {
+    /// <summary>Код ошибки 401, когда доступ изменился: клиенту — обновить токен (POST /auth/refresh) и повторить запрос.</summary>
+    public const string ACCESS_CHANGED = "access_changed";
+
+    private const string ACCESS_CHANGED_ITEM = "PlatformAuth.AccessChanged";
+
     /// <summary>
     /// Проверка access-токенов сервера входа (Keycloak): подпись по ключам из discovery (RS256),
     /// iss, aud, срок действия. Настройки — секция Authentication, проверяются при старте.
@@ -61,20 +67,68 @@ public static class JwtAuthenticationExtensions
         {
             OnMessageReceived = context => ReadTokenFromCookie(context, settings),
             OnTokenValidated = RejectRevokedAsync,
+            OnChallenge = ExplainAccessChangedAsync,
         };
     }
 
     // Мгновенный отзыв: подпись и срок токена в порядке, но его отозвали (блокировка, завершённая сессия, закрытый
-    // доступ к приложению). Проверка есть, только если сервис подключил хранилище отзывов (AddPlatformTokenRevocation).
+    // доступ к приложению) или доступ изменился (роли, состав роли). Проверка есть, только если сервис подключил
+    // хранилище отзывов (AddPlatformTokenRevocation).
     private static async Task RejectRevokedAsync(TokenValidatedContext context)
     {
         ITokenRevocationChecker? checker = context.HttpContext.RequestServices.GetService<ITokenRevocationChecker>();
-        if (checker is not null
-            && context.Principal is not null
-            && await checker.IsRevokedAsync(context.Principal, context.HttpContext.RequestAborted))
+        if (checker is null || context.Principal is null)
         {
-            context.Fail("The token has been revoked.");
+            return;
         }
+
+        switch (await checker.CheckAsync(context.Principal, context.HttpContext.RequestAborted))
+        {
+            case TokenStatus.Revoked:
+                context.Fail("The token has been revoked.");
+                break;
+            case TokenStatus.AccessChanged:
+                context.HttpContext.Items[ACCESS_CHANGED_ITEM] = true;
+                context.Fail("Access has changed: refresh the token.");
+                break;
+            case TokenStatus.Valid:
+            default:
+                break;
+        }
+    }
+
+    // Доступ изменился — 401 с объяснением: error_description=access_changed в WWW-Authenticate и код
+    // auth.access_changed в теле. Клиент обновляет токен без перелогина и повторяет запрос.
+    private static async Task ExplainAccessChangedAsync(JwtBearerChallengeContext context)
+    {
+        if (!context.HttpContext.Items.ContainsKey(ACCESS_CHANGED_ITEM))
+        {
+            return;
+        }
+
+        context.HandleResponse();
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        context.Response.Headers[HeaderNames.WWWAuthenticate] = $"Bearer error=\"invalid_token\", error_description=\"{ACCESS_CHANGED}\"";
+        await context.Response.WriteAsJsonAsync(
+            new
+            {
+                result = (object?)null,
+                error = new
+                {
+                    messages = new[]
+                    {
+                        new
+                        {
+                            code = "auth." + ACCESS_CHANGED,
+                            message = "Доступ изменился: обновите токен (POST /auth/refresh) и повторите запрос.",
+                            invalidField = (string?)null,
+                        },
+                    },
+                    type = "AUTHENTICATION",
+                },
+                isError = true,
+            },
+            context.HttpContext.RequestAborted);
     }
 
     // Заголовок Authorization главнее: явно переданный токен (например, от другого сервиса)

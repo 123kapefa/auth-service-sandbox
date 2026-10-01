@@ -16,6 +16,7 @@ final class AppRoles {
 
     static final String KIND = "kind";
     static final String PERMISSION = "permission";
+    static final String VERSION = "version";
 
     private AppRoles() {
     }
@@ -41,6 +42,12 @@ final class AppRoles {
             .map(RoleModel::getName)
             .sorted()
             .toList();
+    }
+
+    /** Версия роли активного режима (атрибут version), если режим — роль пользователя; иначе null. */
+    static String versionOf(ClientModel client, UserModel user, String activeMode) {
+        RoleModel mode = activeMode == null ? null : client.getRole(activeMode);
+        return mode == null || isPermission(mode) || !user.hasRole(mode) ? null : mode.getFirstAttribute(VERSION);
     }
 
     private static void collect(RoleModel role, Set<RoleModel> into) {

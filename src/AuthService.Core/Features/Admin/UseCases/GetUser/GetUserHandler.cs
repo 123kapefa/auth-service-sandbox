@@ -9,7 +9,7 @@ using SharedKernel;
 namespace AuthService.Core.Features.Admin.UseCases.GetUser;
 
 /// <summary>Карточка пользователя. Нет такого — 404; менеджер и сотрудник — 403, как в боевом сервисе.</summary>
-public sealed class GetUserHandler(IIdentityAdmin identityAdmin, IOptions<JwtAuthenticationOptions> authentication)
+public sealed class GetUserHandler(IIdentityAdmin identityAdmin, UserAppRoles userRoles, IOptions<JwtAuthenticationOptions> authentication)
 {
     public async Task<Result<UserDetailResponse, Error>> Handle(
         Guid userId,
@@ -22,15 +22,13 @@ public sealed class GetUserHandler(IIdentityAdmin identityAdmin, IOptions<JwtAut
             return user.Error;
         }
 
-        Result<IReadOnlyList<string>, Error> roles =
-            await identityAdmin.GetClientRolesAsync(userId, authentication.Value.Audience, cancellationToken);
+        Result<UserRoles, Error> roles = await userRoles.LoadAsync(userId, authentication.Value.Audience, cancellationToken);
         if (roles.IsFailure)
         {
             return roles.Error;
         }
 
-        IReadOnlyList<string> staff = StaffRoles.Of(roles.Value);
-        if (onlyCustomers && staff.Count > 0)
+        if (onlyCustomers && roles.Value.Assigned.Count > 0)
         {
             return AdminErrors.StaffNotAllowed();
         }
@@ -53,8 +51,8 @@ public sealed class GetUserHandler(IIdentityAdmin identityAdmin, IOptions<JwtAut
             user.Value.Username,
             user.Value.Phone,
             user.Value.Email,
-            StaffRoles.Describe(staff),
-            [AuthModes.CUSTOMER, .. staff],
+            StaffRoles.Describe(roles.Value.Assigned),
+            roles.Value.Modes,
             user.Value.ActiveMode,
             user.Value.CreatedAt,
             !user.Value.Enabled,

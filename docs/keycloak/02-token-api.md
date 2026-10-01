@@ -39,6 +39,8 @@ Keycloak ──(access-токен: role, active_mode, permissions, phone, aud, i
 | `active_mode` | `admin` | политики и права |
 | `available_roles` | `["customer", "admin"]` | `CurrentUser.AvailableModes` (переключение — этап 4) |
 | `phone` | `+71234567890` | `CurrentUser.Phone` |
+| `permissions` | `["profile.view", "users.view"]` | `RequirePermissions` — права активного режима (с этапа 4а, [04a-roles.md](04a-roles.md)) |
+| `access_version`, `mode_version` | `1791234567890` | проверка «доступ изменился» — умный рефреш (этап 4а) |
 
 Принимается только RS256, без допуска по времени (`ClockSkew = 0`); claims не переименовываются в URI .NET.
 

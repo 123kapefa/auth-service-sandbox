@@ -10,6 +10,12 @@ namespace AuthService.IntegrationTests.Infrastructure;
 /// <summary>Подставной Admin API: пользователи, которых завёл тест, и запись того, что сервис менял.</summary>
 public sealed class FakeIdentityAdmin : IIdentityAdmin
 {
+    /// <summary>Приложение сервиса (audience): роли пользователя в нём — ClientRoles.</summary>
+    public const string SERVICE_APP = "sandbox-api";
+
+    /// <summary>Второе демо-приложение со своими правами и ролями.</summary>
+    public const string MANAGER_1C = "manager-1c";
+
     /// <summary>Приложения проекта: клиенты с ролью access-denied.</summary>
     public static readonly string[] Apps = ["account-console", "sandbox-bff"];
 
@@ -53,6 +59,13 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
             []);
     }
 
+    /// <summary>Роли пользователя в другом приложении (например, «Менеджер 1С»).</summary>
+    public void SetAppRoles(TestUser user, string clientId, params string[] roles)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        _accounts[user.Id] = _accounts[user.Id].WithRolesIn(clientId, roles);
+    }
+
     public void Reset()
     {
         _accounts.Clear();
@@ -91,8 +104,30 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
 
     public Task<Result<IReadOnlyList<string>, Error>> GetClientRolesAsync(Guid userId, string clientId, CancellationToken cancellationToken) =>
         Task.FromResult(_accounts.TryGetValue(userId, out Account? account)
-            ? Result.Success<IReadOnlyList<string>, Error>(account.ClientRoles)
+            ? Result.Success<IReadOnlyList<string>, Error>(account.RolesIn(clientId))
             : IdentityProviderErrors.UserNotFound());
+
+    // Как в realm: customer — роль по умолчанию, плюс права в составе ролей.
+    public Task<Result<IReadOnlyList<string>, Error>> GetEffectiveClientRolesAsync(Guid userId, string clientId, CancellationToken cancellationToken)
+    {
+        if (!_appRoles.ContainsKey(clientId))
+        {
+            return Task.FromResult(Result.Failure<IReadOnlyList<string>, Error>(IdentityProviderErrors.AppNotFound()));
+        }
+
+        if (!_accounts.TryGetValue(userId, out Account? account))
+        {
+            return Task.FromResult(Result.Failure<IReadOnlyList<string>, Error>(IdentityProviderErrors.UserNotFound()));
+        }
+
+        string[] roles = [.. DefaultRolesOf(clientId).Union(account.RolesIn(clientId), StringComparer.Ordinal)];
+        IReadOnlyList<string> effective = [.. roles.Union(roles.SelectMany(role => CompositesOf(clientId, role)), StringComparer.Ordinal)];
+        return Task.FromResult(Result.Success<IReadOnlyList<string>, Error>(effective));
+    }
+
+    /// <summary>Роли по умолчанию приложения: у sandbox-api — customer.</summary>
+    private static string[] DefaultRolesOf(string clientId) =>
+        string.Equals(clientId, SERVICE_APP, StringComparison.Ordinal) ? ["customer"] : [];
 
     public Task<Result<bool, Error>> HasPasswordAsync(Guid userId, CancellationToken cancellationToken) =>
         Task.FromResult(_accounts.TryGetValue(userId, out Account? account)
@@ -116,12 +151,31 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
                 UserAttributes.RESTRICTION_REASON => user with { RestrictionReason = value },
                 UserAttributes.RESTRICTED_AT => user with { RestrictedAt = value is null ? null : DateTimeOffset.Parse(value, CultureInfo.InvariantCulture) },
                 "active_mode" => user with { ActiveMode = value },
+                _ when name.StartsWith(UserAttributes.APP_MODE_PREFIX, StringComparison.Ordinal) => user with
+                {
+                    AppModes = WithMode(user.AppModes, name[UserAttributes.APP_MODE_PREFIX.Length..], value),
+                },
                 _ => user,
             };
         }
 
         _accounts[userId] = account with { User = user };
         return Task.FromResult(UnitResult.Success<Error>());
+    }
+
+    private static Dictionary<string, string> WithMode(IReadOnlyDictionary<string, string>? modes, string clientId, string? mode)
+    {
+        Dictionary<string, string> result = new(modes ?? new Dictionary<string, string>(), StringComparer.Ordinal);
+        if (mode is null)
+        {
+            result.Remove(clientId);
+        }
+        else
+        {
+            result[clientId] = mode;
+        }
+
+        return result;
     }
 
     /// <summary>Как в realm: у sandbox-api встроенные роли; права заводит сверка каталога; у клиентов входа — access-denied.</summary>
@@ -139,6 +193,24 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
             _appRoles["sandbox-api"][role] = new AppRole(Guid.NewGuid(), role, role, AppRoleKinds.ROLE, null, true);
         }
 
+        // «Менеджер 1С»: свои права и роли, admin — с управлением ролями приложения.
+        _appRoles[MANAGER_1C] = new(StringComparer.Ordinal);
+        foreach (string permission in new[] { "orders.view", "orders.edit", "reports.view", "users.roles.manage", "roles.manage" })
+        {
+            _appRoles[MANAGER_1C][permission] = new AppRole(Guid.NewGuid(), permission, permission, AppRoleKinds.PERMISSION, AppRoleKinds.SOURCE_CODE, false);
+        }
+
+        foreach ((string role, string[] permissions) in new[]
+        {
+            ("operator", new[] { "orders.view", "orders.edit" }),
+            ("accountant", new[] { "orders.view", "reports.view" }),
+            ("admin", new[] { "orders.view", "orders.edit", "reports.view", "users.roles.manage", "roles.manage" }),
+        })
+        {
+            _appRoles[MANAGER_1C][role] = new AppRole(Guid.NewGuid(), role, role, AppRoleKinds.ROLE, null, true);
+            _composites[$"{MANAGER_1C}/{role}"] = [.. permissions];
+        }
+
         foreach (string app in Apps)
         {
             _appRoles[app] = new(StringComparer.Ordinal) { [AppRoles.ACCESS_DENIED] = new AppRole(Guid.NewGuid(), AppRoles.ACCESS_DENIED, null, AppRoleKinds.ROLE, null, false) };
@@ -146,6 +218,14 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     }
 
     public IReadOnlyCollection<AppRole> AppRolesOf(string clientId) => [.. _appRoles[clientId].Values];
+
+    /// <summary>Своя роль приложения с правами (как созданная через админку).</summary>
+    public void AddAppRole(string clientId, string name, params string[] permissions)
+    {
+        _appRoles.GetOrAdd(clientId, _ => new(StringComparer.Ordinal))[name] =
+            new AppRole(Guid.NewGuid(), name, name, AppRoleKinds.ROLE, AppRoleKinds.SOURCE_ADMIN, false);
+        _composites[$"{clientId}/{name}"] = [.. permissions];
+    }
 
     public Task<Result<IReadOnlyList<AppRole>, Error>> GetAppRolesAsync(string clientId, CancellationToken cancellationToken) =>
         Task.FromResult(_appRoles.TryGetValue(clientId, out ConcurrentDictionary<string, AppRole>? roles)
@@ -212,7 +292,7 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         RoleChanges.Add((userId, [.. grant], [.. revoke]));
         _accounts[userId] = Apps.Contains(clientId)
             ? account with { DeniedApps = grant.Count > 0 ? [.. account.DeniedApps.Append(clientId)] : [.. account.DeniedApps.Where(app => app != clientId)] }
-            : account with { ClientRoles = [.. account.ClientRoles.Except(revoke).Union(grant)] };
+            : account.WithRolesIn(clientId, [.. account.RolesIn(clientId).Except(revoke).Union(grant)]);
         return Task.FromResult(UnitResult.Success<Error>());
     }
 
@@ -269,5 +349,21 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         return Task.FromResult(UnitResult.Success<Error>());
     }
 
-    private sealed record Account(IdentityUser User, IReadOnlyList<string> ClientRoles, bool HasPassword, IReadOnlyList<string> DeniedApps);
+    /// <param name="ClientRoles">Роли в sandbox-api.</param>
+    /// <param name="OtherApps">Роли в других приложениях: clientId → роли.</param>
+    private sealed record Account(
+        IdentityUser User,
+        IReadOnlyList<string> ClientRoles,
+        bool HasPassword,
+        IReadOnlyList<string> DeniedApps,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? OtherApps = null)
+    {
+        public IReadOnlyList<string> RolesIn(string clientId) =>
+            string.Equals(clientId, SERVICE_APP, StringComparison.Ordinal) ? ClientRoles : OtherApps?.GetValueOrDefault(clientId) ?? [];
+
+        public Account WithRolesIn(string clientId, IReadOnlyList<string> roles) =>
+            string.Equals(clientId, SERVICE_APP, StringComparison.Ordinal)
+                ? this with { ClientRoles = roles }
+                : this with { OtherApps = new Dictionary<string, IReadOnlyList<string>>(OtherApps ?? new Dictionary<string, IReadOnlyList<string>>(), StringComparer.Ordinal) { [clientId] = roles } };
+    }
 }

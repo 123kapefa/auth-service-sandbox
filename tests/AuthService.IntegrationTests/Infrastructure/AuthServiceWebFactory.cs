@@ -76,11 +76,29 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
         DateTimeOffset? authenticatedAt = null,
         string? sessionId = null,
         DateTimeOffset? issuedAt = null,
-        string authorizedParty = "sandbox-bff")
+        string authorizedParty = "sandbox-bff",
+        IReadOnlyDictionary<string, object>? extraClaims = null)
     {
         ArgumentNullException.ThrowIfNull(user);
 
         DateTime now = (issuedAt ?? DateTimeOffset.UtcNow).UtcDateTime;
+        var claims = new Dictionary<string, object>(StringComparer.Ordinal)
+        {
+            [AuthClaims.SUBJECT] = user.Id.ToString(),
+            [AuthClaims.PHONE] = user.Phone,
+            [AuthClaims.ROLE] = user.Roles.ToArray(),
+            [AuthClaims.AVAILABLE_ROLES] = user.Roles.ToArray(),
+            [AuthClaims.ACTIVE_MODE] = user.ActiveMode,
+            [AuthClaims.PERMISSIONS] = RealmPermissions.Of(user.ActiveMode, user.Roles),
+            [AuthClaims.AUTH_TIME] = (authenticatedAt ?? DateTimeOffset.UtcNow).ToUnixTimeSeconds(),
+            [AuthClaims.SESSION_ID] = sessionId ?? $"session-{user.Id:N}",
+            [AuthClaims.AUTHORIZED_PARTY] = authorizedParty,
+        };
+        foreach ((string name, object value) in extraClaims ?? new Dictionary<string, object>())
+        {
+            claims[name] = value;
+        }
+
         return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {
             Issuer = ISSUER,
@@ -89,18 +107,7 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
             NotBefore = now,
             Expires = now.AddMinutes(15), // как access-токен Keycloak
             SigningCredentials = new SigningCredentials(_signingKey, SecurityAlgorithms.RsaSha256),
-            Claims = new Dictionary<string, object>(StringComparer.Ordinal)
-            {
-                [AuthClaims.SUBJECT] = user.Id.ToString(),
-                [AuthClaims.PHONE] = user.Phone,
-                [AuthClaims.ROLE] = user.Roles.ToArray(),
-                [AuthClaims.AVAILABLE_ROLES] = user.Roles.ToArray(),
-                [AuthClaims.ACTIVE_MODE] = user.ActiveMode,
-                [AuthClaims.PERMISSIONS] = RealmPermissions.Of(user.ActiveMode, user.Roles),
-                [AuthClaims.AUTH_TIME] = (authenticatedAt ?? DateTimeOffset.UtcNow).ToUnixTimeSeconds(),
-                [AuthClaims.SESSION_ID] = sessionId ?? $"session-{user.Id:N}",
-                [AuthClaims.AUTHORIZED_PARTY] = authorizedParty,
-            },
+            Claims = claims,
         });
     }
 
