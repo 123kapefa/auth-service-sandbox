@@ -38,6 +38,8 @@
 | Настройка | Кто читает | Development | Docker | Production |
 |---|---|---|---|---|
 | `ConnectionStrings:AuthDb` | Infrastructure; без неё сервис не стартует | в файле, `localhost:5432` | из `compose.yaml` (`.env`), `postgres:5432` | переменная окружения |
+| `ConnectionStrings:Redis` | мгновенный отзыв токенов (`Shared/Authentication.Redis`); без неё сервис не стартует | в файле, `localhost:6379` | из `compose.yaml`, `redis:6379` | переменная окружения |
+| `TokenRevocation:TokenLifetime` / `LocalCache` | сколько хранить отметку / кэш проверки в памяти | по умолчанию в коде: 16 мин / 2 с | так же | так же; `LocalCache` держать короткой |
 | `AllowedHosts` | ASP.NET Core; чужой `Host` → 400 | `*` (база) | `*` (база) | `auth-sandbox.example;localhost` |
 | `ForwardedHeaders:TrustedNetworks` | `ForwardedHeadersConfiguration` | по умолчанию в коде: `172.16.0.0/12`, `127.0.0.0/8` | так же | так же; задать, если прокси в другой сети |
 | `Authentication:Authority` | проверка токенов (`iss`) | `http://localhost:8180/realms/sandbox` | так же | `https://id.auth-sandbox.example/realms/sandbox` |
@@ -62,10 +64,14 @@
 
 ## Запуск
 
-**Development** — база в Docker, сервис на машине (удобно для отладки):
+**Development** — база, Redis и миграции в Docker, сервис на машине (удобно для отладки):
 
 ```bash
-docker compose up -d --wait postgres
+docker compose up -d --wait postgres redis
+```
+
+```bash
+docker compose up auth-migrator
 ```
 
 ```bash
@@ -80,8 +86,12 @@ dotnet run --project src/AuthService.Api
 docker compose up -d --build --wait auth-service
 ```
 
-**Production** — в файле нет ни одного секрета. Без строки подключения сервис не стартует:
-`ConnectionStrings:AuthDb is required.`
+Мигратор (`efbundle` из образа сервиса) применяет миграции и завершается; в Docker сервис ждёт его успеха сам.
+Back-channel logout Keycloak в Development не работает: Keycloak из контейнера зовёт `auth-service:8080`.
+
+**Production** — в файле нет ни одного секрета. Без строк подключения сервис не стартует:
+`ConnectionStrings:AuthDb is required.`, `ConnectionStrings:Redis is required.` Миграции — тем же `efbundle`
+отдельным шагом развёртывания до старта сервиса.
 
 Проверка: `curl http://localhost:<порт>/health/ready` → `Healthy`.
 

@@ -57,7 +57,7 @@ scripts/keycloak/check-stand.sh
 | 2 | Токен и защищённый API | ✅ | [02-token-api.md](02-token-api.md) |
 | 3 | Вход в приложение (BFF: cookie, refresh, выход) | ✅ | [03-login.md](03-login.md) |
 | 3а | Способы входа: телефон или почта, сброс пароля, 2FA по желанию, passkey | ✅ | [03a-login-methods.md](03a-login-methods.md) |
-| 4 | Режимы, API администрирования, события, мгновенный отзыв доступа | ⬜ | — |
+| 4 | Режимы, API администрирования, события, мгновенный отзыв доступа | ✅ | [04-admin.md](04-admin.md) |
 | 4а | Динамические роли и права в Keycloak, «умный рефреш» | ⬜ | — |
 | 4б | Своя админка доступа (UI): админ проекта и админ приложения | ⬜ | — |
 | 4в | Свой интерфейс входа (Keycloakify): страницы входа и письма | ⬜ | — |
@@ -79,13 +79,17 @@ Keycloak; проекты друг друга не видят. **Приложен
 | Путь | Что это |
 |---|---|
 | `compose.yaml` → `keycloak`, `keycloak-postgres` | Keycloak 26.4 и его отдельная БД |
+| `compose.yaml` → `redis`, `auth-migrator` | отметки мгновенного отзыва токенов; миграции базы сервиса (`efbundle`) до старта сервиса |
 | `infra/keycloak/realm/sandbox-realm.json` | весь realm как код |
 | `infra/keycloak/themes/sandbox` | тема страницы входа: `+` у номера, кнопка «Войти по коду», экран ввода кода |
 | `infra/keycloak/providers/code-login` | плагин Keycloak (Java): форма входа с нормализацией номера, вход по коду; собирается в `infra/keycloak/Dockerfile` |
-| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `lib.sh` — общие помощники |
-| `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права — переиспользуемая библиотека |
+| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал; `lib.sh` — общие помощники |
+| `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права, хук мгновенного отзыва — переиспользуемая библиотека |
+| `src/Shared/Authentication.Redis` | отметки отзыва в Redis, кэш проверки, `AddPlatformTokenRevocation` |
 | `src/AuthService.Core/Authorization` | карта «роль → права» сервиса |
-| `src/AuthService.Core/Features/Auth` | вход, callback, refresh, выход; cookie и `return_to` |
-| `src/AuthService.Infrastructure.Keycloak` | клиент Keycloak: PKCE, обмен кода, refresh, выход |
+| `src/AuthService.Core/Features/Auth` | вход, callback, refresh, выход, режим, back-channel logout; cookie и `return_to` |
+| `src/AuthService.Core/Features/Admin`, `Features/Security` | API администрирования и своих сессий |
+| `src/AuthService.Infrastructure.Postgres` | база сервиса: журнал `auth.audit_entries`, миграции |
+| `src/AuthService.Infrastructure.Keycloak` | клиент Keycloak: PKCE, обмен кода, refresh, выход, Admin API от служебной учётки |
 | `src/AuthService.Api/wwwroot` | демо-страница для тестов входа (`/`) |
 | `.env.example` → блок Keycloak | порты и dev-пароли |

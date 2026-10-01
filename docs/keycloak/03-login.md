@@ -86,7 +86,7 @@ docker compose up -d --wait keycloak auth-service
 scripts/keycloak/check-login.sh
 ```
 
-Ожидается `Итого: 15 ✓, 0 ✗` (Development — `API=http://localhost:5080 scripts/keycloak/check-login.sh`).
+Ожидается `Итого: 16 ✓, 0 ✗` (Development — `API=http://localhost:5080 scripts/keycloak/check-login.sh`).
 
 В браузере: http://localhost:8080 → «Войти» → `0987654321` / `Test1234!` → таблица доступа, «Обновить токен», «Выйти».
 
@@ -108,8 +108,8 @@ scripts/keycloak/check-login.sh
 
 ## Ограничения (для выводов)
 
-- После выхода уже выданный `accessToken` работает до истечения срока (15 мин): JWT проверяется без Keycloak.
-  Мгновенный отзыв при блокировке — этап 4.
+- ~~После выхода уже выданный `accessToken` работает до истечения срока (15 мин)~~ — с этапа 4 отзывается сразу
+  (отметка в Redis, [04-admin.md](04-admin.md)); `check-login.sh` проверяет это.
 - Ответы 401/403 от проверки доступа — стандартные ASP.NET, без `Envelope`.
 
 ## Критерии готовности
