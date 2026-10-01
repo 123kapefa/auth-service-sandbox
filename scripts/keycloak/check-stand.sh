@@ -103,6 +103,18 @@ check "не меняет настройки realm" "$(curl -s -o /dev/null -w '%
 check "токен без секрета не выдаётся" "$(curl -s -o /dev/null -w '%{http_code}' -d grant_type=client_credentials -d client_id=sandbox-bff \
   "$KC/realms/$REALM/protocol/openid-connect/token")" 401
 
+echo "8. Роли и права приложения в Keycloak (этап 4а)"
+API_ID=2631bc45-b176-4774-927a-b6dd4e310582   # фиксированный id клиента sandbox-api в realm JSON
+composites() { curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/clients/$API_ID/roles/$1/composites" \
+  | python3 -c 'import json,sys; print(",".join(sorted(r["name"] for r in json.load(sys.stdin))))'; }
+check "customer = profile.view" "$(composites customer)" profile.view
+check "manager = просмотр и блокировка пользователей" "$(composites manager)" profile.view,users.block,users.view
+check "admin = все права" "$(composites admin)" audit.view,profile.view,users.block,users.roles.manage,users.sessions.manage,users.view
+check "права помечены kind=permission" "$(curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/clients/$API_ID/roles?briefRepresentation=false" \
+  | python3 -c 'import json,sys; r=json.load(sys.stdin); print(",".join(sorted(x["name"] for x in r if x.get("attributes",{}).get("kind")==["permission"])))')" \
+  audit.view,profile.view,users.block,users.roles.manage,users.sessions.manage,users.view
+check "в role токена — только роли, без прав" "$(token 71234567890 | claim role)" admin,customer
+
 echo
 echo "Итого: $PASS ✓, $FAIL ✗"
 [ "$FAIL" -eq 0 ]

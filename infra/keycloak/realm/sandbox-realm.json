@@ -248,15 +248,157 @@
       "sandbox-api": [
         {
           "name": "customer",
-          "description": "Покупатель (есть у всех)"
+          "description": "Покупатель (есть у всех)",
+          "composite": true,
+          "clientRole": true,
+          "composites": {
+            "client": {
+              "sandbox-api": [
+                "profile.view"
+              ]
+            }
+          },
+          "attributes": {
+            "kind": [
+              "role"
+            ],
+            "builtin": [
+              "true"
+            ]
+          }
         },
         {
           "name": "manager",
-          "description": "Менеджер"
+          "description": "Менеджер",
+          "composite": true,
+          "clientRole": true,
+          "composites": {
+            "client": {
+              "sandbox-api": [
+                "profile.view",
+                "users.view",
+                "users.block"
+              ]
+            }
+          },
+          "attributes": {
+            "kind": [
+              "role"
+            ],
+            "builtin": [
+              "true"
+            ]
+          }
         },
         {
           "name": "admin",
-          "description": "Администратор"
+          "description": "Администратор",
+          "composite": true,
+          "clientRole": true,
+          "composites": {
+            "client": {
+              "sandbox-api": [
+                "profile.view",
+                "users.view",
+                "users.block",
+                "users.roles.manage",
+                "users.sessions.manage",
+                "audit.view"
+              ]
+            }
+          },
+          "attributes": {
+            "kind": [
+              "role"
+            ],
+            "builtin": [
+              "true"
+            ]
+          }
+        },
+        {
+          "name": "profile.view",
+          "description": "Свой профиль",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "users.view",
+          "description": "Пользователи: список и карточка",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "users.block",
+          "description": "Блокировка аккаунта и доступ к приложению",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "users.roles.manage",
+          "description": "Смена ролей пользователей",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "users.sessions.manage",
+          "description": "«Выйти везде» за пользователя",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "audit.view",
+          "description": "Журнал действий и входов",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
         }
       ],
       "account": [
@@ -363,31 +505,12 @@
       },
       "protocolMappers": [
         {
-          "name": "role",
+          "name": "роли приложения (role, available_roles)",
           "protocol": "openid-connect",
-          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "protocolMapper": "sandbox-app-roles",
           "consentRequired": false,
           "config": {
-            "usermodel.clientRoleMapping.clientId": "sandbox-api",
-            "claim.name": "role",
-            "jsonType.label": "String",
-            "multivalued": "true",
-            "access.token.claim": "true",
-            "id.token.claim": "false",
-            "userinfo.token.claim": "true",
-            "introspection.token.claim": "true"
-          }
-        },
-        {
-          "name": "available_roles",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-usermodel-client-role-mapper",
-          "consentRequired": false,
-          "config": {
-            "usermodel.clientRoleMapping.clientId": "sandbox-api",
-            "claim.name": "available_roles",
-            "jsonType.label": "String",
-            "multivalued": "true",
+            "roles.client": "sandbox-api",
             "access.token.claim": "true",
             "id.token.claim": "false",
             "userinfo.token.claim": "true",
