@@ -4,6 +4,7 @@ using AuthService.Core.Features.Auth.UseCases.Callback;
 using AuthService.Core.Features.Auth.UseCases.Login;
 using AuthService.Core.Features.Auth.UseCases.Logout;
 using AuthService.Core.Features.Auth.UseCases.Refresh;
+using AuthService.Core.Features.Auth.UseCases.SwitchMode;
 using FluentValidation;
 using Framework.Endpoints;
 using Microsoft.Extensions.Configuration;
@@ -31,6 +32,7 @@ public static class Registration
         services.AddScoped<CallbackHandler>();
         services.AddScoped<RefreshHandler>();
         services.AddScoped<LogoutHandler>();
+        services.AddScoped<SwitchModeHandler>();
 
         return services;
     }

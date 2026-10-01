@@ -36,6 +36,9 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
     /// <summary>Подставной сервер входа вместо Keycloak.</summary>
     public FakeIdentityProvider IdentityProvider { get; } = new();
 
+    /// <summary>Подставной Admin API вместо Keycloak.</summary>
+    public FakeIdentityAdmin IdentityAdmin { get; } = new();
+
     /// <summary>Клиент как браузер без автоматических переходов и cookie: тест видит каждый 302 и Set-Cookie.</summary>
     public HttpClient CreateBrowserClient() =>
         CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
@@ -89,6 +92,8 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
             });
             services.RemoveAll<IIdentityProvider>();
             services.AddSingleton<IIdentityProvider>(IdentityProvider);
+            services.RemoveAll<IIdentityAdmin>();
+            services.AddSingleton<IIdentityAdmin>(IdentityAdmin);
         });
     }
 

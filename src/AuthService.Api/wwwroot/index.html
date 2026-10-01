@@ -63,6 +63,7 @@
       <a class="button" id="account" href="/auth/account">Настройки входа</a>
     </div>
     <dl id="me" hidden></dl>
+    <div class="row" id="modes" hidden style="margin-top:12px"><span>Режим:</span></div>
     <p class="hint">«Настройки входа» — личный кабинет Keycloak: пароль, 2FA (приложение-аутентификатор, коды восстановления) и ключ доступа (passkey).</p>
     <p class="hint">Токены лежат в httpOnly-cookie: страница их не видит и не может украсть — так и задумано.
       Тестовые пользователи и пароль — в <code>docs/keycloak/README.md</code>.</p>
@@ -124,6 +125,33 @@
     ];
     $("me").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
     $("me").hidden = false;
+    showModes(me);
+  }
+
+  // Кнопки режимов: доступные пользователю, текущий выключен. POST /auth/mode сразу ставит новые токены в cookie.
+  function showModes(me) {
+    const modes = $("modes");
+    modes.querySelectorAll("button").forEach((button) => button.remove());
+    for (const mode of me.availableModes) {
+      const button = document.createElement("button");
+      button.textContent = mode;
+      button.disabled = mode === me.activeMode;
+      button.addEventListener("click", () => switchMode(mode));
+      modes.append(button);
+    }
+    modes.hidden = me.availableModes.length < 2;
+  }
+
+  async function switchMode(mode) {
+    const response = await fetch("/auth/mode", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ activeMode: mode }),
+    });
+    log(`POST /auth/mode ${mode}`, response.status);
+    await loadSession();
+    await checkAccess();
   }
 
   async function loadSession() {
@@ -133,7 +161,7 @@
     $("login").hidden = signedIn;
     $("refresh").disabled = $("logout").disabled = !signedIn;
     $("account").hidden = !signedIn;
-    if (signedIn) { showMe(body.result); } else { $("me").hidden = true; }
+    if (signedIn) { showMe(body.result); } else { $("me").hidden = $("modes").hidden = true; }
     return signedIn;
   }
 

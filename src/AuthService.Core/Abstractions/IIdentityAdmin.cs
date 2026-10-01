@@ -8,6 +8,18 @@ public interface IIdentityAdmin
 {
     /// <summary>Пользователь по id; нет такого — NotFound.</summary>
     Task<Result<IdentityUser, Error>> GetUserAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Роли пользователя в клиенте (приложении), выданные ему напрямую. Роли по умолчанию realm (customer)
+    /// сюда не входят — они есть у всех.
+    /// </summary>
+    Task<Result<IReadOnlyList<string>, Error>> GetClientRolesAsync(Guid userId, string clientId, CancellationToken cancellationToken);
+
+    /// <summary>Задан ли пароль (пользователь мог войти только по коду).</summary>
+    Task<Result<bool, Error>> HasPasswordAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>Записать атрибут пользователя; остальные атрибуты не меняются.</summary>
+    Task<UnitResult<Error>> SetAttributeAsync(Guid userId, string name, string value, CancellationToken cancellationToken);
 }
 
 /// <summary>Пользователь сервера входа.</summary>

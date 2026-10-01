@@ -15,4 +15,11 @@ public static class AuthErrors
 
     public static Error SessionMissing() =>
         Error.Authentication("auth.session.missing", "Нет активной сессии. Войдите.");
+
+    /// <summary>Режим неизвестен или у пользователя нет такой роли.</summary>
+    public static Error ModeNotAvailable() =>
+        Error.Authorization("auth.mode.not_available", "Этот режим вам недоступен.");
+
+    public static Error UserBlocked() =>
+        Error.Authentication("auth.user.blocked", "Учётная запись заблокирована.");
 }
