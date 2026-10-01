@@ -96,13 +96,11 @@ internal sealed partial class KeycloakAdminClient(
             : credentials.Error;
     }
 
-    public async Task<UnitResult<Error>> SetAttributeAsync(
-        Guid userId,
-        string name,
-        string value,
-        CancellationToken cancellationToken)
+    public async Task<UnitResult<Error>> UpdateUserAsync(Guid userId, UserChanges changes, CancellationToken cancellationToken)
     {
-        // PUT заменяет атрибуты целиком: читаем пользователя полностью, меняем один атрибут, пишем обратно.
+        ArgumentNullException.ThrowIfNull(changes);
+
+        // PUT заменяет атрибуты целиком: читаем пользователя полностью, меняем нужное, пишем обратно.
         Result<JsonObject, Error> user = await GetJsonAsync<JsonObject>($"users/{userId}", cancellationToken);
         if (user.IsFailure)
         {
@@ -110,10 +108,37 @@ internal sealed partial class KeycloakAdminClient(
         }
 
         JsonObject attributes = user.Value["attributes"] as JsonObject ?? [];
-        attributes[name] = new JsonArray(value);
-        user.Value["attributes"] = attributes;
+        foreach ((string name, string? value) in changes.Attributes)
+        {
+            if (value is null)
+            {
+                attributes.Remove(name);
+            }
+            else
+            {
+                attributes[name] = new JsonArray(value);
+            }
+        }
 
-        Result<HttpResponseMessage, Error> response = await SendAsync(HttpMethod.Put, $"users/{userId}", cancellationToken, JsonContent.Create(user.Value));
+        user.Value["attributes"] = attributes;
+        if (changes.Enabled is { } enabled)
+        {
+            user.Value["enabled"] = enabled;
+        }
+
+        return await SendExpectingSuccessAsync(HttpMethod.Put, $"users/{userId}", cancellationToken, JsonContent.Create(user.Value));
+    }
+
+    public Task<UnitResult<Error>> LogoutUserAsync(Guid userId, CancellationToken cancellationToken) =>
+        SendExpectingSuccessAsync(HttpMethod.Post, $"users/{userId}/logout", cancellationToken);
+
+    private async Task<UnitResult<Error>> SendExpectingSuccessAsync(
+        HttpMethod method,
+        string path,
+        CancellationToken cancellationToken,
+        HttpContent? content = null)
+    {
+        Result<HttpResponseMessage, Error> response = await SendAsync(method, path, cancellationToken, content);
         if (response.IsFailure)
         {
             return response.Error;
@@ -193,7 +218,11 @@ internal sealed partial class KeycloakAdminClient(
             Attribute(user, "phone"),
             Attribute(user, "active_mode"),
             user.Enabled,
-            DateTimeOffset.FromUnixTimeMilliseconds(user.CreatedTimestamp));
+            DateTimeOffset.FromUnixTimeMilliseconds(user.CreatedTimestamp),
+            Attribute(user, UserAttributes.RESTRICTION_REASON),
+            DateTimeOffset.TryParse(Attribute(user, UserAttributes.RESTRICTED_AT), CultureInfo.InvariantCulture, out DateTimeOffset restrictedAt)
+                ? restrictedAt
+                : null);
 
     private static string? Attribute(UserRepresentation user, string name) =>
         user.Attributes is not null && user.Attributes.TryGetValue(name, out string[]? values) && values.Length > 0 ? values[0] : null;

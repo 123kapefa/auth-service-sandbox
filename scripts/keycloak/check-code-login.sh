@@ -77,9 +77,6 @@ sms_code() {
 # sms_count <логин> — сколько «SMS» ушло на номер за 10 минут
 sms_count() { docker compose logs keycloak --since 10m 2>/dev/null | grep -c "\[SANDBOX SMS\] +$1: код входа"; }
 
-# starts <текст> <начало> — печатает <начало>, если текст с него начинается, иначе весь текст (cut на macOS режет байты, не буквы)
-starts() { if [[ "$1" == "$2"* ]]; then echo "$2"; else echo "$1"; fi; }
-
 # mail_code <адрес> — код из последнего письма на адрес (Mailpit), ждём до 10 секунд
 mail_code() {
   local i code

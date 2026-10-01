@@ -11,6 +11,8 @@ public sealed record UsersPageResponse(IReadOnlyList<UserListItemResponse> Items
 /// <param name="Role">Роли сотрудника через запятую или customer.</param>
 /// <param name="CreatedAt">Когда создан.</param>
 /// <param name="IsRestricted">Заблокирован.</param>
+/// <param name="RestrictionReason">Причина блокировки, если указана.</param>
+/// <param name="RestrictedAt">Когда заблокирован.</param>
 public sealed record UserListItemResponse(
     Guid Id,
     string Username,
@@ -18,4 +20,6 @@ public sealed record UserListItemResponse(
     string? Email,
     string Role,
     DateTimeOffset CreatedAt,
-    bool IsRestricted);
+    bool IsRestricted,
+    string? RestrictionReason,
+    DateTimeOffset? RestrictedAt);

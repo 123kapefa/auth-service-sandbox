@@ -51,6 +51,8 @@ public sealed class GetUserHandler(IIdentityAdmin identityAdmin, IOptions<JwtAut
             user.Value.ActiveMode,
             user.Value.CreatedAt,
             !user.Value.Enabled,
+            user.Value.RestrictionReason,
+            user.Value.RestrictedAt,
             hasPassword.Value);
     }
 }

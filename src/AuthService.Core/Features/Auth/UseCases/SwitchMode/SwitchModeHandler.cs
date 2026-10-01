@@ -78,7 +78,10 @@ public sealed class SwitchModeHandler(
 
         if (!string.Equals(user.Value.ActiveMode, mode, StringComparison.Ordinal))
         {
-            UnitResult<Error> saved = await identityAdmin.SetAttributeAsync(id, AuthClaims.ACTIVE_MODE, mode, cancellationToken);
+            UnitResult<Error> saved = await identityAdmin.UpdateUserAsync(
+                id,
+                new UserChanges(null, new Dictionary<string, string?>(StringComparer.Ordinal) { [AuthClaims.ACTIVE_MODE] = mode }),
+                cancellationToken);
             if (saved.IsFailure)
             {
                 return saved.Error;

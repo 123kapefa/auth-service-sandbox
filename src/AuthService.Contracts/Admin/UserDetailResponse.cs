@@ -10,6 +10,8 @@ namespace AuthService.Contracts.Admin;
 /// <param name="ActiveMode">Активный режим.</param>
 /// <param name="CreatedAt">Когда создан.</param>
 /// <param name="IsRestricted">Заблокирован.</param>
+/// <param name="RestrictionReason">Причина блокировки, если указана.</param>
+/// <param name="RestrictedAt">Когда заблокирован.</param>
 /// <param name="HasPassword">Задан ли пароль.</param>
 public sealed record UserDetailResponse(
     Guid Id,
@@ -21,4 +23,6 @@ public sealed record UserDetailResponse(
     string? ActiveMode,
     DateTimeOffset CreatedAt,
     bool IsRestricted,
+    string? RestrictionReason,
+    DateTimeOffset? RestrictedAt,
     bool HasPassword);

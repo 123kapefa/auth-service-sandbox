@@ -28,9 +28,17 @@ public interface IIdentityAdmin
     /// <summary>Задан ли пароль (пользователь мог войти только по коду).</summary>
     Task<Result<bool, Error>> HasPasswordAsync(Guid userId, CancellationToken cancellationToken);
 
-    /// <summary>Записать атрибут пользователя; остальные атрибуты не меняются.</summary>
-    Task<UnitResult<Error>> SetAttributeAsync(Guid userId, string name, string value, CancellationToken cancellationToken);
+    /// <summary>Изменить пользователя: включён ли он и атрибуты (null — удалить). Остальное не меняется.</summary>
+    Task<UnitResult<Error>> UpdateUserAsync(Guid userId, UserChanges changes, CancellationToken cancellationToken);
+
+    /// <summary>Завершить все сессии пользователя: refresh-токены и SSO больше не работают.</summary>
+    Task<UnitResult<Error>> LogoutUserAsync(Guid userId, CancellationToken cancellationToken);
 }
+
+/// <summary>Что поменять у пользователя.</summary>
+/// <param name="Enabled">Включить или выключить (null — не трогать).</param>
+/// <param name="Attributes">Атрибуты: значение — записать, null — удалить.</param>
+public sealed record UserChanges(bool? Enabled, IReadOnlyDictionary<string, string?> Attributes);
 
 /// <summary>Пользователь сервера входа.</summary>
 /// <param name="Id">Id пользователя (sub в токене).</param>
@@ -40,6 +48,8 @@ public interface IIdentityAdmin
 /// <param name="ActiveMode">Активный режим.</param>
 /// <param name="Enabled">false — заблокирован.</param>
 /// <param name="CreatedAt">Когда создан.</param>
+/// <param name="RestrictionReason">Причина блокировки, если указана.</param>
+/// <param name="RestrictedAt">Когда заблокирован.</param>
 public sealed record IdentityUser(
     Guid Id,
     string Username,
@@ -47,4 +57,13 @@ public sealed record IdentityUser(
     string? Phone,
     string? ActiveMode,
     bool Enabled,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? RestrictionReason = null,
+    DateTimeOffset? RestrictedAt = null);
+
+/// <summary>Атрибуты пользователя, которые ведёт сервис (кроме phone и active_mode из контракта токена).</summary>
+public static class UserAttributes
+{
+    public const string RESTRICTION_REASON = "restriction_reason";
+    public const string RESTRICTED_AT = "restricted_at";
+}

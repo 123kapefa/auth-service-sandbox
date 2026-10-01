@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using AuthService.Core.Abstractions;
 using CSharpFunctionalExtensions;
 using SharedKernel;
@@ -11,7 +12,11 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
 {
     private readonly ConcurrentDictionary<Guid, Account> _accounts = new();
 
-    public Collection<(Guid UserId, string Name, string Value)> AttributeChanges { get; } = [];
+    /// <summary>Записанные атрибуты (удаления — со значением null).</summary>
+    public Collection<(Guid UserId, string Name, string? Value)> AttributeChanges { get; } = [];
+
+    /// <summary>У кого сервис завершил все сессии.</summary>
+    public Collection<Guid> Logouts { get; } = [];
 
     /// <summary>С какими параметрами сервис искал пользователей.</summary>
     public Collection<(string? Search, int First, int Max)> Searches { get; } = [];
@@ -30,6 +35,7 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     {
         _accounts.Clear();
         AttributeChanges.Clear();
+        Logouts.Clear();
         Searches.Clear();
     }
 
@@ -66,9 +72,34 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
             ? Result.Success<bool, Error>(account.HasPassword)
             : IdentityProviderErrors.UserNotFound());
 
-    public Task<UnitResult<Error>> SetAttributeAsync(Guid userId, string name, string value, CancellationToken cancellationToken)
+    public Task<UnitResult<Error>> UpdateUserAsync(Guid userId, UserChanges changes, CancellationToken cancellationToken)
     {
-        AttributeChanges.Add((userId, name, value));
+        ArgumentNullException.ThrowIfNull(changes);
+        if (!_accounts.TryGetValue(userId, out Account? account))
+        {
+            return Task.FromResult(UnitResult.Failure(IdentityProviderErrors.UserNotFound()));
+        }
+
+        IdentityUser user = account.User with { Enabled = changes.Enabled ?? account.User.Enabled };
+        foreach ((string name, string? value) in changes.Attributes)
+        {
+            AttributeChanges.Add((userId, name, value));
+            user = name switch
+            {
+                UserAttributes.RESTRICTION_REASON => user with { RestrictionReason = value },
+                UserAttributes.RESTRICTED_AT => user with { RestrictedAt = value is null ? null : DateTimeOffset.Parse(value, CultureInfo.InvariantCulture) },
+                "active_mode" => user with { ActiveMode = value },
+                _ => user,
+            };
+        }
+
+        _accounts[userId] = account with { User = user };
+        return Task.FromResult(UnitResult.Success<Error>());
+    }
+
+    public Task<UnitResult<Error>> LogoutUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        Logouts.Add(userId);
         return Task.FromResult(UnitResult.Success<Error>());
     }
 

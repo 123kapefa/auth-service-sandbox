@@ -71,7 +71,9 @@ public sealed partial class GetUsersHandler(
                     row.User.Email,
                     StaffRoles.Describe(row.Staff),
                     row.User.CreatedAt,
-                    !row.User.Enabled)),
+                    !row.User.Enabled,
+                    row.User.RestrictionReason,
+                    row.User.RestrictedAt)),
         ];
 
         return new UsersPageResponse(items, page, pageSize, found.Value.Count > pageSize);
