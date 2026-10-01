@@ -1,5 +1,6 @@
 using AuthService.Contracts.Auth;
 using AuthService.Core.Abstractions;
+using AuthService.Core.Authorization;
 using CSharpFunctionalExtensions;
 using FluentValidation;
 using FluentValidation.Results;
@@ -23,8 +24,6 @@ public sealed class SwitchModeHandler(
     IValidator<SwitchModeRequest> validator,
     IOptions<JwtAuthenticationOptions> authentication)
 {
-    private static readonly string[] _staffModes = [AuthModes.MANAGER, AuthModes.ADMIN];
-
     public async Task<Result<ModeSwitched, Error>> Handle(
         Guid? userId,
         SwitchModeRequest request,
@@ -70,7 +69,7 @@ public sealed class SwitchModeHandler(
             return roles.Error;
         }
 
-        string[] staffRoles = [.. _staffModes.Where(roles.Value.Contains)];
+        IReadOnlyList<string> staffRoles = StaffRoles.Of(roles.Value);
         string[] available = [AuthModes.CUSTOMER, .. staffRoles];
         if (!available.Contains(mode, StringComparer.Ordinal))
         {
@@ -107,7 +106,7 @@ public sealed class SwitchModeHandler(
         var response = new SwitchModeResponse(
             id,
             user.Value.Phone,
-            staffRoles.Length == 0 ? AuthModes.CUSTOMER : string.Join(',', staffRoles),
+            StaffRoles.Describe(staffRoles),
             available,
             mode,
             hasPassword.Value);

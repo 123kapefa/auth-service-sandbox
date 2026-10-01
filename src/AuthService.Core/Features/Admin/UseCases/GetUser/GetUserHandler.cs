@@ -1,0 +1,56 @@
+using AuthService.Contracts.Admin;
+using AuthService.Core.Abstractions;
+using AuthService.Core.Authorization;
+using CSharpFunctionalExtensions;
+using Microsoft.Extensions.Options;
+using PlatformAuth;
+using SharedKernel;
+
+namespace AuthService.Core.Features.Admin.UseCases.GetUser;
+
+/// <summary>Карточка пользователя. Нет такого — 404; менеджер и сотрудник — 403, как в боевом сервисе.</summary>
+public sealed class GetUserHandler(IIdentityAdmin identityAdmin, IOptions<JwtAuthenticationOptions> authentication)
+{
+    public async Task<Result<UserDetailResponse, Error>> Handle(
+        Guid userId,
+        bool onlyCustomers,
+        CancellationToken cancellationToken)
+    {
+        Result<IdentityUser, Error> user = await identityAdmin.GetUserAsync(userId, cancellationToken);
+        if (user.IsFailure)
+        {
+            return user.Error;
+        }
+
+        Result<IReadOnlyList<string>, Error> roles =
+            await identityAdmin.GetClientRolesAsync(userId, authentication.Value.Audience, cancellationToken);
+        if (roles.IsFailure)
+        {
+            return roles.Error;
+        }
+
+        IReadOnlyList<string> staff = StaffRoles.Of(roles.Value);
+        if (onlyCustomers && staff.Count > 0)
+        {
+            return AdminErrors.StaffNotAllowed();
+        }
+
+        Result<bool, Error> hasPassword = await identityAdmin.HasPasswordAsync(userId, cancellationToken);
+        if (hasPassword.IsFailure)
+        {
+            return hasPassword.Error;
+        }
+
+        return new UserDetailResponse(
+            user.Value.Id,
+            user.Value.Username,
+            user.Value.Phone,
+            user.Value.Email,
+            StaffRoles.Describe(staff),
+            [AuthModes.CUSTOMER, .. staff],
+            user.Value.ActiveMode,
+            user.Value.CreatedAt,
+            !user.Value.Enabled,
+            hasPassword.Value);
+    }
+}

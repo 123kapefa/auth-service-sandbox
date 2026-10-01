@@ -10,6 +10,16 @@ public interface IIdentityAdmin
     Task<Result<IdentityUser, Error>> GetUserAsync(Guid userId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Поиск пользователей: подстрока в логине, почте, имени (как search Admin API Keycloak), по логину по возрастанию.
+    /// search пустой — все. first — сколько пропустить, max — сколько вернуть.
+    /// </summary>
+    Task<Result<IReadOnlyList<IdentityUser>, Error>> SearchUsersAsync(
+        string? search,
+        int first,
+        int max,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Роли пользователя в клиенте (приложении), выданные ему напрямую. Роли по умолчанию realm (customer)
     /// сюда не входят — они есть у всех.
     /// </summary>

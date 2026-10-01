@@ -13,6 +13,9 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
 
     public Collection<(Guid UserId, string Name, string Value)> AttributeChanges { get; } = [];
 
+    /// <summary>С какими параметрами сервис искал пользователей.</summary>
+    public Collection<(string? Search, int First, int Max)> Searches { get; } = [];
+
     /// <summary>Пользователь в «Keycloak»: роли клиента sandbox-api (без customer — он по умолчанию у всех).</summary>
     public void Add(TestUser user, IReadOnlyList<string>? clientRoles = null, bool enabled = true, bool hasPassword = true)
     {
@@ -27,12 +30,31 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     {
         _accounts.Clear();
         AttributeChanges.Clear();
+        Searches.Clear();
     }
 
     public Task<Result<IdentityUser, Error>> GetUserAsync(Guid userId, CancellationToken cancellationToken) =>
         Task.FromResult(_accounts.TryGetValue(userId, out Account? account)
             ? Result.Success<IdentityUser, Error>(account.User)
             : IdentityProviderErrors.UserNotFound());
+
+    // Как search Admin API Keycloak: подстрока в логине или почте, по логину по возрастанию.
+    public Task<Result<IReadOnlyList<IdentityUser>, Error>> SearchUsersAsync(string? search, int first, int max, CancellationToken cancellationToken)
+    {
+        Searches.Add((search, first, max));
+        IReadOnlyList<IdentityUser> users =
+        [
+            .. _accounts.Values
+                .Select(account => account.User)
+                .Where(user => search is null
+                    || user.Username.Contains(search, StringComparison.OrdinalIgnoreCase)
+                    || (user.Email?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false))
+                .OrderBy(user => user.Username, StringComparer.Ordinal)
+                .Skip(first)
+                .Take(max),
+        ];
+        return Task.FromResult(Result.Success<IReadOnlyList<IdentityUser>, Error>(users));
+    }
 
     public Task<Result<IReadOnlyList<string>, Error>> GetClientRolesAsync(Guid userId, string clientId, CancellationToken cancellationToken) =>
         Task.FromResult(_accounts.TryGetValue(userId, out Account? account)

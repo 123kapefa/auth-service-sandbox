@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -5,6 +6,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using AuthService.Core.Abstractions;
 using CSharpFunctionalExtensions;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using SharedKernel;
 
@@ -41,6 +43,30 @@ internal sealed partial class KeycloakAdminClient(
 
         UserRepresentation? user = await message.Content.ReadFromJsonAsync<UserRepresentation>(cancellationToken);
         return user is null ? IdentityProviderErrors.Unavailable() : ToIdentityUser(user);
+    }
+
+    public async Task<Result<IReadOnlyList<IdentityUser>, Error>> SearchUsersAsync(
+        string? search,
+        int first,
+        int max,
+        CancellationToken cancellationToken)
+    {
+        var query = new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["first"] = first.ToString(CultureInfo.InvariantCulture),
+            ["max"] = max.ToString(CultureInfo.InvariantCulture),
+            ["briefRepresentation"] = "false", // нужны атрибуты: телефон и режим
+        };
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query["search"] = search.Trim();
+        }
+
+        Result<UserRepresentation[], Error> users =
+            await GetJsonAsync<UserRepresentation[]>(QueryHelpers.AddQueryString("users", query), cancellationToken);
+        return users.IsSuccess
+            ? Result.Success<IReadOnlyList<IdentityUser>, Error>([.. users.Value.Select(ToIdentityUser)])
+            : users.Error;
     }
 
     public async Task<Result<IReadOnlyList<string>, Error>> GetClientRolesAsync(

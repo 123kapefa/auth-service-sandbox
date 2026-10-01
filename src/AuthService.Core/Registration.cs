@@ -1,3 +1,5 @@
+using AuthService.Core.Features.Admin.UseCases.GetUser;
+using AuthService.Core.Features.Admin.UseCases.GetUsers;
 using AuthService.Core.Features.Auth.Cookies;
 using AuthService.Core.Features.Auth.ReturnUrls;
 using AuthService.Core.Features.Auth.UseCases.Callback;
@@ -33,6 +35,8 @@ public static class Registration
         services.AddScoped<RefreshHandler>();
         services.AddScoped<LogoutHandler>();
         services.AddScoped<SwitchModeHandler>();
+        services.AddScoped<GetUsersHandler>();
+        services.AddScoped<GetUserHandler>();
 
         return services;
     }
