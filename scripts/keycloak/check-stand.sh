@@ -81,6 +81,21 @@ check "чужой redirect_uri отклонён" "$(authorize https://evil.examp
 check "без PKCE — ошибка invalid_request" \
   "$(authorize http://localhost:8080/auth/callback | grep -o 'error=invalid_request' || echo 'нет ошибки')" error=invalid_request
 
+echo "7. Служебная учётка sandbox-bff — Admin API (этап 4)"
+SECRET="${SANDBOX_BFF_CLIENT_SECRET:-$(grep -s '^SANDBOX_BFF_CLIENT_SECRET=' "$(dirname "$0")/../../.env" | cut -d= -f2)}"
+SA=$(curl -s -d grant_type=client_credentials -d client_id=sandbox-bff --data-urlencode "client_secret=$SECRET" \
+  "$KC/realms/$REALM/protocol/openid-connect/token" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("access_token",""))')
+check "токен служебной учётки (client_credentials)" "$([ -n "$SA" ] && echo да || echo нет)" да
+admin_api() { curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $SA" "$KC/admin/realms/$REALM/$1"; }
+check "читает пользователей (view-users)" "$(admin_api 'users?username=79990000001&exact=true')" 200
+check "читает события входа (view-events)" "$(admin_api 'events?max=1')" 200
+check "не читает клиентов realm — лишних прав нет" "$(admin_api clients)" 403
+# Краткое описание realm (GET) Keycloak отдаёт любой админской роли — проверяем запрет на изменение.
+check "не меняет настройки realm" "$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H "Authorization: Bearer $SA" \
+  -H 'Content-Type: application/json' -d '{"displayName":"x"}' "$KC/admin/realms/$REALM")" 403
+check "токен без секрета не выдаётся" "$(curl -s -o /dev/null -w '%{http_code}' -d grant_type=client_credentials -d client_id=sandbox-bff \
+  "$KC/realms/$REALM/protocol/openid-connect/token")" 401
+
 echo
 echo "Итого: $PASS ✓, $FAIL ✗"
 [ "$FAIL" -eq 0 ]

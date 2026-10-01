@@ -10,7 +10,10 @@ namespace AuthService.Infrastructure.Keycloak;
 
 public static class DependencyInjectionExtensions
 {
-    /// <summary>IIdentityProvider через Keycloak. Realm — секция Authentication, клиент — секция Keycloak.</summary>
+    /// <summary>
+    /// IIdentityProvider (вход) и IIdentityAdmin (Admin API) через Keycloak. Realm — секция Authentication,
+    /// клиент — секция Keycloak: тот же клиент ведёт вход и через свою служебную учётку ходит в Admin API.
+    /// </summary>
     public static IServiceCollection AddInfrastructureKeycloak(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddOptions<KeycloakOptions>()
@@ -20,6 +23,8 @@ public static class DependencyInjectionExtensions
         services.AddSingleton(TimeProvider.System);
 
         services.AddHttpClient<IIdentityProvider, KeycloakIdentityProvider>();
+        services.AddSingleton<KeycloakServiceAccount>();
+        services.AddHttpClient<IIdentityAdmin, KeycloakAdminClient>();
 
         // Discovery кэшируется и сам обновляется; адрес — тот же, по которому сервис берёт ключи для проверки токенов.
         services.AddSingleton<IConfigurationManager<OpenIdConnectConfiguration>>(provider =>

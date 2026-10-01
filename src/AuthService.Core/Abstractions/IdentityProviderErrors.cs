@@ -11,4 +11,8 @@ public static class IdentityProviderErrors
     /// <summary>Сервер входа недоступен или ответил ошибкой — можно повторить позже.</summary>
     public static Error Unavailable() =>
         Error.Failure("auth.provider.unavailable", "Сервер входа временно недоступен.").AsTransient();
+
+    /// <summary>Пользователя с таким id нет.</summary>
+    public static Error UserNotFound() =>
+        Error.NotFound("users.not_found", "Пользователь не найден.");
 }
