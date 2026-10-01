@@ -24,6 +24,9 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     /// <summary>Сессии пользователей: id сессии → (пользователь, приложения).</summary>
     private readonly ConcurrentDictionary<string, (Guid UserId, string[] Apps)> _sessions = new(StringComparer.Ordinal);
 
+    /// <summary>События входа «Keycloak», новые сверху.</summary>
+    public Collection<LoginEvent> LoginEvents { get; } = [];
+
     /// <summary>Какие сессии сервис завершил по одной.</summary>
     public Collection<string> DeletedSessions { get; } = [];
 
@@ -50,6 +53,7 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         AttributeChanges.Clear();
         Logouts.Clear();
         DeletedSessions.Clear();
+        LoginEvents.Clear();
         _sessions.Clear();
         RoleChanges.Clear();
         Searches.Clear();
@@ -137,6 +141,20 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
             ? Result.Success<IReadOnlyList<AppAccessInfo>, Error>(
                 [.. Apps.Select(app => new AppAccessInfo(app, $"Приложение {app}", !account.DeniedApps.Contains(app)))])
             : IdentityProviderErrors.UserNotFound());
+
+    public Task<Result<IReadOnlyList<LoginEvent>, Error>> GetLoginEventsAsync(
+        Guid? userId,
+        IReadOnlyCollection<string> types,
+        int first,
+        int max,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(Result.Success<IReadOnlyList<LoginEvent>, Error>(
+        [
+            .. LoginEvents
+                .Where(found => (userId is null || found.UserId == userId) && types.Contains(found.Type))
+                .Skip(first)
+                .Take(max),
+        ]));
 
     public void AddSession(TestUser user, string sessionId, params string[] apps)
     {

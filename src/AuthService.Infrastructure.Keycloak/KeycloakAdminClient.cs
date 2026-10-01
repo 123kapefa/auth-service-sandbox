@@ -192,6 +192,44 @@ internal sealed partial class KeycloakAdminClient(
         return client.Id;
     }
 
+    public async Task<Result<IReadOnlyList<LoginEvent>, Error>> GetLoginEventsAsync(
+        Guid? userId,
+        IReadOnlyCollection<string> types,
+        int first,
+        int max,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(types);
+
+        // type повторяется: events?type=LOGIN&type=LOGIN_ERROR&…
+        List<KeyValuePair<string, string?>> query =
+        [
+            .. types.Select(type => new KeyValuePair<string, string?>("type", type)),
+            new("first", first.ToString(CultureInfo.InvariantCulture)),
+            new("max", max.ToString(CultureInfo.InvariantCulture)),
+        ];
+        if (userId is { } id)
+        {
+            query.Add(new("user", id.ToString()));
+        }
+
+        Result<EventRepresentation[], Error> events =
+            await GetJsonAsync<EventRepresentation[]>(QueryHelpers.AddQueryString("events", query), cancellationToken);
+        return events.IsFailure
+            ? events.Error
+            : Result.Success<IReadOnlyList<LoginEvent>, Error>(
+            [
+                .. events.Value.Select(found => new LoginEvent(
+                    DateTimeOffset.FromUnixTimeMilliseconds(found.Time),
+                    found.Type,
+                    Guid.TryParse(found.UserId, out Guid user) ? user : null,
+                    found.IpAddress,
+                    found.ClientId,
+                    found.Error,
+                    found.Details?.GetValueOrDefault("username"))),
+            ]);
+    }
+
     public async Task<Result<bool, Error>> HasPasswordAsync(Guid userId, CancellationToken cancellationToken)
     {
         Result<Credential[], Error> credentials = await GetJsonAsync<Credential[]>($"users/{userId}/credentials", cancellationToken);
@@ -381,6 +419,15 @@ internal sealed partial class KeycloakAdminClient(
         [property: JsonPropertyName("start")] long Start,
         [property: JsonPropertyName("lastAccess")] long LastAccess,
         [property: JsonPropertyName("clients")] Dictionary<string, string>? Clients);
+
+    private sealed record EventRepresentation(
+        [property: JsonPropertyName("time")] long Time,
+        [property: JsonPropertyName("type")] string Type,
+        [property: JsonPropertyName("userId")] string? UserId,
+        [property: JsonPropertyName("ipAddress")] string? IpAddress,
+        [property: JsonPropertyName("clientId")] string? ClientId,
+        [property: JsonPropertyName("error")] string? Error,
+        [property: JsonPropertyName("details")] Dictionary<string, string>? Details);
 
     private sealed record Credential([property: JsonPropertyName("type")] string Type);
 

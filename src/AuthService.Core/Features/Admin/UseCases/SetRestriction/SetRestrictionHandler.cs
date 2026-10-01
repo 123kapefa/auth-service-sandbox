@@ -7,6 +7,7 @@ using FluentValidation;
 using FluentValidation.Results;
 using SharedKernel;
 using Validation;
+using AuthService.Domain.AuditLog;
 
 namespace AuthService.Core.Features.Admin.UseCases.SetRestriction;
 
@@ -21,6 +22,7 @@ public sealed class SetRestrictionHandler(
     IValidator<SetRestrictionRequest> validator,
     AdminTargets targets,
     AccessRevoker revoker,
+    AdminAudit audit,
     TimeProvider timeProvider,
     GetUserHandler getUser)
 {
@@ -50,12 +52,22 @@ public sealed class SetRestrictionHandler(
             return user.Error;
         }
 
-        UnitResult<Error> changed = request.Restricted!.Value
+        bool restricted = request.Restricted!.Value;
+        UnitResult<Error> changed = restricted
             ? await BlockAsync(user.Value, request.Reason, cancellationToken)
             : await UnblockAsync(user.Value, cancellationToken);
         if (changed.IsFailure)
         {
             return changed.Error;
+        }
+
+        if (restricted == user.Value.Enabled)
+        {
+            await audit.RecordAsync(
+                AuditActions.USER_RESTRICTION_CHANGED,
+                user.Value,
+                new { restricted = new { old = !user.Value.Enabled, @new = restricted }, reason = restricted ? request.Reason?.Trim() : null },
+                cancellationToken);
         }
 
         return await getUser.Handle(userId, onlyCustomers: false, cancellationToken);

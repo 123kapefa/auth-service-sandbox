@@ -243,6 +243,38 @@ MASTER=$(curl -s -d grant_type=password -d client_id=admin-cli -d "username=${KE
 check "сессия удалена в админке Keycloak" "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer $MASTER" "$KC/admin/realms/sandbox/sessions/$TABLET_SID")" 204
 sleep 1
 check "после: access-токен — 401 (Keycloak сообщил сервису)" "$(status "$TABLET" GET /me/)" 401
+
+echo "8. Журнал: действия сотрудников и входы"
+ADMIN="$WORK/admin3"; MANAGER="$WORK/manager3"; : > "$ADMIN"; : > "$MANAGER"
+login "$ADMIN" /me/ 1234567890 > /dev/null
+login "$MANAGER" /me/ 0987654321 > /dev/null
+ACTIONS='",".join(sorted({i["action"] for i in r["items"]}))'
+check "действия с покупателем записаны (разделы 3–5)" \
+  "$(admin_get "$ADMIN" "/auth/admin/audit?objectId=$ID_CUSTOMER&pageSize=100" "$ACTIONS")" \
+  "200 UserAppAccessChanged,UserRestrictionChanged,UserRoleChanged"
+BLOCK='[i for i in r["items"] if i["action"] == "UserRestrictionChanged" and i["changes"]["restricted"]["new"]][0]'
+check "блокировка: кто, в каком режиме, причина" \
+  "$(admin_get "$ADMIN" "/auth/admin/audit?objectId=$ID_CUSTOMER&action=UserRestrictionChanged&pageSize=100" "$BLOCK"'["actorName"] + " " + '"$BLOCK"'["actorRole"] + " " + '"$BLOCK"'["changes"]["reason"]')" \
+  "200 +70987654321 manager проверка check-admin.sh"
+check "смена роли: было → стало" \
+  "$(admin_get "$ADMIN" "/auth/admin/audit?objectId=$ID_CUSTOMER&action=UserRoleChanged&pageSize=1" 'r["items"][0]["changes"]["role"]["old"] + "→" + r["items"][0]["changes"]["role"]["new"]')" \
+  "200 admin→customer"
+check "«выйти везде» записано" \
+  "$(admin_get "$ADMIN" "/auth/admin/audit?objectId=$ID_MANAGER_CUSTOMER&action=UserLoggedOutEverywhere&pageSize=1" 'r["items"][0]["objectName"]')" \
+  "200 79990000003"
+check "фильтр по автору: действия менеджера" \
+  "$(admin_get "$ADMIN" "/auth/admin/audit?actorId=$ID_MANAGER&pageSize=100" 'str(all(i["actorName"] == "+70987654321" for i in r["items"]) and len(r["items"]) > 0)')" \
+  "200 True"
+check "менеджеру журнал недоступен — 403" "$(status "$MANAGER" GET /auth/admin/audit)" 403
+login "$WORK/wrong" /me/ 79990000001 wrong-password > /dev/null   # неудачный вход — событие LOGIN_ERROR
+check "входы покупателя: LOGIN и LOGIN_ERROR" \
+  "$(admin_get "$ADMIN" "/auth/admin/login-events?userId=$ID_CUSTOMER&pageSize=100" '",".join(sorted({i["type"] for i in r["items"]} & {"LOGIN", "LOGIN_ERROR"}))')" \
+  "200 LOGIN,LOGIN_ERROR"
+check "ошибка входа с причиной" \
+  "$(admin_get "$ADMIN" "/auth/admin/login-events?userId=$ID_CUSTOMER&pageSize=100" '[i for i in r["items"] if i["type"] == "LOGIN_ERROR"][0]["error"]')" \
+  "200 invalid_user_credentials"
+check "в карточке — последний вход" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER" 'str(r["lastLoginAt"] is not None)')" "200 True"
+for JAR in "$ADMIN" "$MANAGER"; do status "$JAR" POST /auth/logout > /dev/null; done
 for JAR in "$ADMIN" "$MANAGER"; do status "$JAR" POST /auth/logout > /dev/null; done
 
 summary

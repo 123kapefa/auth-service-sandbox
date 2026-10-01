@@ -17,6 +17,12 @@ COPY src/Shared/Validation/Validation.csproj src/Shared/Validation/
 RUN dotnet restore src/AuthService.Api/AuthService.Api.csproj
 COPY . .
 RUN dotnet publish src/AuthService.Api/AuthService.Api.csproj -c Release --no-restore -o /out/api
+# Мигратор (efbundle) — в том же образе, что и сервис: его запускает отдельный контейнер до старта сервиса.
+# Версия dotnet-ef — как у пакетов EF Core (Directory.Packages.props).
+RUN dotnet tool install --global dotnet-ef --version 10.0.7
+RUN /root/.dotnet/tools/dotnet-ef migrations bundle \
+      --project src/AuthService.Infrastructure.Postgres --startup-project src/AuthService.Infrastructure.Postgres \
+      --configuration Release --output /out/api/efbundle
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS api
 WORKDIR /app

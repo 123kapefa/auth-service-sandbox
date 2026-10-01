@@ -13,6 +13,7 @@ namespace AuthService.Contracts.Admin;
 /// <param name="RestrictionReason">Причина блокировки, если указана.</param>
 /// <param name="RestrictedAt">Когда заблокирован.</param>
 /// <param name="HasPassword">Задан ли пароль.</param>
+/// <param name="LastLoginAt">Последний вход (события Keycloak хранятся 30 дней; раньше — null).</param>
 public sealed record UserDetailResponse(
     Guid Id,
     string Username,
@@ -25,4 +26,5 @@ public sealed record UserDetailResponse(
     bool IsRestricted,
     string? RestrictionReason,
     DateTimeOffset? RestrictedAt,
-    bool HasPassword);
+    bool HasPassword,
+    DateTimeOffset? LastLoginAt);

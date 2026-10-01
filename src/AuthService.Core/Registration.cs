@@ -2,6 +2,7 @@ using AuthService.Core.Features.Admin;
 using AuthService.Core.Features.Admin.UseCases.AppAccess;
 using AuthService.Core.Features.Admin.UseCases.GetUser;
 using AuthService.Core.Features.Admin.UseCases.GetUsers;
+using AuthService.Core.Features.Admin.UseCases.Journal;
 using AuthService.Core.Features.Admin.UseCases.SetRestriction;
 using AuthService.Core.Features.Admin.UseCases.SetRole;
 using AuthService.Core.Features.Auth.Cookies;
@@ -49,6 +50,8 @@ public static class Registration
         services.AddScoped<AppAccessHandler>();
         services.AddScoped<AdminTargets>();
         services.AddScoped<AccessRevoker>();
+        services.AddScoped<AdminAudit>();
+        services.AddScoped<JournalHandler>();
         services.AddScoped<SessionsHandler>();
 
         return services;

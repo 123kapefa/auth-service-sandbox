@@ -6,6 +6,7 @@ using FluentValidation.Results;
 using SharedKernel;
 using Validation;
 using PlatformAuth.Revocation;
+using AuthService.Domain.AuditLog;
 
 namespace AuthService.Core.Features.Admin.UseCases.AppAccess;
 
@@ -19,6 +20,7 @@ public sealed class AppAccessHandler(
     IValidator<SetAppAccessRequest> validator,
     AdminTargets targets,
     ITokenRevocationStore revocations,
+    AdminAudit audit,
     TimeProvider timeProvider)
 {
     public async Task<Result<IReadOnlyList<AppAccessResponse>, Error>> GetAsync(
@@ -89,6 +91,12 @@ public sealed class AppAccessHandler(
                 // Токены этого приложения (azp) — недействительны сразу; токены остальных приложений не трогаем.
                 await revocations.RevokeAppAsync(clientId, userId.ToString(), timeProvider.GetUtcNow(), cancellationToken);
             }
+
+            await audit.RecordAsync(
+                AuditActions.USER_APP_ACCESS_CHANGED,
+                user.Value,
+                new { app = clientId, hasAccess = new { old = app.HasAccess, @new = hasAccess } },
+                cancellationToken);
         }
 
         return await ListAsync(userId, cancellationToken);

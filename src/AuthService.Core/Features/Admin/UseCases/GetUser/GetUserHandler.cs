@@ -41,6 +41,13 @@ public sealed class GetUserHandler(IIdentityAdmin identityAdmin, IOptions<JwtAut
             return hasPassword.Error;
         }
 
+        Result<IReadOnlyList<LoginEvent>, Error> lastLogin =
+            await identityAdmin.GetLoginEventsAsync(userId, [LoginEventTypes.LOGIN], 0, 1, cancellationToken);
+        if (lastLogin.IsFailure)
+        {
+            return lastLogin.Error;
+        }
+
         return new UserDetailResponse(
             user.Value.Id,
             user.Value.Username,
@@ -53,6 +60,7 @@ public sealed class GetUserHandler(IIdentityAdmin identityAdmin, IOptions<JwtAut
             !user.Value.Enabled,
             user.Value.RestrictionReason,
             user.Value.RestrictedAt,
-            hasPassword.Value);
+            hasPassword.Value,
+            lastLogin.Value.Count > 0 ? lastLogin.Value[0].Time : null);
     }
 }

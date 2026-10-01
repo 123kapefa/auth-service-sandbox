@@ -42,6 +42,17 @@ public interface IIdentityAdmin
     /// </summary>
     Task<Result<IReadOnlyList<AppAccessInfo>, Error>> GetAppAccessAsync(Guid userId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// События входа Keycloak (хранятся realm, eventsExpiration): новые сверху. userId null — всех пользователей;
+    /// types — какие (LOGIN, LOGIN_ERROR, LOGOUT…).
+    /// </summary>
+    Task<Result<IReadOnlyList<LoginEvent>, Error>> GetLoginEventsAsync(
+        Guid? userId,
+        IReadOnlyCollection<string> types,
+        int first,
+        int max,
+        CancellationToken cancellationToken);
+
     /// <summary>Задан ли пароль (пользователь мог войти только по коду).</summary>
     Task<Result<bool, Error>> HasPasswordAsync(Guid userId, CancellationToken cancellationToken);
 
@@ -96,6 +107,33 @@ public sealed record IdentitySession(
     DateTimeOffset StartedAt,
     DateTimeOffset LastAccessAt,
     IReadOnlyList<string> Apps);
+
+/// <summary>Событие входа на сервере входа.</summary>
+/// <param name="Time">Когда.</param>
+/// <param name="Type">LOGIN, LOGIN_ERROR, LOGOUT…</param>
+/// <param name="UserId">Кто (у неудачного входа с неизвестным логином — null).</param>
+/// <param name="IpAddress">С какого IP.</param>
+/// <param name="ClientId">В какое приложение.</param>
+/// <param name="Error">Причина ошибки (invalid_user_credentials, user_disabled…).</param>
+/// <param name="Username">Логин, если Keycloak его записал.</param>
+public sealed record LoginEvent(
+    DateTimeOffset Time,
+    string Type,
+    Guid? UserId,
+    string? IpAddress,
+    string? ClientId,
+    string? Error,
+    string? Username);
+
+/// <summary>Типы событий входа Keycloak, которые показывает журнал.</summary>
+public static class LoginEventTypes
+{
+    public const string LOGIN = "LOGIN";
+    public const string LOGIN_ERROR = "LOGIN_ERROR";
+    public const string LOGOUT = "LOGOUT";
+
+    public static IReadOnlyCollection<string> All { get; } = [LOGIN, LOGIN_ERROR, LOGOUT];
+}
 
 /// <summary>Приложение и доступ к нему пользователя.</summary>
 /// <param name="ClientId">Клиент приложения в Keycloak.</param>

@@ -40,6 +40,9 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
     /// <summary>Отметки об отзыве в памяти вместо Redis.</summary>
     public InMemoryTokenRevocations Revocations { get; } = new();
 
+    /// <summary>Журнал в памяти вместо Postgres.</summary>
+    public InMemoryAuditLog AuditLog { get; } = new();
+
     /// <summary>Подставной Admin API вместо Keycloak.</summary>
     public FakeIdentityAdmin IdentityAdmin { get; } = new();
 
@@ -115,6 +118,8 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
             });
             services.RemoveAll<IIdentityProvider>();
             services.AddSingleton<IIdentityProvider>(IdentityProvider);
+            services.RemoveAll<IAuditLog>();
+            services.AddSingleton<IAuditLog>(AuditLog);
             services.RemoveAll<ITokenRevocationStore>();
             services.AddSingleton<ITokenRevocationStore>(Revocations);
             services.RemoveAll<IIdentityAdmin>();

@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using PlatformAuth;
 using SharedKernel;
 using Validation;
+using AuthService.Domain.AuditLog;
 
 namespace AuthService.Core.Features.Admin.UseCases.SetRole;
 
@@ -25,6 +26,7 @@ public sealed class SetRoleHandler(
     IValidator<SetRoleRequest> validator,
     IOptions<JwtAuthenticationOptions> authentication,
     AccessRevoker revoker,
+    AdminAudit audit,
     TimeProvider timeProvider,
     GetUserHandler getUser)
 {
@@ -85,7 +87,17 @@ public sealed class SetRoleHandler(
         }
 
         UnitResult<Error> changed = await ApplyAsync(user.Value, clientId, grant, revoke, target, cancellationToken);
-        return changed.IsFailure ? changed.Error : await getUser.Handle(userId, onlyCustomers: false, cancellationToken);
+        if (changed.IsFailure)
+        {
+            return changed.Error;
+        }
+
+        await audit.RecordAsync(
+            AuditActions.USER_ROLE_CHANGED,
+            user.Value,
+            new { role = new { old = StaffRoles.Describe(current), @new = role } },
+            cancellationToken);
+        return await getUser.Handle(userId, onlyCustomers: false, cancellationToken);
     }
 
     private async Task<UnitResult<Error>> ApplyAsync(

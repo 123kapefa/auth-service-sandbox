@@ -1,3 +1,5 @@
+using AuthService.Core.Abstractions;
+using AuthService.Infrastructure.Postgres.AuditLog;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,9 +17,10 @@ public static class DependencyInjectionExtensions
 
         services.AddDbContext<AuthDbContext>(options =>
         {
-            options.UseNpgsql(connectionString);
+            options.UseNpgsql(connectionString, AuthDbContext.ConfigureNpgsql);
             options.UseSnakeCaseNamingConvention();
         });
+        services.AddScoped<IAuditLog, EfAuditLog>();
 
         return services;
     }

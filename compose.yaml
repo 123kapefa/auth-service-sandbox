@@ -34,10 +34,20 @@ services:
     ports:
       - "${MAILPIT_UI_PORT:-8025}:8025"
 
-  auth-service:
+  # Миграции базы сервиса: efbundle из образа сервиса (стандарт платформы — мигратор-sidecar). Отрабатывает и
+  # завершается; сервис ждёт его успеха. Образ собирается здесь, сервис берёт его по имени.
+  auth-migrator:
     build:
       context: .
       target: api
+    image: auth_service-api:local
+    entrypoint: ["./efbundle", "--connection", "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  auth-service:
+    image: auth_service-api:local
     # dotnet не должен быть PID 1: иначе упавший при старте процесс зависает, а контейнер остаётся "running".
     init: true
     ports:
@@ -52,6 +62,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      auth-migrator:
+        condition: service_completed_successfully
 
   # --- Keycloak (этап 1, docs/keycloak/01-stand.md) ---------------------------------
   # Отдельная БД: в реальных проектах Keycloak не делит базу с приложениями.

@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using PlatformAuth;
 using SharedKernel;
+using AuthService.Domain.AuditLog;
 
 namespace AuthService.Core.Features.Admin.UseCases.UserSessions;
 
@@ -45,6 +46,7 @@ public sealed class UserSessionsEndpoints : IEndpoint
         Guid userId,
         [FromServices] AdminTargets targets,
         [FromServices] AccessRevoker revoker,
+        [FromServices] AdminAudit audit,
         [FromServices] SessionsHandler sessions,
         CancellationToken cancellationToken)
     {
@@ -55,6 +57,11 @@ public sealed class UserSessionsEndpoints : IEndpoint
         }
 
         UnitResult<Error> loggedOut = await revoker.EndAllSessionsAsync(userId, cancellationToken);
+        if (loggedOut.IsSuccess)
+        {
+            await audit.RecordAsync(AuditActions.USER_LOGGED_OUT_EVERYWHERE, user.Value, new { }, cancellationToken);
+        }
+
         return loggedOut.IsFailure
             ? Result.Failure<SessionsResponse, Error>(loggedOut.Error)
             : await sessions.ListAsync(userId, currentSessionId: null, cancellationToken);
