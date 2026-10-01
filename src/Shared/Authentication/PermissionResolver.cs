@@ -10,21 +10,14 @@ public interface IPermissionResolver
 }
 
 /// <summary>
-/// Права считаются по активному режиму, а не по всем ролям сразу: админ в режиме покупателя
-/// получает права покупателя. Режим без соответствующей роли не даёт прав.
+/// Права — из claim permissions токена: их кладёт сервер входа (маппер приложения), уже по активному режиму —
+/// админ в режиме покупателя получает права покупателя. Карта «роль → права» живёт в Keycloak, а не в коде сервисов.
 /// </summary>
-internal sealed class ActiveModePermissionResolver(IRolePermissionMap map) : IPermissionResolver
+internal sealed class TokenPermissionResolver : IPermissionResolver
 {
     public IReadOnlySet<string> GetPermissions(ClaimsPrincipal user)
     {
         ArgumentNullException.ThrowIfNull(user);
-
-        string? activeMode = user.FindFirstValue(AuthClaims.ACTIVE_MODE);
-        if (activeMode is null || !user.IsInRole(activeMode))
-        {
-            return FrozenSet<string>.Empty;
-        }
-
-        return map.GetPermissions(activeMode).ToFrozenSet(StringComparer.Ordinal);
+        return user.FindAll(AuthClaims.PERMISSIONS).Select(claim => claim.Value).ToFrozenSet(StringComparer.Ordinal);
     }
 }

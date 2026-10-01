@@ -1,6 +1,8 @@
 package sandbox.keycloak.codelogin;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.RoleModel;
@@ -20,6 +22,33 @@ final class AppRoles {
 
     static boolean isPermission(RoleModel role) {
         return PERMISSION.equals(role.getFirstAttribute(KIND));
+    }
+
+    /**
+     * Права активного режима: режим — роль приложения, которая есть у пользователя; права — права в её составе
+     * (с вложенными составными ролями). Режима нет или такой роли у пользователя нет — прав нет.
+     */
+    static List<String> permissionsOf(ClientModel client, UserModel user, String activeMode) {
+        RoleModel mode = activeMode == null ? null : client.getRole(activeMode);
+        if (mode == null || isPermission(mode) || !user.hasRole(mode)) {
+            return List.of();
+        }
+
+        Set<RoleModel> composites = new HashSet<>();
+        collect(mode, composites);
+        return composites.stream()
+            .filter(AppRoles::isPermission)
+            .map(RoleModel::getName)
+            .sorted()
+            .toList();
+    }
+
+    private static void collect(RoleModel role, Set<RoleModel> into) {
+        role.getCompositesStream().forEach(child -> {
+            if (into.add(child)) {
+                collect(child, into); // защита от циклов: уже собранную роль не обходим повторно
+            }
+        });
     }
 
     /** Роли пользователя в приложении (с учётом ролей по умолчанию и групп), без прав, по алфавиту. */

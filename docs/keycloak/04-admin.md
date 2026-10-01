@@ -35,7 +35,7 @@
 | `GET /auth/login?reauth=true` | — | войти заново (`prompt=login`): пароль и 2FA, если включена |
 | `POST /auth/backchannel-logout` | подпись `logout_token` | Keycloak сообщает о сессиях, завершённых у него |
 
-Права по режимам (`AuthServiceRolePermissions`): менеджер — `users.view`, `users.block`; админ — всё, включая
+Права по режимам (с этапа 4а — составные роли в Keycloak, в токене — claim `permissions`): менеджер — `users.view`, `users.block`; админ — всё, включая
 `users.roles.manage`, `users.sessions.manage`, `audit.view`.
 
 ### Правила

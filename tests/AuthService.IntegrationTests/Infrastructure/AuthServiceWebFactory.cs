@@ -96,6 +96,7 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
                 [AuthClaims.ROLE] = user.Roles.ToArray(),
                 [AuthClaims.AVAILABLE_ROLES] = user.Roles.ToArray(),
                 [AuthClaims.ACTIVE_MODE] = user.ActiveMode,
+                [AuthClaims.PERMISSIONS] = RealmPermissions.Of(user.ActiveMode, user.Roles),
                 [AuthClaims.AUTH_TIME] = (authenticatedAt ?? DateTimeOffset.UtcNow).ToUnixTimeSeconds(),
                 [AuthClaims.SESSION_ID] = sessionId ?? $"session-{user.Id:N}",
                 [AuthClaims.AUTHORIZED_PARTY] = authorizedParty,

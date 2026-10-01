@@ -15,7 +15,7 @@ public static class AuthenticationConfiguration
         services.AddPlatformJwtAuthentication(configuration);
         services.AddPlatformTokenRevocation(configuration);
         services.AddPlatformAuthorization();
-        services.AddPlatformPermissions<AuthServiceRolePermissions>();
+        services.AddPlatformPermissions();
         services.AddInfrastructureKeycloak(configuration);
 
         return services;

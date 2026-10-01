@@ -7,6 +7,7 @@ import org.keycloak.models.ClientModel;
 import org.keycloak.models.ClientSessionContext;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.ProtocolMapperModel;
+import org.keycloak.models.UserModel;
 import org.keycloak.models.UserSessionModel;
 import org.keycloak.protocol.oidc.mappers.AbstractOIDCProtocolMapper;
 import org.keycloak.protocol.oidc.mappers.OIDCAccessTokenMapper;
@@ -17,14 +18,17 @@ import org.keycloak.provider.ProviderConfigProperty;
 import org.keycloak.representations.IDToken;
 
 /**
- * Роли приложения в токене: claims role и available_roles — только роли (режимы) клиента приложения, без прав.
- * Стандартный маппер ролей клиента положил бы и права: роли составные, права входят в них.
+ * Роли и права приложения в токене. role и available_roles — только роли (режимы) клиента приложения, без прав
+ * (стандартный маппер ролей клиента положил бы и права: роли составные). permissions — права активного режима:
+ * админ в режиме покупателя получает права покупателя. Сервисы читают права из токена — карта в их коде не нужна.
  */
 public final class AppRolesMapper extends AbstractOIDCProtocolMapper
     implements OIDCAccessTokenMapper, UserInfoTokenMapper, TokenIntrospectionTokenMapper {
 
     public static final String PROVIDER_ID = "sandbox-app-roles";
     public static final String ROLES_CLIENT = "roles.client";
+    public static final String MODE_ATTRIBUTE = "mode.attribute";
+    private static final String DEFAULT_MODE_ATTRIBUTE = "active_mode";
 
     private static final List<ProviderConfigProperty> CONFIG = new ArrayList<>();
 
@@ -35,6 +39,13 @@ public final class AppRolesMapper extends AbstractOIDCProtocolMapper
         client.setHelpText("Клиент, роли которого — роли и права приложения (например, sandbox-api).");
         client.setType(ProviderConfigProperty.CLIENT_LIST_TYPE);
         CONFIG.add(client);
+        ProviderConfigProperty mode = new ProviderConfigProperty();
+        mode.setName(MODE_ATTRIBUTE);
+        mode.setLabel("Атрибут активного режима");
+        mode.setHelpText("Атрибут пользователя с активным режимом в этом приложении (по умолчанию active_mode).");
+        mode.setType(ProviderConfigProperty.STRING_TYPE);
+        mode.setDefaultValue(DEFAULT_MODE_ATTRIBUTE);
+        CONFIG.add(mode);
         OIDCAttributeMapperHelper.addIncludeInTokensConfig(CONFIG, AppRolesMapper.class);
     }
 
@@ -55,7 +66,7 @@ public final class AppRolesMapper extends AbstractOIDCProtocolMapper
 
     @Override
     public String getHelpText() {
-        return "role и available_roles — роли (режимы) приложения без прав.";
+        return "role и available_roles — роли (режимы) приложения без прав; permissions — права активного режима.";
     }
 
     @Override
@@ -71,8 +82,11 @@ public final class AppRolesMapper extends AbstractOIDCProtocolMapper
             return;
         }
 
-        List<String> roles = AppRoles.rolesOf(client, userSession.getUser());
+        UserModel user = userSession.getUser();
+        List<String> roles = AppRoles.rolesOf(client, user);
+        String modeAttribute = mapping.getConfig().getOrDefault(MODE_ATTRIBUTE, DEFAULT_MODE_ATTRIBUTE);
         token.getOtherClaims().put("role", roles);
         token.getOtherClaims().put("available_roles", roles);
+        token.getOtherClaims().put("permissions", AppRoles.permissionsOf(client, user, user.getFirstAttribute(modeAttribute)));
     }
 }

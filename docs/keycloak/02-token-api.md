@@ -11,20 +11,22 @@
 ## Как устроено
 
 ```
-Keycloak ──(access-токен: role, active_mode, phone, aud, iss)──► AuthService
+Keycloak ──(access-токен: role, active_mode, permissions, phone, aud, iss)──► AuthService
                                                                   │
    Shared/Authentication (переиспользуемая библиотека, будущий NuGet)
      AddPlatformJwtAuthentication   подпись RS256 по ключам из discovery, iss, aud, срок
      AddPlatformAuthorization       политики AdminOnly, ManagerOrAdmin («роль + режим»)
-     AddPlatformPermissions<TMap>   права по активному режиму + CurrentUser («кто вызвал»)
+     AddPlatformPermissions         права из токена (claim permissions) + CurrentUser («кто вызвал»)
                                                                   │
    AuthService.Core
-     Authorization/                 карта «роль → права» этого сервиса
+     Authorization/                 константы прав этого сервиса
      Features/Me, Features/Demo     эндпоинты (IEndpoint)
 ```
 
-Библиотека не знает прав конкретного сервиса: карту задаёт сервис (`AuthServiceRolePermissions`).
-Другой проект подключит те же три вызова со своей картой.
+С этапа 4а карта «роль → права» живёт в Keycloak (составные роли клиента приложения), а права активного режима
+приходят в токене — их кладёт маппер плагина ([04a-roles.md](04a-roles.md)). Сервис держит только константы прав,
+по которым эндпоинты их требуют; другой проект подключит те же три вызова. До 4а карту задавал код сервиса
+(`AuthServiceRolePermissions`) — схема выше показана уже в новом виде.
 
 ### Токен
 

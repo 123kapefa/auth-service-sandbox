@@ -16,6 +16,9 @@ public static class AuthClaims
 
     public const string PHONE = "phone";
 
+    /// <summary>Права активного режима (массив): кладёт сервер входа, по ним RequirePermissions.</summary>
+    public const string PERMISSIONS = "permissions";
+
     /// <summary>Приложение (клиент), которому выдан токен.</summary>
     public const string AUTHORIZED_PARTY = "azp";
 

@@ -22,6 +22,7 @@ public sealed class CurrentUserTests
                 new(AuthClaims.ROLE, AuthModes.ADMIN),
                 new(AuthClaims.AVAILABLE_ROLES, AuthModes.CUSTOMER),
                 new(AuthClaims.AVAILABLE_ROLES, AuthModes.ADMIN),
+                new(AuthClaims.PERMISSIONS, "things.delete"),
             ],
             "test",
             AuthClaims.SUBJECT,
@@ -54,16 +55,10 @@ public sealed class CurrentUserTests
     private static CurrentUser Resolve(ClaimsIdentity identity)
     {
         ServiceProvider services = new ServiceCollection()
-            .AddPlatformPermissions<TestRolePermissions>()
+            .AddPlatformPermissions()
             .BuildServiceProvider();
 
         services.GetRequiredService<IHttpContextAccessor>().HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) };
         return services.CreateScope().ServiceProvider.GetRequiredService<CurrentUser>();
-    }
-
-    private sealed class TestRolePermissions : IRolePermissionMap
-    {
-        public IReadOnlyCollection<string> GetPermissions(string role) =>
-            role == AuthModes.ADMIN ? ["things.delete"] : [];
     }
 }

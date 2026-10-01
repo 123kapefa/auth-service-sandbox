@@ -27,7 +27,7 @@ docker compose up -d --build --wait keycloak
 scripts/keycloak/check-stand.sh
 ```
 
-Ожидается `Итого: 41 ✓, 0 ✗`.
+Ожидается `Итого: 44 ✓, 0 ✗`.
 
 | Что | Адрес | Доступ |
 |---|---|---|---|
@@ -86,7 +86,7 @@ Keycloak; проекты друг друга не видят. **Приложен
 | `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал; `lib.sh` — общие помощники |
 | `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права, хук мгновенного отзыва — переиспользуемая библиотека |
 | `src/Shared/Authentication.Redis` | отметки отзыва в Redis, кэш проверки, `AddPlatformTokenRevocation` |
-| `src/AuthService.Core/Authorization` | карта «роль → права» сервиса |
+| `src/AuthService.Core/Authorization` | константы прав сервиса (сам состав ролей — в Keycloak, с этапа 4а) |
 | `src/AuthService.Core/Features/Auth` | вход, callback, refresh, выход, режим, back-channel logout; cookie и `return_to` |
 | `src/AuthService.Core/Features/Admin`, `Features/Security` | API администрирования и своих сессий |
 | `src/AuthService.Infrastructure.Postgres` | база сервиса: журнал `auth.audit_entries`, миграции |
