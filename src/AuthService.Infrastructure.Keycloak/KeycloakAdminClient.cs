@@ -69,6 +69,63 @@ internal sealed partial class KeycloakAdminClient(
             : users.Error;
     }
 
+    public async Task<Result<IdentityUser?, Error>> FindUserExactAsync(string login, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(login);
+        string trimmed = login.Trim();
+        var query = new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            [trimmed.Contains('@', StringComparison.Ordinal) ? "email" : "username"] = trimmed,
+            ["exact"] = "true",
+            ["briefRepresentation"] = "false",
+        };
+        Result<UserRepresentation[], Error> users =
+            await GetJsonAsync<UserRepresentation[]>(QueryHelpers.AddQueryString("users", query), cancellationToken);
+        if (users.IsFailure)
+        {
+            return users.Error;
+        }
+
+        return users.Value.Length == 1 ? ToIdentityUser(users.Value[0]) : (IdentityUser?)null;
+    }
+
+    public async Task<Result<IReadOnlyList<IdentityUser>, Error>> GetRoleUsersAsync(
+        string clientId,
+        string roleName,
+        int first,
+        int max,
+        CancellationToken cancellationToken)
+    {
+        Result<string, Error> client = await FindClientIdAsync(clientId, cancellationToken);
+        if (client.IsFailure)
+        {
+            return IdentityProviderErrors.AppNotFound();
+        }
+
+        string path = QueryHelpers.AddQueryString(
+            $"clients/{client.Value}/roles/{Uri.EscapeDataString(roleName)}/users",
+            new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["first"] = first.ToString(CultureInfo.InvariantCulture),
+                ["max"] = max.ToString(CultureInfo.InvariantCulture),
+                ["briefRepresentation"] = "false",
+            });
+        Result<UserRepresentation[], Error> users = await GetJsonAsync<UserRepresentation[]>(path, cancellationToken);
+        return users.IsSuccess
+            ? Result.Success<IReadOnlyList<IdentityUser>, Error>([.. users.Value.Select(ToIdentityUser)])
+            : users.Error;
+    }
+
+    public async Task<Result<IReadOnlyList<ClientInfo>, Error>> GetClientsAsync(CancellationToken cancellationToken)
+    {
+        // Служебная учётка видит только клиенты, на которые ей дано право (FGAP v2).
+        Result<ClientRepresentation[], Error> clients = await GetJsonAsync<ClientRepresentation[]>("clients", cancellationToken);
+        return clients.IsSuccess
+            ? Result.Success<IReadOnlyList<ClientInfo>, Error>(
+                [.. clients.Value.OrderBy(client => client.ClientId, StringComparer.Ordinal).Select(client => new ClientInfo(client.ClientId, client.Name))])
+            : clients.Error;
+    }
+
     public async Task<Result<IReadOnlyList<string>, Error>> GetClientRolesAsync(
         Guid userId,
         string clientId,

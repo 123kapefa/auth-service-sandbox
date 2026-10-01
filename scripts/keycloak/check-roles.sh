@@ -166,8 +166,14 @@ check "админ 1С видит роли своего приложения" \
 check "роли приложения сервиса — 403" "$(call "$APP_ADMIN" GET /auth/admin/apps/sandbox-api/roles)" "403 apps.forbidden"
 check "пользователи проекта — 403" "$(status "$APP_ADMIN" GET /auth/admin/users)" 403
 check "блокировка аккаунта — 403" "$(curl -s -o /dev/null -w '%{http_code}' -b "$APP_ADMIN" -X PUT -H 'Content-Type: application/json' -d '{"restricted":true}' "$API/auth/admin/users/$OPERATOR_ID/restriction")" 403
-check "поиск пользователя с ролями в 1С" \
-  "$(call "$APP_ADMIN" GET "$APP/users?search=79990000008" '' '",".join(r["items"][0]["roles"])')" "200 operator"
+check "админка: «кто я» — только своё приложение" \
+  "$(call "$APP_ADMIN" GET /auth/admin/me '' '",".join(a["clientId"] + ":" + str(a["viaProject"]) for a in r["apps"])')" "200 manager-1c:False"
+check "пользователи 1С — только с ролью в нём" \
+  "$(call "$APP_ADMIN" GET "$APP/users" '' '",".join(u["username"] + ":" + "+".join(u["roles"]) for u in r["items"])')" \
+  "200 79990000007:admin,79990000008:operator"
+check "точный поиск по телефону — человек без роли" \
+  "$(call "$APP_ADMIN" GET "$APP/users?search=%2B7%20999%20000-00-01" '' 'r["items"][0]["username"] + ":" + str(len(r["items"][0]["roles"]))')" "200 79990000001:0"
+check "по части номера базу не перебрать" "$(call "$APP_ADMIN" GET "$APP/users?search=7999" '' 'str(len(r["items"]))')" "200 0"
 check "своё право приложения" \
   "$(call "$APP_ADMIN" POST "$APP/permissions" '{"name":"orders.export","description":"Выгрузка заказов"}' '[p["source"] for p in r if p["name"] == "orders.export"][0]')" "200 admin"
 check "своя роль приложения" \

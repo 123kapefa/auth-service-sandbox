@@ -30,6 +30,7 @@ public sealed class AppAdminTests : IClassFixture<AuthServiceWebFactory>
         factory.Revocations.Reset();
         factory.AuditLog.Reset();
         _keycloak.Add(TestUser.AdminInAdminMode, [AuthModes.ADMIN]);
+        _keycloak.Add(TestUser.AdminInCustomerMode, [AuthModes.ADMIN]); // роль admin есть, режим — customer
         _keycloak.Add(TestUser.Customer, []);
         _keycloak.Add(_appAdmin, []);
         _keycloak.SetAppRoles(_appAdmin, FakeIdentityAdmin.MANAGER_1C, "admin");
@@ -72,8 +73,6 @@ public sealed class AppAdminTests : IClassFixture<AuthServiceWebFactory>
     public async Task ProjectAdmin_InCustomerMode_ServiceApp_Forbidden()
     {
         // Роль admin в sandbox-api есть, но режим — customer: в приложении сервиса действуют только права режима.
-        _keycloak.Add(TestUser.AdminInCustomerMode, [AuthModes.ADMIN]);
-
         await AssertErrorAsync(await SendAsync(TestUser.AdminInCustomerMode, HttpMethod.Get, "/auth/admin/apps/sandbox-api/roles"), HttpStatusCode.Forbidden, "apps.forbidden");
     }
 
@@ -89,6 +88,75 @@ public sealed class AppAdminTests : IClassFixture<AuthServiceWebFactory>
         JsonElement user = Assert.Single(page.GetProperty("items").EnumerateArray());
         Assert.Equal(_operator.Id, user.GetProperty("id").GetGuid());
         Assert.Equal(["operator"], Strings(user, "roles"));
+    }
+
+    [Fact]
+    public async Task AppUsers_NoSearch_OnlyWithRoleInApp()
+    {
+        JsonElement page = await ResultAsync(await SendAsync(_appAdmin, HttpMethod.Get, $"{APP}/users"));
+
+        Guid[] ids = [.. page.GetProperty("items").EnumerateArray().Select(user => user.GetProperty("id").GetGuid())];
+        Assert.Equal(new[] { _appAdmin.Id, _operator.Id }.Order(), ids.Order());
+    }
+
+    [Fact]
+    public async Task AppUsers_ExactPhone_FindsUserWithoutRole()
+    {
+        string phone = Uri.EscapeDataString(TestUser.Customer.Phone);
+
+        JsonElement page = await ResultAsync(await SendAsync(_appAdmin, HttpMethod.Get, $"{APP}/users?search={phone}"));
+
+        JsonElement user = Assert.Single(page.GetProperty("items").EnumerateArray());
+        Assert.Equal(TestUser.Customer.Id, user.GetProperty("id").GetGuid());
+        Assert.Empty(Strings(user, "roles"));
+    }
+
+    [Fact]
+    public async Task AppUsers_PartialSearch_NothingFound()
+    {
+        JsonElement page = await ResultAsync(await SendAsync(_appAdmin, HttpMethod.Get, $"{APP}/users?search=7999"));
+
+        Assert.Empty(page.GetProperty("items").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task AdminMe_AppAdmin_OnlyOwnApp()
+    {
+        JsonElement me = await ResultAsync(await SendAsync(_appAdmin, HttpMethod.Get, "/auth/admin/me"));
+
+        JsonElement app = Assert.Single(me.GetProperty("apps").EnumerateArray());
+        Assert.Equal("manager-1c", app.GetProperty("clientId").GetString());
+        Assert.False(app.GetProperty("viaProject").GetBoolean());
+        Assert.Equal(["roles.manage", "users.roles.manage"], [.. Strings(app, "permissions").Order(StringComparer.Ordinal)]);
+        Assert.Equal(["profile.view"], Strings(me, "permissions"));
+    }
+
+    [Fact]
+    public async Task AdminMe_ProjectAdmin_AllAppsWithRoles()
+    {
+        JsonElement me = await ResultAsync(await SendAsync(TestUser.AdminInAdminMode, HttpMethod.Get, "/auth/admin/me"));
+
+        Assert.Equal(["manager-1c", "sandbox-api"], [.. me.GetProperty("apps").EnumerateArray().Select(app => app.GetProperty("clientId").GetString()!)]);
+        Assert.All(me.GetProperty("apps").EnumerateArray(), app => Assert.True(app.GetProperty("viaProject").GetBoolean()));
+        Assert.Contains("audit.view", Strings(me, "permissions"));
+    }
+
+    [Theory]
+    [MemberData(nameof(NotAdmins))]
+    public async Task AdminMe_NotAdmin_NoApps(TestUser caller)
+    {
+        JsonElement me = await ResultAsync(await SendAsync(caller, HttpMethod.Get, "/auth/admin/me"));
+
+        Assert.Empty(me.GetProperty("apps").EnumerateArray());
+    }
+
+    public static TheoryData<TestUser> NotAdmins => [TestUser.Customer, _operator, TestUser.AdminInCustomerMode];
+
+    [Fact]
+    public async Task AdminMe_Anonymous_Unauthorized()
+    {
+        using HttpClient client = _factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(new Uri("/auth/admin/me", UriKind.Relative))).StatusCode);
     }
 
     [Fact]

@@ -11,7 +11,8 @@ using SharedKernel;
 namespace AuthService.Core.Features.Admin.UseCases.AppUsers;
 
 /// <summary>
-/// GET /auth/admin/apps/{clientId}/users?search&amp;page&amp;pageSize — пользователи и их роли в приложении; право
+/// GET /auth/admin/apps/{clientId}/users?search&amp;page&amp;pageSize — пользователи с ролью в приложении, search — точный
+/// телефон или почта (найти человека, чтобы выдать роль); право
 /// users.roles.manage (у админа проекта — в токене, у админа приложения — в самом приложении).
 /// </summary>
 public sealed class AppUsersEndpoint : IEndpoint

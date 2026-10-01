@@ -1,6 +1,9 @@
 namespace AuthService.Contracts.Admin;
 
-/// <summary>Пользователи для админа приложения: найти человека и выдать ему роль. Без данных аккаунта (блокировка и т. п.).</summary>
+/// <summary>
+/// Пользователи приложения для его админа: с ролью в приложении или один — по точному телефону или почте. Без данных
+/// аккаунта (блокировка и т. п.).
+/// </summary>
 public sealed record AppUsersPageResponse(IReadOnlyList<AppUserResponse> Items, int Page, int PageSize, bool HasMore);
 
 /// <summary>Пользователь и его выданные роли в приложении.</summary>

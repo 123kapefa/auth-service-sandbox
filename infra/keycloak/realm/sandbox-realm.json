@@ -855,22 +855,24 @@
     {
       "id": "2631bc45-b176-4774-927a-b6dd4e310582",
       "clientId": "sandbox-api",
-      "name": "Sandbox API (носитель ролей и audience)",
+      "name": "Auth Sandbox",
       "enabled": true,
       "bearerOnly": true,
       "publicClient": false,
       "standardFlowEnabled": false,
-      "directAccessGrantsEnabled": false
+      "directAccessGrantsEnabled": false,
+      "description": "Приложение сервиса входа: носитель ролей и audience"
     },
     {
       "id": "5e0c1b7a-1c00-4d1c-9a11-3c1c0000a1c1",
       "clientId": "manager-1c",
-      "name": "Менеджер 1С (второе демо-приложение: носитель ролей и audience)",
+      "name": "Менеджер 1С",
       "enabled": true,
       "bearerOnly": true,
       "publicClient": false,
       "standardFlowEnabled": false,
-      "directAccessGrantsEnabled": false
+      "directAccessGrantsEnabled": false,
+      "description": "Второе демо-приложение: носитель ролей и audience"
     },
     {
       "id": "7d0f5b8e-3c2a-4f51-9a6e-2b8d41c0e7a1",

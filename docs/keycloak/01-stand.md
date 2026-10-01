@@ -83,6 +83,14 @@ curl -s -d grant_type=password -d client_id=dev-cli -d username=79990000002 -d '
 docker compose rm -sfv keycloak keycloak-postgres && docker volume rm auth_service_keycloak_postgres_data && docker compose up -d --wait keycloak
 ```
 
+Если подняты Redis и сервис (этап 4 и дальше), после пересоздания — очистить отметки и перезапустить сервис (ключи
+подписи Keycloak новые). Иначе отметки «доступ изменился» прошлого стенда (живут 16 минут) сравниваются с версиями
+нового, где их ещё нет, и токены получают 401 `access_changed`:
+
+```bash
+docker compose exec -T redis redis-cli FLUSHALL && docker compose restart auth-service
+```
+
 ```bash
 scripts/keycloak/check-stand.sh
 ```

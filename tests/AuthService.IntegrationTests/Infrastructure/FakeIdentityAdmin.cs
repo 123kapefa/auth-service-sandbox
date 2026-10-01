@@ -102,6 +102,44 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         return Task.FromResult(Result.Success<IReadOnlyList<IdentityUser>, Error>(users));
     }
 
+    public Task<Result<IdentityUser?, Error>> FindUserExactAsync(string login, CancellationToken cancellationToken)
+    {
+        IdentityUser? user = _accounts.Values
+            .Select(account => account.User)
+            .FirstOrDefault(found => string.Equals(found.Username, login, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(found.Email, login, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(Result.Success<IdentityUser?, Error>(user));
+    }
+
+    public Task<Result<IReadOnlyList<IdentityUser>, Error>> GetRoleUsersAsync(
+        string clientId,
+        string roleName,
+        int first,
+        int max,
+        CancellationToken cancellationToken)
+    {
+        if (!_appRoles.ContainsKey(clientId))
+        {
+            return Task.FromResult(Result.Failure<IReadOnlyList<IdentityUser>, Error>(IdentityProviderErrors.AppNotFound()));
+        }
+
+        IReadOnlyList<IdentityUser> users =
+        [
+            .. _accounts.Values
+                .Where(account => account.RolesIn(clientId).Contains(roleName, StringComparer.Ordinal))
+                .Select(account => account.User)
+                .OrderBy(user => user.Username, StringComparer.Ordinal)
+                .Skip(first)
+                .Take(max),
+        ];
+        return Task.FromResult(Result.Success<IReadOnlyList<IdentityUser>, Error>(users));
+    }
+
+    // Как FGAP v2: учётка видит клиенты приложений и клиенты входа.
+    public Task<Result<IReadOnlyList<ClientInfo>, Error>> GetClientsAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(Result.Success<IReadOnlyList<ClientInfo>, Error>(
+            [.. _appRoles.Keys.Order(StringComparer.Ordinal).Select(clientId => new ClientInfo(clientId, $"Приложение {clientId}"))]));
+
     public Task<Result<IReadOnlyList<string>, Error>> GetClientRolesAsync(Guid userId, string clientId, CancellationToken cancellationToken) =>
         Task.FromResult(_accounts.TryGetValue(userId, out Account? account)
             ? Result.Success<IReadOnlyList<string>, Error>(account.RolesIn(clientId))

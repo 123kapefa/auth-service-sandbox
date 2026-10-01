@@ -19,6 +19,22 @@ public interface IIdentityAdmin
         int max,
         CancellationToken cancellationToken);
 
+    /// <summary>Пользователь по точному логину: почта (с «@») или логин-телефон цифрами; нет — null.</summary>
+    Task<Result<IdentityUser?, Error>> FindUserExactAsync(string login, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Пользователи, которым роль клиента выдана напрямую (без ролей по умолчанию). Нет такого клиента или роли — NotFound.
+    /// </summary>
+    Task<Result<IReadOnlyList<IdentityUser>, Error>> GetRoleUsersAsync(
+        string clientId,
+        string roleName,
+        int first,
+        int max,
+        CancellationToken cancellationToken);
+
+    /// <summary>Клиенты, видимые служебной учётке (FGAP v2): clientId и название.</summary>
+    Task<Result<IReadOnlyList<ClientInfo>, Error>> GetClientsAsync(CancellationToken cancellationToken);
+
     /// <summary>
     /// Роли пользователя в клиенте (приложении), выданные ему напрямую. Роли по умолчанию realm (customer)
     /// сюда не входят — они есть у всех.
@@ -193,6 +209,9 @@ public static class AppRoleKinds
     public const string SOURCE_CODE = "code";
     public const string SOURCE_ADMIN = "admin";
 }
+
+/// <summary>Клиент Keycloak: clientId и название.</summary>
+public sealed record ClientInfo(string ClientId, string? Name);
 
 /// <summary>Приложение и доступ к нему пользователя.</summary>
 /// <param name="ClientId">Клиент приложения в Keycloak.</param>
