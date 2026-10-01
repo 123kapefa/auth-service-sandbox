@@ -65,6 +65,17 @@ public interface IIdentityAdmin
     /// <summary>Обновить описание и атрибуты роли клиента приложения.</summary>
     Task<UnitResult<Error>> UpdateAppRoleAsync(string clientId, AppRole role, CancellationToken cancellationToken);
 
+    /// <summary>Состав роли приложения: имена ролей (прав), которые в неё входят напрямую.</summary>
+    Task<Result<IReadOnlyList<string>, Error>> GetRoleCompositesAsync(string clientId, string roleName, CancellationToken cancellationToken);
+
+    /// <summary>Изменить состав роли: добавить и убрать роли (права) клиента приложения.</summary>
+    Task<UnitResult<Error>> SetRoleCompositesAsync(
+        string clientId,
+        string roleName,
+        IReadOnlyCollection<string> add,
+        IReadOnlyCollection<string> remove,
+        CancellationToken cancellationToken);
+
     /// <summary>Удалить роль клиента приложения; Keycloak убирает её и из составных ролей.</summary>
     Task<UnitResult<Error>> DeleteAppRoleAsync(string clientId, string name, CancellationToken cancellationToken);
 

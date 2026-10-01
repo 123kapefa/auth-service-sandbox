@@ -290,6 +290,66 @@ internal sealed partial class KeycloakAdminClient(
             : await SendExpectingSuccessAsync(HttpMethod.Delete, $"clients/{client.Value}/roles/{Uri.EscapeDataString(name)}", cancellationToken);
     }
 
+    public async Task<Result<IReadOnlyList<string>, Error>> GetRoleCompositesAsync(
+        string clientId,
+        string roleName,
+        CancellationToken cancellationToken)
+    {
+        Result<string, Error> client = await FindClientIdAsync(clientId, cancellationToken);
+        if (client.IsFailure)
+        {
+            return IdentityProviderErrors.AppNotFound();
+        }
+
+        Result<RoleRepresentation[], Error> composites = await GetJsonAsync<RoleRepresentation[]>(
+            $"clients/{client.Value}/roles/{Uri.EscapeDataString(roleName)}/composites", cancellationToken);
+        return composites.IsFailure
+            ? composites.Error
+            : Result.Success<IReadOnlyList<string>, Error>([.. composites.Value.Select(role => role.Name).Order(StringComparer.Ordinal)]);
+    }
+
+    public async Task<UnitResult<Error>> SetRoleCompositesAsync(
+        string clientId,
+        string roleName,
+        IReadOnlyCollection<string> add,
+        IReadOnlyCollection<string> remove,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(add);
+        ArgumentNullException.ThrowIfNull(remove);
+
+        Result<string, Error> client = await FindClientIdAsync(clientId, cancellationToken);
+        if (client.IsFailure)
+        {
+            return IdentityProviderErrors.AppNotFound();
+        }
+
+        // Состав меняется по id и имени ролей: берём их из списка ролей клиента.
+        Result<RoleRepresentation[], Error> roles = await GetJsonAsync<RoleRepresentation[]>($"clients/{client.Value}/roles", cancellationToken);
+        if (roles.IsFailure)
+        {
+            return roles.Error;
+        }
+
+        string path = $"clients/{client.Value}/roles/{Uri.EscapeDataString(roleName)}/composites";
+        foreach ((HttpMethod method, IReadOnlyCollection<string> names) in new[] { (HttpMethod.Post, add), (HttpMethod.Delete, remove) })
+        {
+            RoleRepresentation[] selected = [.. roles.Value.Where(role => names.Contains(role.Name)).Select(role => new RoleRepresentation(role.Id, role.Name))];
+            if (selected.Length == 0)
+            {
+                continue;
+            }
+
+            UnitResult<Error> changed = await SendExpectingSuccessAsync(method, path, cancellationToken, JsonContent.Create(selected));
+            if (changed.IsFailure)
+            {
+                return changed;
+            }
+        }
+
+        return UnitResult.Success<Error>();
+    }
+
     private static AppRole ToAppRole(RoleRepresentation role) =>
         new(
             Guid.TryParse(role.Id, out Guid id) ? id : null,

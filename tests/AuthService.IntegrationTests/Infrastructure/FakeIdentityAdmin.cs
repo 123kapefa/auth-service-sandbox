@@ -15,6 +15,9 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
 
     private readonly ConcurrentDictionary<Guid, Account> _accounts = new();
 
+    /// <summary>Состав ролей: «clientId/роль» → имена ролей (прав) в составе.</summary>
+    private readonly ConcurrentDictionary<string, HashSet<string>> _composites = new(StringComparer.Ordinal);
+
     /// <summary>Роли клиентов приложений: clientId → имя → роль.</summary>
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, AppRole>> _appRoles = new(StringComparer.Ordinal);
 
@@ -125,7 +128,12 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     public void SeedAppRoles()
     {
         _appRoles.Clear();
+        _composites.Clear();
         _appRoles["sandbox-api"] = new(StringComparer.Ordinal);
+        _composites["sandbox-api/customer"] = ["profile.view"];
+        _composites["sandbox-api/manager"] = ["profile.view", "users.view", "users.block"];
+        _composites["sandbox-api/admin"] =
+            ["profile.view", "users.view", "users.block", "users.roles.manage", "users.sessions.manage", "audit.view", "roles.manage"];
         foreach (string role in new[] { "customer", "manager", "admin" })
         {
             _appRoles["sandbox-api"][role] = new AppRole(Guid.NewGuid(), role, role, AppRoleKinds.ROLE, null, true);
@@ -162,6 +170,25 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         ArgumentNullException.ThrowIfNull(role);
         ConcurrentDictionary<string, AppRole> roles = _appRoles[clientId];
         roles[role.Name] = role with { Id = roles.TryGetValue(role.Name, out AppRole? old) ? old.Id : Guid.NewGuid() };
+        return Task.FromResult(UnitResult.Success<Error>());
+    }
+
+    public IReadOnlySet<string> CompositesOf(string clientId, string role) =>
+        _composites.TryGetValue($"{clientId}/{role}", out HashSet<string>? names) ? names : new HashSet<string>(StringComparer.Ordinal);
+
+    public Task<Result<IReadOnlyList<string>, Error>> GetRoleCompositesAsync(string clientId, string roleName, CancellationToken cancellationToken) =>
+        Task.FromResult(Result.Success<IReadOnlyList<string>, Error>([.. CompositesOf(clientId, roleName).Order(StringComparer.Ordinal)]));
+
+    public Task<UnitResult<Error>> SetRoleCompositesAsync(
+        string clientId,
+        string roleName,
+        IReadOnlyCollection<string> add,
+        IReadOnlyCollection<string> remove,
+        CancellationToken cancellationToken)
+    {
+        HashSet<string> names = _composites.GetOrAdd($"{clientId}/{roleName}", _ => new HashSet<string>(StringComparer.Ordinal));
+        names.UnionWith(add);
+        names.ExceptWith(remove);
         return Task.FromResult(UnitResult.Success<Error>());
     }
 

@@ -15,6 +15,7 @@ namespace AuthService.Core.Features.Admin.UseCases.Permissions;
 /// </summary>
 public sealed class PermissionsHandler(
     IIdentityAdmin identityAdmin,
+    AppCatalog catalog,
     IValidator<CreatePermissionRequest> validator,
     AdminAudit audit)
 {
@@ -101,16 +102,8 @@ public sealed class PermissionsHandler(
         return await ListAsync(clientId, cancellationToken);
     }
 
-    // Приложение — клиент, у которого есть роли (kind=role); у клиента только для входа (access-denied) их нет.
-    private async Task<Result<IReadOnlyList<AppRole>, Error>> AppRolesAsync(string clientId, CancellationToken cancellationToken)
-    {
-        Result<IReadOnlyList<AppRole>, Error> roles = await identityAdmin.GetAppRolesAsync(clientId, cancellationToken);
-        return roles.IsSuccess && !roles.Value.Any(role =>
-                string.Equals(role.Kind, AppRoleKinds.ROLE, StringComparison.Ordinal)
-                && !string.Equals(role.Name, AppRoles.ACCESS_DENIED, StringComparison.Ordinal))
-            ? IdentityProviderErrors.AppNotFound()
-            : roles;
-    }
+    private Task<Result<IReadOnlyList<AppRole>, Error>> AppRolesAsync(string clientId, CancellationToken cancellationToken) =>
+        catalog.LoadAsync(clientId, cancellationToken);
 
-    private static bool IsPermission(AppRole role) => string.Equals(role.Kind, AppRoleKinds.PERMISSION, StringComparison.Ordinal);
+    private static bool IsPermission(AppRole role) => AppCatalog.IsPermission(role);
 }

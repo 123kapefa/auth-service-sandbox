@@ -980,15 +980,15 @@
             }
           },
           {
-            "name": "Клиент приложения с ролями: view, map-roles, manage",
-            "description": "sandbox-api: роли и права приложения — читать, выдавать, создавать и менять (секрета у клиента нет)",
+            "name": "Клиент приложения с ролями: view, map-roles, manage, map-roles-composite",
+            "description": "sandbox-api: роли и права приложения — читать, выдавать, создавать, менять и собирать состав ролей (секрета у клиента нет)",
             "type": "scope",
             "logic": "POSITIVE",
             "decisionStrategy": "AFFIRMATIVE",
             "config": {
               "defaultResourceType": "Clients",
               "resources": "[\"2631bc45-b176-4774-927a-b6dd4e310582\"]",
-              "scopes": "[\"view\",\"map-roles\",\"manage\"]",
+              "scopes": "[\"view\",\"map-roles\",\"manage\",\"map-roles-composite\"]",
               "applyPolicies": "[\"sandbox-bff service account\",\"клиент sandbox-bff\"]"
             }
           },

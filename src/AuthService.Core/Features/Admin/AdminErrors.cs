@@ -37,4 +37,20 @@ public static class AdminErrors
     /// <summary>Это роль, а не право.</summary>
     public static Error NotPermission(string name) =>
         Error.Validation("permissions.not_permission", $"«{name}» — роль, а не право.", "name");
+
+    /// <summary>Встроенную роль удалить нельзя.</summary>
+    public static Error BuiltinRole(string name) =>
+        Error.Conflict("roles.builtin", $"Роль «{name}» встроенная — удалить нельзя.");
+
+    /// <summary>У admin нельзя забрать управление ролями — иначе управлять ими станет некому.</summary>
+    public static Error RolesLockout() =>
+        Error.Conflict("roles.lockout", "У роли admin нельзя убрать roles.manage — иначе управлять ролями станет некому.");
+
+    /// <summary>Таких прав нет в каталоге приложения.</summary>
+    public static Error UnknownPermissions(IEnumerable<string> names) =>
+        Error.Validation("roles.unknown_permission", $"Нет таких прав: {string.Join(", ", names)}.", "permissions");
+
+    /// <summary>Это право, а не роль.</summary>
+    public static Error NotRole(string name) =>
+        Error.Validation("roles.not_role", $"«{name}» — право, а не роль.", "name");
 }
