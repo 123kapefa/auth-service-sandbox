@@ -11,6 +11,7 @@ using AuthService.Core.Features.Auth.UseCases.Login;
 using AuthService.Core.Features.Auth.UseCases.Logout;
 using AuthService.Core.Features.Auth.UseCases.Refresh;
 using AuthService.Core.Features.Auth.UseCases.SwitchMode;
+using AuthService.Core.Features.Security;
 using FluentValidation;
 using Framework.Endpoints;
 using Microsoft.Extensions.Configuration;
@@ -45,6 +46,7 @@ public static class Registration
         services.AddScoped<SetRoleHandler>();
         services.AddScoped<AppAccessHandler>();
         services.AddScoped<AdminTargets>();
+        services.AddScoped<SessionsHandler>();
 
         return services;
     }

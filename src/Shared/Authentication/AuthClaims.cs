@@ -16,6 +16,9 @@ public static class AuthClaims
 
     public const string PHONE = "phone";
 
+    /// <summary>Id сессии сервера входа: какая из сессий пользователя — текущая.</summary>
+    public const string SESSION_ID = "sid";
+
     /// <summary>Когда пользователь вошёл (секунды Unix): для действий, требующих недавнего входа.</summary>
     public const string AUTH_TIME = "auth_time";
 }

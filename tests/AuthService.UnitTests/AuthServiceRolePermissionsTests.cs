@@ -23,6 +23,7 @@ public sealed class AuthServiceRolePermissionsTests
                 AuthServicePermissions.Users.VIEW,
                 AuthServicePermissions.Users.BLOCK,
                 AuthServicePermissions.Users.MANAGE_ROLES,
+                AuthServicePermissions.Users.MANAGE_SESSIONS,
                 AuthServicePermissions.Audit.VIEW,
             ]
         },

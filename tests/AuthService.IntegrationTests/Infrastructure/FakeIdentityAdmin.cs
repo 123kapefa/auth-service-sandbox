@@ -21,6 +21,12 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     /// <summary>Выданные и снятые роли клиента: (пользователь, выдать, снять).</summary>
     public Collection<(Guid UserId, string[] Grant, string[] Revoke)> RoleChanges { get; } = [];
 
+    /// <summary>Сессии пользователей: id сессии → (пользователь, приложения).</summary>
+    private readonly ConcurrentDictionary<string, (Guid UserId, string[] Apps)> _sessions = new(StringComparer.Ordinal);
+
+    /// <summary>Какие сессии сервис завершил по одной.</summary>
+    public Collection<string> DeletedSessions { get; } = [];
+
     /// <summary>У кого сервис завершил все сессии.</summary>
     public Collection<Guid> Logouts { get; } = [];
 
@@ -43,6 +49,8 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         _accounts.Clear();
         AttributeChanges.Clear();
         Logouts.Clear();
+        DeletedSessions.Clear();
+        _sessions.Clear();
         RoleChanges.Clear();
         Searches.Clear();
     }
@@ -130,8 +138,35 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
                 [.. Apps.Select(app => new AppAccessInfo(app, $"Приложение {app}", !account.DeniedApps.Contains(app)))])
             : IdentityProviderErrors.UserNotFound());
 
+    public void AddSession(TestUser user, string sessionId, params string[] apps)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        _sessions[sessionId] = (user.Id, apps);
+    }
+
+    public Task<Result<IReadOnlyList<IdentitySession>, Error>> GetSessionsAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult(Result.Success<IReadOnlyList<IdentitySession>, Error>(
+        [
+            .. _sessions
+                .Where(session => session.Value.UserId == userId)
+                .OrderBy(session => session.Key, StringComparer.Ordinal)
+                .Select(session => new IdentitySession(session.Key, "10.0.0.1", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, session.Value.Apps)),
+        ]));
+
+    public Task<UnitResult<Error>> DeleteSessionAsync(string sessionId, CancellationToken cancellationToken)
+    {
+        DeletedSessions.Add(sessionId);
+        _sessions.TryRemove(sessionId, out _);
+        return Task.FromResult(UnitResult.Success<Error>());
+    }
+
     public Task<UnitResult<Error>> LogoutUserAsync(Guid userId, CancellationToken cancellationToken)
     {
+        foreach (string sessionId in _sessions.Where(session => session.Value.UserId == userId).Select(session => session.Key).ToList())
+        {
+            _sessions.TryRemove(sessionId, out _);
+        }
+
         Logouts.Add(userId);
         return Task.FromResult(UnitResult.Success<Error>());
     }

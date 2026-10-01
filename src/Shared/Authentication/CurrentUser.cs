@@ -23,6 +23,9 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor, IPermi
 
     public IReadOnlyList<string> Roles => [.. Principal.FindAll(AuthClaims.ROLE).Select(claim => claim.Value)];
 
+    /// <summary>Id сессии сервера входа (claim sid). null — claim нет.</summary>
+    public string? SessionId => Principal.FindFirstValue(AuthClaims.SESSION_ID);
+
     /// <summary>Когда пользователь вошёл (claim auth_time). null — claim нет.</summary>
     public DateTimeOffset? AuthenticatedAt =>
         long.TryParse(Principal.FindFirstValue(AuthClaims.AUTH_TIME), NumberStyles.Integer, CultureInfo.InvariantCulture, out long seconds)

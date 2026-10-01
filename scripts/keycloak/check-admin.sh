@@ -68,6 +68,19 @@ d=json.load(open(sys.argv[1])); r=d.get("result")
 print([a["hasAccess"] for a in r if a["clientId"]==sys.argv[2]][0] if r is not None else d["error"]["messages"][0]["code"])' "$WORK/admin.json" "$3"
 }
 
+# my_sessions <jar> <python-выражение над result> — GET /security/sessions
+my_sessions() { admin_get "$1" /security/sessions "$2" | cut -d' ' -f2-; }
+
+# post <jar> <путь> — POST; печатает «<код> <тело result или код ошибки>»
+post() {
+  curl -s -o "$WORK/admin.json" -w '%{http_code}' -b "$1" -X POST "$API$2"
+  printf ' '
+  python3 -c '
+import json,sys
+d=json.load(open(sys.argv[1])); r=d.get("result")
+print(eval(sys.argv[2]) if r is not None else d["error"]["messages"][0]["code"])' "$WORK/admin.json" "$3"
+}
+
 me() { curl -s -b "$1" "$API/me/" | python3 -c 'import json,sys; v=json.load(sys.stdin)["result"][sys.argv[1]]; print(",".join(v) if isinstance(v,list) else v)' "$2" 2>/dev/null; }
 
 require_service
@@ -186,6 +199,30 @@ check "менеджер сотруднику — 403" "$(app_access "$MANAGER" "
 check "открыть доступ обратно" "$(app_access "$ADMIN" "$ID_CUSTOMER" sandbox-bff true)" "200 True"
 check "вход в демо-приложение снова работает" "$(login "$WORK/reopened" /me/ 79990000001)" /me/
 status "$WORK/reopened" POST /auth/logout > /dev/null
+
+echo "6. Сессии (/security/sessions и «выйти везде»)"
+PHONE="$WORK/phone"; LAPTOP="$WORK/laptop"; : > "$PHONE"; : > "$LAPTOP"
+login "$PHONE" /me/ 79990000003 > /dev/null
+login "$LAPTOP" /me/ 79990000003 > /dev/null
+CURRENT='[i["id"] for i in r["items"] if i["isCurrent"]][0]'
+PHONE_SID=$(my_sessions "$PHONE" "$CURRENT")
+LAPTOP_SID=$(my_sessions "$LAPTOP" "$CURRENT")
+check "в списке свои сессии, текущая отмечена" "$(my_sessions "$PHONE" 'str(sum(i["isCurrent"] for i in r["items"])) + " " + str(any(i["id"] == "'"$LAPTOP_SID"'" for i in r["items"]))')" "1 True"
+check "в сессии видно приложение" "$(my_sessions "$PHONE" '",".join([i for i in r["items"] if i["isCurrent"]][0]["apps"])')" sandbox-bff
+check "с телефона завершить сессию ноутбука" "$(post "$PHONE" "/security/sessions/$LAPTOP_SID/terminate" 'str(any(i["id"] == "'"$LAPTOP_SID"'" for i in r["items"]))')" "200 False"
+check "ноутбук: refresh — 401" "$(status "$LAPTOP" POST /auth/refresh)" 401
+check "телефон: refresh — 200" "$(status "$PHONE" POST /auth/refresh)" 200
+ADMIN_SID=$(my_sessions "$ADMIN" "$CURRENT")
+check "чужую сессию — 404" "$(post "$PHONE" "/security/sessions/$ADMIN_SID/terminate" 'r')" "404 sessions.not_found"
+: > "$LAPTOP"; login "$LAPTOP" /me/ 79990000003 > /dev/null
+check "завершить все остальные" "$(post "$PHONE" /security/sessions/terminate-all-others 'str(r["terminated"] >= 1)')" "200 True"
+check "ноутбук снова отключён" "$(status "$LAPTOP" POST /auth/refresh)" 401
+check "телефон работает" "$(status "$PHONE" POST /auth/refresh)" 200
+ID_MANAGER_CUSTOMER=$(curl -s -b "$ADMIN" "$API/auth/admin/users?search=79990000003" | python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["items"][0]["id"])')
+check "админ видит сессии пользователя" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_MANAGER_CUSTOMER/sessions" 'str(len(r["items"]) >= 1)')" "200 True"
+check "менеджеру «выйти везде» нельзя — 403" "$(status "$MANAGER" POST "/auth/admin/users/$ID_MANAGER_CUSTOMER/logout")" 403
+check "админ: «выйти везде»" "$(post "$ADMIN" "/auth/admin/users/$ID_MANAGER_CUSTOMER/logout" 'str(len(r["items"]))')" "200 0"
+check "телефон отключён" "$(status "$PHONE" POST /auth/refresh)" 401
 for JAR in "$ADMIN" "$MANAGER"; do status "$JAR" POST /auth/logout > /dev/null; done
 
 summary

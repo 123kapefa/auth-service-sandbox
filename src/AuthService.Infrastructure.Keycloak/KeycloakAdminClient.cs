@@ -233,6 +233,27 @@ internal sealed partial class KeycloakAdminClient(
         return await SendExpectingSuccessAsync(HttpMethod.Put, $"users/{userId}", cancellationToken, JsonContent.Create(user.Value));
     }
 
+    public async Task<Result<IReadOnlyList<IdentitySession>, Error>> GetSessionsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        Result<SessionRepresentation[], Error> sessions = await GetJsonAsync<SessionRepresentation[]>($"users/{userId}/sessions", cancellationToken);
+        return sessions.IsFailure
+            ? sessions.Error
+            : Result.Success<IReadOnlyList<IdentitySession>, Error>(
+            [
+                .. sessions.Value
+                    .OrderByDescending(session => session.LastAccess)
+                    .Select(session => new IdentitySession(
+                        session.Id,
+                        session.IpAddress,
+                        DateTimeOffset.FromUnixTimeMilliseconds(session.Start),
+                        DateTimeOffset.FromUnixTimeMilliseconds(session.LastAccess),
+                        [.. (session.Clients?.Values ?? Enumerable.Empty<string>()).Order(StringComparer.Ordinal)])),
+            ]);
+    }
+
+    public Task<UnitResult<Error>> DeleteSessionAsync(string sessionId, CancellationToken cancellationToken) =>
+        SendExpectingSuccessAsync(HttpMethod.Delete, $"sessions/{Uri.EscapeDataString(sessionId)}", cancellationToken);
+
     public Task<UnitResult<Error>> LogoutUserAsync(Guid userId, CancellationToken cancellationToken) =>
         SendExpectingSuccessAsync(HttpMethod.Post, $"users/{userId}/logout", cancellationToken);
 
@@ -353,6 +374,13 @@ internal sealed partial class KeycloakAdminClient(
         [property: JsonPropertyName("id")] string Id,
         [property: JsonPropertyName("clientId")] string ClientId,
         [property: JsonPropertyName("name")] string? Name);
+
+    private sealed record SessionRepresentation(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("ipAddress")] string? IpAddress,
+        [property: JsonPropertyName("start")] long Start,
+        [property: JsonPropertyName("lastAccess")] long LastAccess,
+        [property: JsonPropertyName("clients")] Dictionary<string, string>? Clients);
 
     private sealed record Credential([property: JsonPropertyName("type")] string Type);
 

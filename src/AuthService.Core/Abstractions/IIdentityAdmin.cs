@@ -48,6 +48,12 @@ public interface IIdentityAdmin
     /// <summary>Изменить пользователя: включён ли он и атрибуты (null — удалить). Остальное не меняется.</summary>
     Task<UnitResult<Error>> UpdateUserAsync(Guid userId, UserChanges changes, CancellationToken cancellationToken);
 
+    /// <summary>Сессии пользователя на сервере входа: где и когда вошёл, в какие приложения.</summary>
+    Task<Result<IReadOnlyList<IdentitySession>, Error>> GetSessionsAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>Завершить одну сессию: её refresh-токены и SSO больше не работают, остальные сессии — да.</summary>
+    Task<UnitResult<Error>> DeleteSessionAsync(string sessionId, CancellationToken cancellationToken);
+
     /// <summary>Завершить все сессии пользователя: refresh-токены и SSO больше не работают.</summary>
     Task<UnitResult<Error>> LogoutUserAsync(Guid userId, CancellationToken cancellationToken);
 }
@@ -77,6 +83,19 @@ public sealed record IdentityUser(
     DateTimeOffset CreatedAt,
     string? RestrictionReason = null,
     DateTimeOffset? RestrictedAt = null);
+
+/// <summary>Сессия пользователя на сервере входа.</summary>
+/// <param name="Id">Id сессии (claim sid в токенах этой сессии).</param>
+/// <param name="IpAddress">IP, с которого вошли.</param>
+/// <param name="StartedAt">Когда вошли.</param>
+/// <param name="LastAccessAt">Последняя активность (вход или refresh).</param>
+/// <param name="Apps">Приложения (clientId), в которых открыта сессия.</param>
+public sealed record IdentitySession(
+    string Id,
+    string? IpAddress,
+    DateTimeOffset StartedAt,
+    DateTimeOffset LastAccessAt,
+    IReadOnlyList<string> Apps);
 
 /// <summary>Приложение и доступ к нему пользователя.</summary>
 /// <param name="ClientId">Клиент приложения в Keycloak.</param>

@@ -13,6 +13,9 @@ public static class AuthServicePermissions
         public const string VIEW = "users.view";
         public const string BLOCK = "users.block";
         public const string MANAGE_ROLES = "users.roles.manage";
+
+        /// <summary>Завершать сессии пользователя («выйти везде») — уровень аккаунта, только админ проекта.</summary>
+        public const string MANAGE_SESSIONS = "users.sessions.manage";
     }
 
     public static class Audit
