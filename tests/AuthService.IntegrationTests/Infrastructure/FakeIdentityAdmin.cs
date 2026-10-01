@@ -15,6 +15,9 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
 
     private readonly ConcurrentDictionary<Guid, Account> _accounts = new();
 
+    /// <summary>Роли клиентов приложений: clientId → имя → роль.</summary>
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, AppRole>> _appRoles = new(StringComparer.Ordinal);
+
     /// <summary>Записанные атрибуты (удаления — со значением null).</summary>
     public Collection<(Guid UserId, string Name, string? Value)> AttributeChanges { get; } = [];
 
@@ -50,6 +53,7 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     public void Reset()
     {
         _accounts.Clear();
+        SeedAppRoles();
         AttributeChanges.Clear();
         Logouts.Clear();
         DeletedSessions.Clear();
@@ -116,6 +120,55 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         _accounts[userId] = account with { User = user };
         return Task.FromResult(UnitResult.Success<Error>());
     }
+
+    /// <summary>Как в realm: у sandbox-api встроенные роли; права заводит сверка каталога; у клиентов входа — access-denied.</summary>
+    public void SeedAppRoles()
+    {
+        _appRoles.Clear();
+        _appRoles["sandbox-api"] = new(StringComparer.Ordinal);
+        foreach (string role in new[] { "customer", "manager", "admin" })
+        {
+            _appRoles["sandbox-api"][role] = new AppRole(Guid.NewGuid(), role, role, AppRoleKinds.ROLE, null, true);
+        }
+
+        foreach (string app in Apps)
+        {
+            _appRoles[app] = new(StringComparer.Ordinal) { [AppRoles.ACCESS_DENIED] = new AppRole(Guid.NewGuid(), AppRoles.ACCESS_DENIED, null, AppRoleKinds.ROLE, null, false) };
+        }
+    }
+
+    public IReadOnlyCollection<AppRole> AppRolesOf(string clientId) => [.. _appRoles[clientId].Values];
+
+    public Task<Result<IReadOnlyList<AppRole>, Error>> GetAppRolesAsync(string clientId, CancellationToken cancellationToken) =>
+        Task.FromResult(_appRoles.TryGetValue(clientId, out ConcurrentDictionary<string, AppRole>? roles)
+            ? Result.Success<IReadOnlyList<AppRole>, Error>([.. roles.Values.OrderBy(role => role.Name, StringComparer.Ordinal)])
+            : IdentityProviderErrors.AppNotFound());
+
+    public Task<UnitResult<Error>> CreateAppRoleAsync(string clientId, AppRole role, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(role);
+        if (!_appRoles.TryGetValue(clientId, out ConcurrentDictionary<string, AppRole>? roles))
+        {
+            return Task.FromResult(UnitResult.Failure(IdentityProviderErrors.AppNotFound()));
+        }
+
+        return Task.FromResult(roles.TryAdd(role.Name, role with { Id = Guid.NewGuid() })
+            ? UnitResult.Success<Error>()
+            : UnitResult.Failure(IdentityProviderErrors.RoleExists(role.Name)));
+    }
+
+    public Task<UnitResult<Error>> UpdateAppRoleAsync(string clientId, AppRole role, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(role);
+        ConcurrentDictionary<string, AppRole> roles = _appRoles[clientId];
+        roles[role.Name] = role with { Id = roles.TryGetValue(role.Name, out AppRole? old) ? old.Id : Guid.NewGuid() };
+        return Task.FromResult(UnitResult.Success<Error>());
+    }
+
+    public Task<UnitResult<Error>> DeleteAppRoleAsync(string clientId, string name, CancellationToken cancellationToken) =>
+        Task.FromResult(_appRoles[clientId].TryRemove(name, out _)
+            ? UnitResult.Success<Error>()
+            : UnitResult.Failure(IdentityProviderErrors.RoleNotFound(name)));
 
     public Task<UnitResult<Error>> SetClientRolesAsync(
         Guid userId,

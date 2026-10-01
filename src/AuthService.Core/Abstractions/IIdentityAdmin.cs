@@ -53,6 +53,21 @@ public interface IIdentityAdmin
         int max,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Роли клиента приложения с атрибутами: и роли (kind=role), и права (kind=permission). Служебной учётке нужно
+    /// точечное право на клиент (FGAP v2). Нет такого клиента или нет права на него — NotFound.
+    /// </summary>
+    Task<Result<IReadOnlyList<AppRole>, Error>> GetAppRolesAsync(string clientId, CancellationToken cancellationToken);
+
+    /// <summary>Создать роль клиента приложения (право или роль) с описанием и атрибутами. Уже есть — Conflict.</summary>
+    Task<UnitResult<Error>> CreateAppRoleAsync(string clientId, AppRole role, CancellationToken cancellationToken);
+
+    /// <summary>Обновить описание и атрибуты роли клиента приложения.</summary>
+    Task<UnitResult<Error>> UpdateAppRoleAsync(string clientId, AppRole role, CancellationToken cancellationToken);
+
+    /// <summary>Удалить роль клиента приложения; Keycloak убирает её и из составных ролей.</summary>
+    Task<UnitResult<Error>> DeleteAppRoleAsync(string clientId, string name, CancellationToken cancellationToken);
+
     /// <summary>Задан ли пароль (пользователь мог войти только по коду).</summary>
     Task<Result<bool, Error>> HasPasswordAsync(Guid userId, CancellationToken cancellationToken);
 
@@ -133,6 +148,29 @@ public static class LoginEventTypes
     public const string LOGOUT = "LOGOUT";
 
     public static IReadOnlyCollection<string> All { get; } = [LOGIN, LOGIN_ERROR, LOGOUT];
+}
+
+/// <summary>Роль клиента приложения: роль (режим) или право.</summary>
+/// <param name="Id">Id роли в Keycloak (null — ещё не создана).</param>
+/// <param name="Name">Имя: manager, users.view…</param>
+/// <param name="Description">Описание для админки.</param>
+/// <param name="Kind">AppRoleKinds: role или permission.</param>
+/// <param name="Source">Откуда право: code (константа в коде сервиса) или admin (создано в админке).</param>
+/// <param name="Builtin">Встроенная роль — защищена от удаления.</param>
+public sealed record AppRole(Guid? Id, string Name, string? Description, string Kind, string? Source, bool Builtin);
+
+/// <summary>Атрибуты ролей клиента приложения в Keycloak.</summary>
+public static class AppRoleKinds
+{
+    public const string ATTRIBUTE_KIND = "kind";
+    public const string ATTRIBUTE_SOURCE = "source";
+    public const string ATTRIBUTE_BUILTIN = "builtin";
+
+    public const string ROLE = "role";
+    public const string PERMISSION = "permission";
+
+    public const string SOURCE_CODE = "code";
+    public const string SOURCE_ADMIN = "admin";
 }
 
 /// <summary>Приложение и доступ к нему пользователя.</summary>

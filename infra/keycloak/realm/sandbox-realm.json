@@ -303,7 +303,8 @@
                 "users.block",
                 "users.roles.manage",
                 "users.sessions.manage",
-                "audit.view"
+                "audit.view",
+                "roles.manage"
               ]
             }
           },
@@ -389,6 +390,20 @@
         {
           "name": "audit.view",
           "description": "Журнал действий и входов",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "roles.manage",
+          "description": "Роли и права приложения",
           "composite": false,
           "clientRole": true,
           "attributes": {
@@ -946,6 +961,7 @@
         "policies": [
           {
             "name": "sandbox-bff service account",
+            "description": "Служебная учётка сервиса входа — как пользователь",
             "type": "user",
             "logic": "POSITIVE",
             "decisionStrategy": "UNANIMOUS",
@@ -954,15 +970,39 @@
             }
           },
           {
-            "name": "Клиенты приложений: view и map-roles",
-            "type": "scope",
+            "name": "клиент sandbox-bff",
+            "description": "Та же учётка — как клиент: часть проверок Admin API Keycloak оценивает от клиента",
+            "type": "client",
             "logic": "POSITIVE",
             "decisionStrategy": "UNANIMOUS",
             "config": {
+              "clients": "[\"sandbox-bff\"]"
+            }
+          },
+          {
+            "name": "Клиент приложения с ролями: view, map-roles, manage",
+            "description": "sandbox-api: роли и права приложения — читать, выдавать, создавать и менять (секрета у клиента нет)",
+            "type": "scope",
+            "logic": "POSITIVE",
+            "decisionStrategy": "AFFIRMATIVE",
+            "config": {
               "defaultResourceType": "Clients",
-              "resources": "[\"2631bc45-b176-4774-927a-b6dd4e310582\", \"7d0f5b8e-3c2a-4f51-9a6e-2b8d41c0e7a1\", \"c41e9a20-6b7d-4e38-8f15-90a2d3b6c5f4\"]",
+              "resources": "[\"2631bc45-b176-4774-927a-b6dd4e310582\"]",
+              "scopes": "[\"view\",\"map-roles\",\"manage\"]",
+              "applyPolicies": "[\"sandbox-bff service account\",\"клиент sandbox-bff\"]"
+            }
+          },
+          {
+            "name": "Клиенты приложений: view и map-roles",
+            "description": "Клиенты для входа: видеть и выдавать роль access-denied",
+            "type": "scope",
+            "logic": "POSITIVE",
+            "decisionStrategy": "AFFIRMATIVE",
+            "config": {
+              "defaultResourceType": "Clients",
+              "resources": "[\"7d0f5b8e-3c2a-4f51-9a6e-2b8d41c0e7a1\",\"c41e9a20-6b7d-4e38-8f15-90a2d3b6c5f4\"]",
               "scopes": "[\"view\",\"map-roles\"]",
-              "applyPolicies": "[\"sandbox-bff service account\"]"
+              "applyPolicies": "[\"sandbox-bff service account\",\"клиент sandbox-bff\"]"
             }
           }
         ],

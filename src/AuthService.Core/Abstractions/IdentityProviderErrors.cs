@@ -16,6 +16,18 @@ public static class IdentityProviderErrors
     public static Error LogoutTokenInvalid() =>
         Error.Validation("auth.logout_token.invalid", "logout_token недействителен.");
 
+    /// <summary>Нет такого приложения (клиента с ролями) или служебной учётке не дано право на него.</summary>
+    public static Error AppNotFound() =>
+        Error.NotFound("apps.not_found", "Приложение не найдено.");
+
+    /// <summary>Роль или право с таким именем уже есть.</summary>
+    public static Error RoleExists(string name) =>
+        Error.Conflict("roles.exists", $"Роль или право «{name}» уже есть.");
+
+    /// <summary>Нет такой роли или права.</summary>
+    public static Error RoleNotFound(string name) =>
+        Error.NotFound("roles.not_found", $"Роль или право «{name}» не найдено.");
+
     /// <summary>Пользователя с таким id нет.</summary>
     public static Error UserNotFound() =>
         Error.NotFound("users.not_found", "Пользователь не найден.");

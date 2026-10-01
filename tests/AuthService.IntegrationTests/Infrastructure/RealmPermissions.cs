@@ -29,6 +29,7 @@ public static class RealmPermissions
                 AuthServicePermissions.Users.MANAGE_ROLES,
                 AuthServicePermissions.Users.MANAGE_SESSIONS,
                 AuthServicePermissions.Audit.VIEW,
+                AuthServicePermissions.Roles.MANAGE,
             ],
             _ => [],
         };

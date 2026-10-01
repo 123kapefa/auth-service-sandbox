@@ -230,6 +230,99 @@ internal sealed partial class KeycloakAdminClient(
             ]);
     }
 
+    public async Task<Result<IReadOnlyList<AppRole>, Error>> GetAppRolesAsync(string clientId, CancellationToken cancellationToken)
+    {
+        Result<string, Error> client = await FindClientIdAsync(clientId, cancellationToken);
+        if (client.IsFailure)
+        {
+            return IdentityProviderErrors.AppNotFound();
+        }
+
+        Result<RoleRepresentation[], Error> roles = await GetJsonAsync<RoleRepresentation[]>(
+            $"clients/{client.Value}/roles?briefRepresentation=false", cancellationToken);
+        return roles.IsFailure
+            ? roles.Error
+            : Result.Success<IReadOnlyList<AppRole>, Error>([.. roles.Value.Select(ToAppRole).OrderBy(role => role.Name, StringComparer.Ordinal)]);
+    }
+
+    public async Task<UnitResult<Error>> CreateAppRoleAsync(string clientId, AppRole role, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(role);
+
+        Result<string, Error> client = await FindClientIdAsync(clientId, cancellationToken);
+        if (client.IsFailure)
+        {
+            return IdentityProviderErrors.AppNotFound();
+        }
+
+        Result<HttpResponseMessage, Error> response = await SendAsync(
+            HttpMethod.Post, $"clients/{client.Value}/roles", cancellationToken, JsonContent.Create(ToRepresentation(role)));
+        if (response.IsFailure)
+        {
+            return response.Error;
+        }
+
+        using HttpResponseMessage message = response.Value;
+        return message.StatusCode == HttpStatusCode.Conflict
+            ? IdentityProviderErrors.RoleExists(role.Name)
+            : message.IsSuccessStatusCode ? UnitResult.Success<Error>() : ToError(message);
+    }
+
+    public async Task<UnitResult<Error>> UpdateAppRoleAsync(string clientId, AppRole role, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(role);
+
+        Result<string, Error> client = await FindClientIdAsync(clientId, cancellationToken);
+        return client.IsFailure
+            ? IdentityProviderErrors.AppNotFound()
+            : await SendExpectingSuccessAsync(
+                HttpMethod.Put,
+                $"clients/{client.Value}/roles/{Uri.EscapeDataString(role.Name)}",
+                cancellationToken,
+                JsonContent.Create(ToRepresentation(role)));
+    }
+
+    public async Task<UnitResult<Error>> DeleteAppRoleAsync(string clientId, string name, CancellationToken cancellationToken)
+    {
+        Result<string, Error> client = await FindClientIdAsync(clientId, cancellationToken);
+        return client.IsFailure
+            ? IdentityProviderErrors.AppNotFound()
+            : await SendExpectingSuccessAsync(HttpMethod.Delete, $"clients/{client.Value}/roles/{Uri.EscapeDataString(name)}", cancellationToken);
+    }
+
+    private static AppRole ToAppRole(RoleRepresentation role) =>
+        new(
+            Guid.TryParse(role.Id, out Guid id) ? id : null,
+            role.Name,
+            role.Description,
+            First(role.Attributes, AppRoleKinds.ATTRIBUTE_KIND) ?? AppRoleKinds.ROLE,
+            First(role.Attributes, AppRoleKinds.ATTRIBUTE_SOURCE),
+            string.Equals(First(role.Attributes, AppRoleKinds.ATTRIBUTE_BUILTIN), "true", StringComparison.Ordinal));
+
+    private static Dictionary<string, object?> ToRepresentation(AppRole role)
+    {
+        Dictionary<string, string[]> attributes = new(StringComparer.Ordinal) { [AppRoleKinds.ATTRIBUTE_KIND] = [role.Kind] };
+        if (role.Source is not null)
+        {
+            attributes[AppRoleKinds.ATTRIBUTE_SOURCE] = [role.Source];
+        }
+
+        if (role.Builtin)
+        {
+            attributes[AppRoleKinds.ATTRIBUTE_BUILTIN] = ["true"];
+        }
+
+        return new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["name"] = role.Name,
+            ["description"] = role.Description,
+            ["attributes"] = attributes,
+        };
+    }
+
+    private static string? First(Dictionary<string, string[]>? attributes, string name) =>
+        attributes is not null && attributes.TryGetValue(name, out string[]? values) && values.Length > 0 ? values[0] : null;
+
     public async Task<Result<bool, Error>> HasPasswordAsync(Guid userId, CancellationToken cancellationToken)
     {
         Result<Credential[], Error> credentials = await GetJsonAsync<Credential[]>($"users/{userId}/credentials", cancellationToken);
@@ -406,7 +499,9 @@ internal sealed partial class KeycloakAdminClient(
 
     private sealed record RoleRepresentation(
         [property: JsonPropertyName("id")] string Id,
-        [property: JsonPropertyName("name")] string Name);
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("description")] string? Description = null,
+        [property: JsonPropertyName("attributes")] Dictionary<string, string[]>? Attributes = null);
 
     private sealed record ClientRepresentation(
         [property: JsonPropertyName("id")] string Id,

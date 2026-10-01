@@ -29,4 +29,12 @@ public static class AdminErrors
     /// <summary>Нет такого приложения (или служебной учётке не дано право на его клиента).</summary>
     public static Error AppNotFound() =>
         Error.NotFound("apps.not_found", "Приложение не найдено.");
+
+    /// <summary>Системное право объявлено кодом сервиса — его проверяет код; удалить нельзя.</summary>
+    public static Error SystemPermission(string name) =>
+        Error.Conflict("permissions.system", $"Право «{name}» объявлено кодом сервиса — удалить нельзя.");
+
+    /// <summary>Это роль, а не право.</summary>
+    public static Error NotPermission(string name) =>
+        Error.Validation("permissions.not_permission", $"«{name}» — роль, а не право.", "name");
 }

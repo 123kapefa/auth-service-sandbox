@@ -83,7 +83,7 @@ Keycloak; проекты друг друга не видят. **Приложен
 | `infra/keycloak/realm/sandbox-realm.json` | весь realm как код |
 | `infra/keycloak/themes/sandbox` | тема страницы входа: `+` у номера, кнопка «Войти по коду», экран ввода кода |
 | `infra/keycloak/providers/code-login` | плагин Keycloak (Java): форма входа с нормализацией номера, вход по коду; собирается в `infra/keycloak/Dockerfile` |
-| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал; `lib.sh` — общие помощники |
+| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал; `check-roles.sh` — роли и права приложений (этап 4а); `lib.sh` — общие помощники |
 | `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права, хук мгновенного отзыва — переиспользуемая библиотека |
 | `src/Shared/Authentication.Redis` | отметки отзыва в Redis, кэш проверки, `AddPlatformTokenRevocation` |
 | `src/AuthService.Core/Authorization` | константы прав сервиса (сам состав ролей — в Keycloak, с этапа 4а) |

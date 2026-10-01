@@ -8,5 +8,9 @@ public static class AuditActions
     public const string USER_APP_ACCESS_CHANGED = "UserAppAccessChanged";
     public const string USER_LOGGED_OUT_EVERYWHERE = "UserLoggedOutEverywhere";
 
+    public const string PERMISSION_CREATED = "PermissionCreated";
+    public const string PERMISSION_DELETED = "PermissionDeleted";
+
     public const string USER_OBJECT = "user";
+    public const string PERMISSION_OBJECT = "permission";
 }
