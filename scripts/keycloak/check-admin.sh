@@ -57,6 +57,17 @@ d=json.load(open(sys.argv[1])); r=d.get("result")
 print(r["role"] if r is not None else d["error"]["messages"][0]["code"])' "$WORK/admin.json"
 }
 
+# app_access <jar> <id> <clientId> <true|false> — PUT …/apps/{clientId}/access; печатает «<код> <доступ к приложению или код ошибки>»
+app_access() {
+  curl -s -o "$WORK/admin.json" -w '%{http_code}' -b "$1" -X PUT -H 'Content-Type: application/json' \
+    -d "{\"hasAccess\":$4}" "$API/auth/admin/users/$2/apps/$3/access"
+  printf ' '
+  python3 -c '
+import json,sys
+d=json.load(open(sys.argv[1])); r=d.get("result")
+print([a["hasAccess"] for a in r if a["clientId"]==sys.argv[2]][0] if r is not None else d["error"]["messages"][0]["code"])' "$WORK/admin.json" "$3"
+}
+
 me() { curl -s -b "$1" "$API/me/" | python3 -c 'import json,sys; v=json.load(sys.stdin)["result"][sys.argv[1]]; print(",".join(v) if isinstance(v,list) else v)' "$2" 2>/dev/null; }
 
 require_service
@@ -154,6 +165,27 @@ check "обычный вход при живой сессии — без фор�
 curl -s -o /dev/null -D "$WORK/h" -b "$ADMIN" -c "$ADMIN" "$API/auth/login?return_to=/&reauth=true"
 check "reauth=true — Keycloak снова показывает форму" "$(curl -s -b "$ADMIN" -c "$ADMIN" "$(header "$WORK/h" location)" | grep -q 'id="kc-form-login"' && echo форма || echo нет)" форма
 status "$CUSTOMER" POST /auth/logout > /dev/null
+
+echo "5. Доступ к приложению (аккаунт рабочий, одно приложение закрыто)"
+app_access "$ADMIN" "$ID_CUSTOMER" sandbox-bff true > /dev/null   # на случай прошлого упавшего прогона
+APPS='",".join(a["clientId"] + ":" + str(a["hasAccess"]) for a in r)'
+check "приложения проекта и доступ" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER/apps" "$APPS")" "200 account-console:True,sandbox-bff:True"
+CUSTOMER="$WORK/customer4"; : > "$CUSTOMER"
+login "$CUSTOMER" /me/ 79990000001 > /dev/null
+check "менеджер закрывает покупателю демо-приложение" "$(app_access "$MANAGER" "$ID_CUSTOMER" sandbox-bff false)" "200 False"
+check "личный кабинет остаётся открыт" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER/apps" "$APPS")" "200 account-console:True,sandbox-bff:False"
+check "открытая сессия демо-приложения: refresh — 401" "$(status "$CUSTOMER" POST /auth/refresh)" 401
+check "новый вход в демо-приложение — «доступ закрыт»" \
+  "$(starts "$(login "$WORK/denied" /me/ 79990000001)" "keycloak: Доступ к этому приложению для вас закрыт")" "keycloak: Доступ к этому приложению для вас закрыт"
+check "другое приложение (dev-cli) токены выдаёт" "$(curl -s -o /dev/null -w '%{http_code}' -d grant_type=password -d client_id=dev-cli \
+  -d username=79990000001 -d 'password=Test1234!' "${KC:-http://localhost:8180}/realms/sandbox/protocol/openid-connect/token")" 200
+check "аккаунт не заблокирован" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER" 'str(r["isRestricted"])')" "200 False"
+check "не приложение (sandbox-api) — 404" "$(app_access "$ADMIN" "$ID_CUSTOMER" sandbox-api false)" "404 apps.not_found"
+check "свой доступ — 403" "$(app_access "$ADMIN" "$ID_ADMIN" sandbox-bff false)" "403 users.self_access"
+check "менеджер сотруднику — 403" "$(app_access "$MANAGER" "$ID_ADMIN" sandbox-bff false)" "403 users.staff_forbidden"
+check "открыть доступ обратно" "$(app_access "$ADMIN" "$ID_CUSTOMER" sandbox-bff true)" "200 True"
+check "вход в демо-приложение снова работает" "$(login "$WORK/reopened" /me/ 79990000001)" /me/
+status "$WORK/reopened" POST /auth/logout > /dev/null
 for JAR in "$ADMIN" "$MANAGER"; do status "$JAR" POST /auth/logout > /dev/null; done
 
 summary

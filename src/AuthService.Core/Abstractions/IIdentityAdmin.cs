@@ -36,6 +36,12 @@ public interface IIdentityAdmin
         IReadOnlyCollection<string> revoke,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Приложения, которыми можно управлять (клиенты с ролью access-denied, видимые служебной учётке),
+    /// и открыт ли к ним доступ пользователю.
+    /// </summary>
+    Task<Result<IReadOnlyList<AppAccessInfo>, Error>> GetAppAccessAsync(Guid userId, CancellationToken cancellationToken);
+
     /// <summary>Задан ли пароль (пользователь мог войти только по коду).</summary>
     Task<Result<bool, Error>> HasPasswordAsync(Guid userId, CancellationToken cancellationToken);
 
@@ -71,6 +77,18 @@ public sealed record IdentityUser(
     DateTimeOffset CreatedAt,
     string? RestrictionReason = null,
     DateTimeOffset? RestrictedAt = null);
+
+/// <summary>Приложение и доступ к нему пользователя.</summary>
+/// <param name="ClientId">Клиент приложения в Keycloak.</param>
+/// <param name="Name">Название клиента.</param>
+/// <param name="HasAccess">false — доступ закрыт (роль access-denied клиента).</param>
+public sealed record AppAccessInfo(string ClientId, string? Name, bool HasAccess);
+
+/// <summary>Роль клиента приложения «доступ закрыт»: кому выдана — тот в это приложение не входит.</summary>
+public static class AppRoles
+{
+    public const string ACCESS_DENIED = "access-denied";
+}
 
 /// <summary>Атрибуты пользователя, которые ведёт сервис (кроме phone и active_mode из контракта токена).</summary>
 public static class UserAttributes

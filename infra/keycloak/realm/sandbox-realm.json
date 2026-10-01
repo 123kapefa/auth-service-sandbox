@@ -33,9 +33,32 @@
   "authenticationFlows": [
     {
       "alias": "sandbox browser",
-      "description": "Вход в браузере: как встроенный browser, но 2FA — OTP или код восстановления",
+      "description": "Вход в браузере: способ входа, затем — открыт ли доступ к этому приложению",
       "providerId": "basic-flow",
       "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": true,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "priority": 10,
+          "flowAlias": "sandbox who"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "sandbox-app-access-check",
+          "priority": 20
+        }
+      ]
+    },
+    {
+      "alias": "sandbox who",
+      "description": "Кто вы: живая сессия, внешний провайдер или форма входа",
+      "providerId": "basic-flow",
+      "topLevel": false,
       "builtIn": false,
       "authenticationExecutions": [
         {
@@ -307,6 +330,22 @@
           "clientRole": true,
           "attributes": {}
         }
+      ],
+      "sandbox-bff": [
+        {
+          "name": "access-denied",
+          "description": "Доступ к демо-приложению закрыт",
+          "composite": false,
+          "clientRole": true
+        }
+      ],
+      "account-console": [
+        {
+          "name": "access-denied",
+          "description": "Доступ к личному кабинету закрыт",
+          "composite": false,
+          "clientRole": true
+        }
       ]
     }
   },
@@ -476,6 +515,7 @@
       "directAccessGrantsEnabled": false
     },
     {
+      "id": "7d0f5b8e-3c2a-4f51-9a6e-2b8d41c0e7a1",
       "clientId": "sandbox-bff",
       "name": "BFF: вход, cookie, refresh, logout, Admin API",
       "enabled": true,
@@ -550,6 +590,7 @@
       "optionalClientScopes": []
     },
     {
+      "id": "c41e9a20-6b7d-4e38-8f15-90a2d3b6c5f4",
       "clientId": "account-console",
       "name": "${client_account-console}",
       "rootUrl": "${authBaseUrl}",
@@ -728,6 +769,52 @@
                 "name": "map-roles-composite"
               }
             ]
+          },
+          {
+            "name": "7d0f5b8e-3c2a-4f51-9a6e-2b8d41c0e7a1",
+            "ownerManagedAccess": false,
+            "attributes": {},
+            "uris": [],
+            "scopes": [
+              {
+                "name": "view"
+              },
+              {
+                "name": "map-roles-client-scope"
+              },
+              {
+                "name": "map-roles"
+              },
+              {
+                "name": "manage"
+              },
+              {
+                "name": "map-roles-composite"
+              }
+            ]
+          },
+          {
+            "name": "c41e9a20-6b7d-4e38-8f15-90a2d3b6c5f4",
+            "ownerManagedAccess": false,
+            "attributes": {},
+            "uris": [],
+            "scopes": [
+              {
+                "name": "view"
+              },
+              {
+                "name": "map-roles-client-scope"
+              },
+              {
+                "name": "map-roles"
+              },
+              {
+                "name": "manage"
+              },
+              {
+                "name": "map-roles-composite"
+              }
+            ]
           }
         ],
         "policies": [
@@ -741,13 +828,13 @@
             }
           },
           {
-            "name": "sandbox-api: view и map-roles",
+            "name": "Клиенты приложений: view и map-roles",
             "type": "scope",
             "logic": "POSITIVE",
             "decisionStrategy": "UNANIMOUS",
             "config": {
               "defaultResourceType": "Clients",
-              "resources": "[\"2631bc45-b176-4774-927a-b6dd4e310582\"]",
+              "resources": "[\"2631bc45-b176-4774-927a-b6dd4e310582\", \"7d0f5b8e-3c2a-4f51-9a6e-2b8d41c0e7a1\", \"c41e9a20-6b7d-4e38-8f15-90a2d3b6c5f4\"]",
               "scopes": "[\"view\",\"map-roles\"]",
               "applyPolicies": "[\"sandbox-bff service account\"]"
             }
@@ -1140,6 +1227,38 @@
         "roles": [
           "manage-account",
           "view-groups"
+        ]
+      }
+    ]
+  },
+  "clientProfiles": {
+    "profiles": [
+      {
+        "name": "sandbox-app-access",
+        "description": "Не выдавать токены приложения тем, у кого закрыт доступ к нему (роль access-denied клиента)",
+        "executors": [
+          {
+            "executor": "sandbox-app-access",
+            "configuration": {}
+          }
+        ]
+      }
+    ]
+  },
+  "clientPolicies": {
+    "policies": [
+      {
+        "name": "sandbox-app-access",
+        "description": "Доступ к приложению — для всех клиентов realm",
+        "enabled": true,
+        "conditions": [
+          {
+            "condition": "any-client",
+            "configuration": {}
+          }
+        ],
+        "profiles": [
+          "sandbox-app-access"
         ]
       }
     ]

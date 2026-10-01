@@ -10,6 +10,9 @@ namespace AuthService.IntegrationTests.Infrastructure;
 /// <summary>Подставной Admin API: пользователи, которых завёл тест, и запись того, что сервис менял.</summary>
 public sealed class FakeIdentityAdmin : IIdentityAdmin
 {
+    /// <summary>Приложения проекта: клиенты с ролью access-denied.</summary>
+    public static readonly string[] Apps = ["account-console", "sandbox-bff"];
+
     private readonly ConcurrentDictionary<Guid, Account> _accounts = new();
 
     /// <summary>Записанные атрибуты (удаления — со значением null).</summary>
@@ -31,7 +34,8 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         _accounts[user.Id] = new Account(
             new IdentityUser(user.Id, user.Phone.TrimStart('+'), null, user.Phone, user.ActiveMode, enabled, DateTimeOffset.UtcNow),
             clientRoles ?? user.Roles,
-            hasPassword);
+            hasPassword,
+            []);
     }
 
     public void Reset()
@@ -114,9 +118,17 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         }
 
         RoleChanges.Add((userId, [.. grant], [.. revoke]));
-        _accounts[userId] = account with { ClientRoles = [.. account.ClientRoles.Except(revoke).Union(grant)] };
+        _accounts[userId] = Apps.Contains(clientId)
+            ? account with { DeniedApps = grant.Count > 0 ? [.. account.DeniedApps.Append(clientId)] : [.. account.DeniedApps.Where(app => app != clientId)] }
+            : account with { ClientRoles = [.. account.ClientRoles.Except(revoke).Union(grant)] };
         return Task.FromResult(UnitResult.Success<Error>());
     }
+
+    public Task<Result<IReadOnlyList<AppAccessInfo>, Error>> GetAppAccessAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult(_accounts.TryGetValue(userId, out Account? account)
+            ? Result.Success<IReadOnlyList<AppAccessInfo>, Error>(
+                [.. Apps.Select(app => new AppAccessInfo(app, $"Приложение {app}", !account.DeniedApps.Contains(app)))])
+            : IdentityProviderErrors.UserNotFound());
 
     public Task<UnitResult<Error>> LogoutUserAsync(Guid userId, CancellationToken cancellationToken)
     {
@@ -124,5 +136,5 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         return Task.FromResult(UnitResult.Success<Error>());
     }
 
-    private sealed record Account(IdentityUser User, IReadOnlyList<string> ClientRoles, bool HasPassword);
+    private sealed record Account(IdentityUser User, IReadOnlyList<string> ClientRoles, bool HasPassword, IReadOnlyList<string> DeniedApps);
 }

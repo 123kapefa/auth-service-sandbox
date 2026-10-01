@@ -89,16 +89,15 @@ check "токен служебной учётки (client_credentials)" "$([ -n 
 admin_api() { curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $SA" "$KC/admin/realms/$REALM/$1"; }
 check "читает пользователей (view-users)" "$(admin_api 'users?username=79990000001&exact=true')" 200
 check "читает события входа (view-events)" "$(admin_api 'events?max=1')" 200
-# Точечные права (FGAP v2): из клиентов — только sandbox-api (выдавать его роли), секретов не видно.
-check "из клиентов видит только sandbox-api" "$(curl -s -H "Authorization: Bearer $SA" "$KC/admin/realms/$REALM/clients" | python3 -c 'import json,sys; print(",".join(c["clientId"] for c in json.load(sys.stdin)))')" sandbox-api
-check "sandbox-bff даже не находит" "$(curl -s -H "Authorization: Bearer $SA" "$KC/admin/realms/$REALM/clients?clientId=sandbox-bff&search=true")" "[]"
-# Настоящий id sandbox-bff — мастер-админкой (логин и пароль — из .env), чтобы проверить сам запрет на секрет.
+# Точечные права (FGAP v2): из клиентов — только клиенты приложений (выдавать их роли), чужие клиенты и их секреты не видны.
+check "из клиентов видит только клиенты приложений" "$(curl -s -H "Authorization: Bearer $SA" "$KC/admin/realms/$REALM/clients" | python3 -c 'import json,sys; print(",".join(sorted(c["clientId"] for c in json.load(sys.stdin))))')" account-console,sandbox-api,sandbox-bff
+check "чужой клиент (broker) даже не находит" "$(curl -s -H "Authorization: Bearer $SA" "$KC/admin/realms/$REALM/clients?clientId=broker&search=true")" "[]"
+# Настоящий id broker — мастер-админкой (логин и пароль — из .env), чтобы проверить сам запрет на секрет.
 ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-$(grep -s '^KEYCLOAK_ADMIN_PASSWORD=' "$(dirname "$0")/../../.env" | cut -d= -f2)}"
 MASTER=$(curl -s -d grant_type=password -d client_id=admin-cli -d "username=${KEYCLOAK_ADMIN:-admin}" --data-urlencode "password=$ADMIN_PASSWORD" \
   "$KC/realms/master/protocol/openid-connect/token" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("access_token",""))')
-BFF_ID=$(curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/clients?clientId=sandbox-bff" | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["id"])')
-check "секрет sandbox-bff не читает" "$(admin_api "clients/$BFF_ID/client-secret")" 403
-# Краткое описание realm (GET) Keycloak отдаёт любой админской роли — проверяем запрет на изменение.
+BROKER_ID=$(curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/clients?clientId=broker" | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["id"])')
+check "секрет чужого клиента не читает" "$(admin_api "clients/$BROKER_ID/client-secret")" 403
 check "не меняет настройки realm" "$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H "Authorization: Bearer $SA" \
   -H 'Content-Type: application/json' -d '{"displayName":"x"}' "$KC/admin/realms/$REALM")" 403
 check "токен без секрета не выдаётся" "$(curl -s -o /dev/null -w '%{http_code}' -d grant_type=client_credentials -d client_id=sandbox-bff \

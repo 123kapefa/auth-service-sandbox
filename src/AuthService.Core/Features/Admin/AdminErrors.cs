@@ -21,4 +21,12 @@ public static class AdminErrors
         Error.Authorization(
             "auth.reauthentication_required",
             "Подтвердите, что это вы: войдите заново (GET /auth/login?reauth=true) и повторите действие.");
+
+    /// <summary>Свой доступ к приложению закрывать нельзя.</summary>
+    public static Error SelfAccess() =>
+        Error.Authorization("users.self_access", "Нельзя менять свой доступ к приложению.");
+
+    /// <summary>Нет такого приложения (или служебной учётке не дано право на его клиента).</summary>
+    public static Error AppNotFound() =>
+        Error.NotFound("apps.not_found", "Приложение не найдено.");
 }

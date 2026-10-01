@@ -137,6 +137,36 @@ internal sealed partial class KeycloakAdminClient(
         return UnitResult.Success<Error>();
     }
 
+    public async Task<Result<IReadOnlyList<AppAccessInfo>, Error>> GetAppAccessAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        // Служебная учётка видит только клиенты приложений, на которые ей дано право (FGAP v2).
+        Result<ClientRepresentation[], Error> clients = await GetJsonAsync<ClientRepresentation[]>("clients", cancellationToken);
+        if (clients.IsFailure)
+        {
+            return clients.Error;
+        }
+
+        List<AppAccessInfo> apps = [];
+        foreach (ClientRepresentation client in clients.Value.OrderBy(found => found.ClientId, StringComparer.Ordinal))
+        {
+            string path = $"users/{userId}/role-mappings/clients/{client.Id}";
+            Result<RoleRepresentation[], Error> assigned = await GetJsonAsync<RoleRepresentation[]>(path, cancellationToken);
+            Result<RoleRepresentation[], Error> available = await GetJsonAsync<RoleRepresentation[]>($"{path}/available", cancellationToken);
+            if (assigned.IsFailure || available.IsFailure)
+            {
+                return assigned.IsFailure ? assigned.Error : available.Error;
+            }
+
+            bool denied = assigned.Value.Any(role => string.Equals(role.Name, AppRoles.ACCESS_DENIED, StringComparison.Ordinal));
+            if (denied || available.Value.Any(role => string.Equals(role.Name, AppRoles.ACCESS_DENIED, StringComparison.Ordinal)))
+            {
+                apps.Add(new AppAccessInfo(client.ClientId, client.Name, !denied));
+            }
+        }
+
+        return apps;
+    }
+
     // Внутренний id клиента по clientId. Служебная учётка видит только клиенты, на которые ей дано право (FGAP v2).
     private async Task<Result<string, Error>> FindClientIdAsync(string clientId, CancellationToken cancellationToken)
     {
@@ -321,7 +351,8 @@ internal sealed partial class KeycloakAdminClient(
 
     private sealed record ClientRepresentation(
         [property: JsonPropertyName("id")] string Id,
-        [property: JsonPropertyName("clientId")] string ClientId);
+        [property: JsonPropertyName("clientId")] string ClientId,
+        [property: JsonPropertyName("name")] string? Name);
 
     private sealed record Credential([property: JsonPropertyName("type")] string Type);
 

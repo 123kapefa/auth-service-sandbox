@@ -1,13 +1,10 @@
 using System.Globalization;
 using AuthService.Contracts.Admin;
 using AuthService.Core.Abstractions;
-using AuthService.Core.Authorization;
 using AuthService.Core.Features.Admin.UseCases.GetUser;
 using CSharpFunctionalExtensions;
 using FluentValidation;
 using FluentValidation.Results;
-using Microsoft.Extensions.Options;
-using PlatformAuth;
 using SharedKernel;
 using Validation;
 
@@ -22,7 +19,7 @@ namespace AuthService.Core.Features.Admin.UseCases.SetRestriction;
 public sealed class SetRestrictionHandler(
     IIdentityAdmin identityAdmin,
     IValidator<SetRestrictionRequest> validator,
-    IOptions<JwtAuthenticationOptions> authentication,
+    AdminTargets targets,
     TimeProvider timeProvider,
     GetUserHandler getUser)
 {
@@ -46,22 +43,10 @@ public sealed class SetRestrictionHandler(
             return AdminErrors.SelfRestriction();
         }
 
-        Result<IdentityUser, Error> user = await identityAdmin.GetUserAsync(userId, cancellationToken);
+        Result<IdentityUser, Error> user = await targets.FindAsync(userId, onlyCustomers, cancellationToken);
         if (user.IsFailure)
         {
             return user.Error;
-        }
-
-        Result<IReadOnlyList<string>, Error> roles =
-            await identityAdmin.GetClientRolesAsync(userId, authentication.Value.Audience, cancellationToken);
-        if (roles.IsFailure)
-        {
-            return roles.Error;
-        }
-
-        if (onlyCustomers && StaffRoles.Of(roles.Value).Count > 0)
-        {
-            return AdminErrors.StaffNotAllowed();
         }
 
         UnitResult<Error> changed = request.Restricted!.Value

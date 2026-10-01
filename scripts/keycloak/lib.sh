@@ -74,9 +74,13 @@ form_action() {
   python3 -c 'import re,sys,html; m=re.search(r"<form[^>]*" + (("id=\"" + sys.argv[2] + "\"[^>]*") if len(sys.argv) > 2 else "") + r"action=\"([^\"]+)\"", open(sys.argv[1]).read()); print(html.unescape(m.group(1)) if m else "")' "$@"
 }
 
-# feedback <html> — текст сообщения Keycloak на странице (класс kc-feedback-text)
+# feedback <html> — текст сообщения Keycloak: на форме (класс kc-feedback-text) или на странице ошибки (kc-error-message)
 feedback() {
-  python3 -c 'import re,sys,html; m=re.search(r"kc-feedback-text[^\"]*\"[^>]*>\s*([^<]+)", open(sys.argv[1]).read()); print(html.unescape(m.group(1)).strip() if m else "")' "$1"
+  python3 -c '
+import re,sys,html
+s = open(sys.argv[1]).read()
+m = re.search(r"kc-feedback-text[^\"]*\"[^>]*>\s*([^<]+)", s) or re.search(r"id=\"kc-error-message\"[\s\S]*?<p[^>]*>\s*([^<]+)", s)
+print(html.unescape(m.group(1)).strip() if m else "")' "$1"
 }
 
 # require_service — сервис должен отвечать, иначе проверять нечего
