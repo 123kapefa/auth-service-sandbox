@@ -19,6 +19,8 @@ export default defineConfig({
       },
     }),
   ],
+  // 5174 — чтобы не занять порт админки (frontend/, 5173).
+  server: { port: 5174, strictPort: true },
   test: {
     environment: "jsdom",
     globals: true,

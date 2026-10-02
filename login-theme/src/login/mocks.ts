@@ -17,8 +17,27 @@ export const { getKcContextMock } = createGetKcContextMock({
     },
   } satisfies KcContextExtensionPerPage,
   overrides: {
-    locale: { currentLanguageTag: "ru" },
-    realm: { displayName: "Auth Sandbox" },
+    // Как в realm: русский по умолчанию и английский.
+    locale: {
+      currentLanguageTag: "ru",
+      supported: [
+        { languageTag: "ru", label: "Русский", url: "?kc_locale=ru" },
+        { languageTag: "en", label: "English", url: "?kc_locale=en" },
+      ],
+    },
+    realm: { displayName: "Auth Sandbox", registrationEmailAsUsername: false },
   },
-  overridesPerPage: {},
+  // Как в realm sandbox: вход по телефону или почте, сброс пароля, без регистрации и «запомнить меня».
+  overridesPerPage: {
+    "login.ftl": {
+      realm: {
+        loginWithEmailAllowed: true,
+        registrationAllowed: false,
+        resetPasswordAllowed: true,
+        rememberMe: false,
+      },
+    },
+    "login-reset-password.ftl": { realm: { loginWithEmailAllowed: true } },
+    "webauthn-authenticate.ftl": { realm: { registrationAllowed: false } },
+  },
 });

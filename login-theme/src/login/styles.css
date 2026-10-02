@@ -40,9 +40,52 @@ body {
     sans-serif;
 }
 
-/* Разметка стандартных страниц Keycloak (сетка Bootstrap в именах классов) — без своей вёрстки. */
+/*
+ * Содержимое карточки стандартных страниц Keycloak (настройка 2FA, ключ доступа, информация…): разметка Keycloak
+ * со списками, ссылками и абзацами — базовые стили Tailwind их обнуляют, здесь — аккуратный текст.
+ */
 @layer components {
-  .kc-form-group-row {
-    @apply grid gap-1.5;
+  #kc-content {
+    @apply text-sm leading-relaxed;
+  }
+  #kc-content p {
+    @apply my-2;
+  }
+  #kc-content ol {
+    @apply my-3 grid list-decimal gap-3 pl-5;
+  }
+  /* Коды восстановления пронумерованы в тексте («1: …») — без второго номера списка. */
+  #kc-content #kc-recovery-codes-list {
+    @apply list-none pl-0;
+  }
+  #kc-content ul:not([class]) {
+    @apply my-2 list-disc pl-5;
+  }
+  #kc-content a:not([class]) {
+    @apply text-primary hover:underline;
+  }
+  #kc-content img {
+    @apply mx-auto my-3 rounded-md bg-white p-2;
+  }
+  /* Разметка PatternFly в стандартных страницах: предупреждение и кнопки-ссылки. */
+  #kc-content .pf-c-alert__title {
+    @apply mb-1 font-semibold text-warning;
+  }
+  #kc-content .pf-screen-reader {
+    @apply sr-only;
+  }
+  #kc-content .pf-c-button.pf-m-link {
+    @apply rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted;
+  }
+  #kc-content .checkbox label {
+    @apply flex items-center gap-2;
+  }
+  #kc-content hr {
+    @apply my-4 border-border;
+  }
+  #kc-content code,
+  #kc-content .kc-totp-secret-key,
+  #kc-totp-secret-key {
+    @apply rounded bg-muted px-2 py-1 font-mono text-xs break-all;
   }
 }

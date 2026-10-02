@@ -138,3 +138,33 @@ describe("вход по коду", () => {
     expect(screen.getByRole("button", { name: "Отправить код ещё раз" })).toBeEnabled();
   });
 });
+
+describe("стандартные страницы в нашем каркасе", () => {
+  it("2FA: «Одноразовый код» и кнопка входа по-русски", async () => {
+    render(<KcPage kcContext={getKcContextMock({ pageId: "login-otp.ftl", overrides: {} })} />);
+    expect(await screen.findByLabelText("Одноразовый код")).toBeInTheDocument();
+  });
+
+  it("выбор способа входа — по-русски, без английских названий", async () => {
+    render(
+      <KcPage
+        kcContext={getKcContextMock({ pageId: "select-authenticator.ftl", overrides: {} })}
+      />,
+    );
+    expect(await screen.findByText("Приложение-аутентификатор")).toBeInTheDocument();
+    expect(screen.queryByText(/Authenticator Application/)).not.toBeInTheDocument();
+  });
+
+  it("коды восстановления — в списке с id, который тема оформляет без нумерации", async () => {
+    const { container } = render(
+      <KcPage
+        kcContext={getKcContextMock({
+          pageId: "login-recovery-authn-code-config.ftl",
+          overrides: {},
+        })}
+      />,
+    );
+    await screen.findByText(/code-123/);
+    expect(container.querySelector("#kc-recovery-codes-list")).not.toBeNull();
+  });
+});

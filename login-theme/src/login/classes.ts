@@ -33,9 +33,10 @@ export const classes = {
     "absolute inset-y-0 right-0 flex items-center px-3 text-xs text-muted-foreground hover:text-foreground",
   kcFormPasswordVisibilityIconShow: "",
   kcFormPasswordVisibilityIconHide: "",
-  kcFormOptionsClass: "flex items-center justify-between text-sm",
+  kcFormOptionsClass: "text-sm",
   kcFormOptionsWrapperClass: "flex w-full items-center justify-between gap-2 text-sm",
-  kcFormSettingClass: "flex items-center justify-between text-sm",
+  // Стоит рядом с kcFormGroupClass (ссылки и кнопки формы) — сетка, не строка: иначе кнопка сжимается.
+  kcFormSettingClass: "gap-3 text-sm",
   kcCheckboxInputClass: "mr-2",
   kcFormButtonsClass: "grid gap-2",
   kcFormButtonsWrapperClass: "grid gap-2",
@@ -71,4 +72,9 @@ export const classes = {
   kcSelectAuthListItemDescriptionClass: "text-xs text-muted-foreground",
   kcSelectAuthListItemFillClass: "flex-1",
   kcSrOnlyClass: "sr-only",
+  kcCheckInputClass: "mr-2",
+  // Коды восстановления: предупреждение, список кодов, «Печать / Скачать / Копировать».
+  kcRecoveryCodesWarning: "my-3 rounded-md border border-warning/50 p-3 text-sm",
+  kcRecoveryCodesList: "my-3 grid grid-cols-2 gap-2 rounded-md bg-muted p-3 font-mono text-sm",
+  kcRecoveryCodesActions: "mb-3 flex flex-wrap gap-2",
 } satisfies { [key in ClassKey]?: string };

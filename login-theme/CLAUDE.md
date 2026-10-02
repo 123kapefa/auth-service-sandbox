@@ -29,7 +29,7 @@ src/login/lib/phone.ts — «+» перед номером, логин цифр�
 
 ```bash
 npm ci
-npm run dev          # http://localhost:5173/?page=login.ftl — страницы на макетах, без Keycloak
+npm run dev          # http://localhost:5174/?page=login.ftl — страницы на макетах, без Keycloak
 npm run lint
 npm run type-check
 npm test
