@@ -29,7 +29,7 @@ scripts/keycloak/check-stand.sh
 
 Ожидается `Итого: 44 ✓, 0 ✗`. Остальные проверки (сервис поднят: `docker compose up -d --build --wait`):
 `check-api.sh` 48, `check-login.sh` 16, `check-login-methods.sh` 21, `check-code-login.sh` 28, `check-admin.sh` 108,
-`check-roles.sh` 71; .NET-тестов — 325; тестов админки (Vitest) — 20.
+`check-roles.sh` 71; .NET-тестов — 325; тестов админки (Vitest) — 27.
 
 | Что | Адрес | Доступ |
 |---|---|---|---|

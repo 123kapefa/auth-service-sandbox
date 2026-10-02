@@ -14,9 +14,13 @@ export function navItems(access: AdminAccess): NavItem[] {
     items.push({ to: "/users", label: "Пользователи" });
   }
 
+  // Приложение — в меню, если в нём можно выдавать роли или менять сами роли (раздел с вкладками).
   for (const app of access.apps) {
-    if (app.permissions.includes(Permissions.usersRolesManage)) {
-      items.push({ to: `/apps/${app.clientId}/users`, label: app.name ?? app.clientId });
+    if (
+      app.permissions.includes(Permissions.usersRolesManage) ||
+      app.permissions.includes(Permissions.rolesManage)
+    ) {
+      items.push({ to: `/apps/${app.clientId}`, label: app.name ?? app.clientId });
     }
   }
 

@@ -23,7 +23,6 @@ export function AppUsersPage() {
 
   return (
     <div className="grid gap-4">
-      <h1 className="text-lg font-semibold">{app.name ?? app.clientId}: пользователи</h1>
       <SearchBox
         value={search}
         label="Найти пользователя"

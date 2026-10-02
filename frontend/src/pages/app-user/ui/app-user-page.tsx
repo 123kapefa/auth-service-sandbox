@@ -26,9 +26,9 @@ export function AppUserPage() {
           to={`/apps/${clientId}/users`}
           className="text-sm text-muted-foreground hover:underline"
         >
-          ← {appName}: пользователи
+          ← Пользователи
         </Link>
-        <h1 className="mt-1 text-lg font-semibold">{title}</h1>
+        <h2 className="mt-1 text-base font-semibold">{title}</h2>
       </div>
       {query.isPending ? (
         <Loading />

@@ -37,7 +37,14 @@ describe("navItems", () => {
     ]);
   });
 
-  it("менеджер: пользователи; приложение без выдачи ролей в меню не попадает", () => {
+  it("приложение, где можно только менять роли, — тоже в меню", () => {
+    expect(labels(session(["profile.view"], [app("manager-1c", ["roles.manage"])]))).toEqual([
+      "Обзор",
+      "manager-1c",
+    ]);
+  });
+
+  it("менеджер: пользователи; приложение без ролей и их выдачи в меню не попадает", () => {
     expect(
       labels(session(["users.view", "users.block"], [app("sandbox-api", ["users.block"], true)])),
     ).toEqual(["Обзор", "Пользователи"]);
