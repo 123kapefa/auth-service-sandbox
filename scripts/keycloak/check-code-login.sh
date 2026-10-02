@@ -12,67 +12,6 @@ source "$(dirname "$0")/lib.sh"
 
 MAILPIT="${MAILPIT:-http://localhost:${MAILPIT_UI_PORT:-8025}}"
 
-# code_start <jar> <логин> — форма входа → «Войти по коду»; печатает текст экрана кода или ошибку.
-# Страница — в $WORK/page.html.
-code_start() {
-  local jar=$1 h="$WORK/h" page="$WORK/page.html"
-  curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" "$API/auth/login?return_to=/me/"
-  curl -s -o "$page" -b "$jar" -c "$jar" "$(header "$h" location)"
-  curl -s -o "$page" -b "$jar" -c "$jar" --data-urlencode "username=$2" --data-urlencode "codeLogin=" "$(form_action "$page")"
-  code_screen "$page"
-}
-
-# code_start_fresh <jar> <логин> — как code_start, но если от прошлого прогона осталась пауза перед повтором (60 с),
-# дожидается её и отправляет код заново
-code_start_fresh() {
-  local screen wait
-  screen=$(code_start "$1" "$2")
-  if [[ "$(feedback "$WORK/page.html")" == "Код уже отправлен"* ]]; then
-    wait=$(feedback "$WORK/page.html" | grep -o 'через [0-9]* с' | head -1 | grep -o '[0-9]*')
-    echo "  … пауза перед повтором от прошлого прогона: ждём ${wait} с" >&2
-    sleep "$((wait + 1))"
-    code_send_again "$1" > /dev/null
-  fi
-  echo "$screen"
-}
-
-# code_screen <html> — «куда отправили» с экрана кода (теми же словами, что страница темы: из codeChannel и
-# codeTarget); не экран кода — ошибка со страницы
-code_screen() {
-  if [ "$(kc_page "$1")" = sandbox-code-login.ftl ]; then
-    kc "$1" '("Отправили код письмом на " if c["codeChannel"] == "EMAIL" else "Отправили код в SMS на ") + c["codeTarget"] + "."'
-  else
-    echo "ошибка: $(feedback "$1" | sed 's/^$/нет экрана кода/')"
-  fi
-}
-
-# code_send_again <jar> — «Отправить код ещё раз»; печатает сообщение Keycloak
-code_send_again() {
-  local jar=$1 page="$WORK/page.html"
-  curl -s -o "$page" -b "$jar" -c "$jar" --data-urlencode "resend=" "$(form_action "$page")"
-  feedback "$page"
-}
-
-# code_submit <jar> <код> — ввод кода; печатает, куда сервис вернул браузер, или «keycloak: <ошибка>»
-code_submit() {
-  local jar=$1 h="$WORK/h" page="$WORK/page.html" url
-  curl -s -o "$page" -D "$h" -b "$jar" -c "$jar" --data-urlencode "code=$2" "$(form_action "$page")"
-  url=$(header "$h" location)
-  [ -n "$url" ] || { echo "keycloak: $(feedback "$page")"; return; }
-  curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" "$url"
-  header "$h" location
-}
-
-# sms_code <логин> [после строки N] — последний код из «SMS» (лог Keycloak), ждём до 10 секунд
-sms_code() {
-  local i code
-  for i in 1 2 3 4 5 6 7 8 9 10; do
-    code=$(docker compose logs keycloak --since 10m 2>/dev/null | grep "\[SANDBOX SMS\] +$1: код входа" | tail -1 | grep -o '[0-9]\{6\}$')
-    [ -n "$code" ] && { echo "$code"; return; }
-    sleep 1
-  done
-}
-
 # sms_count <логин> — сколько «SMS» ушло на номер за 10 минут
 sms_count() { docker compose logs keycloak --since 10m 2>/dev/null | grep -c "\[SANDBOX SMS\] +$1: код входа"; }
 
