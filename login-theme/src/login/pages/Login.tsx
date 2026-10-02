@@ -6,11 +6,12 @@ import { useIsPasswordRevealed } from "keycloakify/tools/useIsPasswordRevealed";
 import { useState } from "react";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../KcContext";
-import { toLogin, withPlus } from "../lib/phone";
+import { formatLogin, nextLogin, toLogin } from "../lib/phone";
 
 /**
  * Вход (login.ftl): телефон или почта и пароль; «Войти по коду» — тот же логин, без пароля (плагин code-login);
- * «Войти с ключом доступа» — passkey. Номер показывается с «+», уходит цифрами.
+ * «Войти с ключом доступа» — passkey. Номер показывается как +7 (999) 000-00-01 (с 8 и 10 цифр — тоже +7), уходит
+ * цифрами скрытым полем username.
  */
 export default function Login(props: PageProps<Extract<KcContext, { pageId: "login.ftl" }>, I18n>) {
   const { kcContext, i18n, doUseDefaultCss, Template, classes } = props;
@@ -27,7 +28,7 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
     authenticators,
   } = kcContext;
   const { msg, msgStr } = i18n;
-  const [username, setUsername] = useState(() => withPlus(login.username ?? ""));
+  const [username, setUsername] = useState(() => formatLogin(login.username ?? ""));
   const [submitting, setSubmitting] = useState(false);
   const webAuthnButtonId = "authenticateWebAuthnButton";
   const hasError = messagesPerField.existsError("username", "password");
@@ -72,9 +73,8 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
                 id="username"
                 className={kcClsx("kcInputClass")}
                 value={username}
-                onChange={(event) => setUsername(withPlus(event.target.value))}
+                onChange={(event) => setUsername(nextLogin(username, event.target.value))}
                 type="text"
-                inputMode="email"
                 autoFocus
                 autoComplete={enableWebAuthnConditionalUI ? "username webauthn" : "username"}
                 aria-invalid={hasError || undefined}
@@ -141,6 +141,7 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
               id="sandbox-code-login"
               name="codeLogin"
               type="submit"
+              disabled={submitting}
               className={kcClsx("kcButtonClass", "kcButtonSecondaryClass")}
             >
               {msgStr("sandboxCodeLoginDo")}
