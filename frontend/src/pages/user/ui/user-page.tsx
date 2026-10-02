@@ -41,6 +41,22 @@ export function UserPage() {
           ← Пользователи
         </Link>
         <h1 className="mt-1 text-lg font-semibold">{user.phone ?? user.username}</h1>
+        {can.has(Permissions.auditView) && (
+          <div className="mt-1 flex gap-4 text-sm">
+            <Link
+              to={`/journal?tab=actions&objectId=${user.id}`}
+              className="underline-offset-2 hover:underline"
+            >
+              Действия с пользователем
+            </Link>
+            <Link
+              to={`/journal?tab=logins&userId=${user.id}`}
+              className="underline-offset-2 hover:underline"
+            >
+              Его входы
+            </Link>
+          </div>
+        )}
       </div>
       <Card>
         <CardTitle>Аккаунт</CardTitle>

@@ -1,7 +1,8 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { accessOf, adminSessionQueries, Permissions } from "@/entities/admin-session";
+import { accessOf, adminSessionQueries } from "@/entities/admin-session";
 import { Badge, Card, CardTitle } from "@/shared/ui";
+import { appTabs } from "@/widgets/app-section";
 
 /** Обзор: что вызвавшему доступно — уровень проекта и приложения под управлением. */
 export function OverviewPage() {
@@ -34,9 +35,9 @@ export function OverviewPage() {
           <ul className="grid gap-3">
             {access.apps.map((app) => (
               <li key={app.clientId}>
-                {app.permissions.includes(Permissions.usersRolesManage) ? (
+                {appTabs(app).length > 0 ? (
                   <Link
-                    to={`/apps/${app.clientId}/users`}
+                    to={`/apps/${app.clientId}`}
                     className="font-medium underline-offset-2 hover:underline"
                   >
                     {app.name ?? app.clientId}

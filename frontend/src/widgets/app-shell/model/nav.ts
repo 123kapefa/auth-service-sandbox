@@ -1,4 +1,5 @@
-import { type AdminAccess, Permissions } from "@/entities/admin-session";
+import { type AdminAccess } from "@/entities/admin-session";
+import { appTabs } from "@/widgets/app-section";
 
 export interface NavItem {
   to: string;
@@ -14,12 +15,13 @@ export function navItems(access: AdminAccess): NavItem[] {
     items.push({ to: "/users", label: "Пользователи" });
   }
 
-  // Приложение — в меню, если в нём можно выдавать роли или менять сами роли (раздел с вкладками).
+  if (access.projectAudit) {
+    items.push({ to: "/journal", label: "Журнал" });
+  }
+
+  // Приложение — в меню, если в его разделе есть хоть одна вкладка (выдача ролей, роли и права, журнал).
   for (const app of access.apps) {
-    if (
-      app.permissions.includes(Permissions.usersRolesManage) ||
-      app.permissions.includes(Permissions.rolesManage)
-    ) {
+    if (appTabs(app).length > 0) {
       items.push({ to: `/apps/${app.clientId}`, label: app.name ?? app.clientId });
     }
   }

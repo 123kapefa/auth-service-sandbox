@@ -1,7 +1,9 @@
 import { createBrowserRouter } from "react-router";
+import { AppJournalPage } from "@/pages/app-journal";
 import { AppRolesPage } from "@/pages/app-roles";
 import { AppUserPage } from "@/pages/app-user";
 import { AppUsersPage } from "@/pages/app-users";
+import { JournalPage } from "@/pages/journal";
 import { NotFoundPage } from "@/pages/not-found";
 import { OverviewPage } from "@/pages/overview";
 import { UserPage } from "@/pages/user";
@@ -18,6 +20,7 @@ export const router = createBrowserRouter(
         { index: true, element: <OverviewPage /> },
         { path: "users", element: <UsersPage /> },
         { path: "users/:userId", element: <UserPage /> },
+        { path: "journal", element: <JournalPage /> },
         {
           path: "apps/:clientId",
           element: <AppSection />,
@@ -26,6 +29,7 @@ export const router = createBrowserRouter(
             { path: "users", element: <AppUsersPage /> },
             { path: "users/:userId", element: <AppUserPage /> },
             { path: "roles", element: <AppRolesPage /> },
+            { path: "journal", element: <AppJournalPage /> },
           ],
         },
         { path: "*", element: <NotFoundPage /> },

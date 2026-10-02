@@ -30,7 +30,7 @@ describe("OverviewPage", () => {
 
     expect(screen.getByRole("link", { name: "Менеджер 1С" })).toHaveAttribute(
       "href",
-      "/apps/manager-1c/users",
+      "/apps/manager-1c",
     );
     expect(screen.getByText(/как админ приложения/)).toBeInTheDocument();
     expect(screen.getByText(/Прав уровня проекта нет/)).toBeInTheDocument();

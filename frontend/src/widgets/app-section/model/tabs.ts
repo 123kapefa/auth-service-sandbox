@@ -16,5 +16,9 @@ export function appTabs(app: ManagedApp): AppTab[] {
     tabs.push({ to: "roles", label: "Роли и права" });
   }
 
+  if (app.permissions.includes(Permissions.auditView)) {
+    tabs.push({ to: "journal", label: "Журнал" });
+  }
+
   return tabs;
 }

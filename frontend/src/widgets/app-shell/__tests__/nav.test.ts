@@ -30,6 +30,14 @@ describe("navItems", () => {
     expect(labels(admin)).toEqual(["Обзор", "Пользователи", "manager-1c", "sandbox-api"]);
   });
 
+  it("журнал проекта — по audit.view; приложение только с журналом — тоже в меню", () => {
+    expect(labels(session(["audit.view"], [app("manager-1c", ["audit.view"])]))).toEqual([
+      "Обзор",
+      "Журнал",
+      "manager-1c",
+    ]);
+  });
+
   it("админ приложения: только своё приложение", () => {
     expect(labels(session(["profile.view"], [app("manager-1c", ["users.roles.manage"])]))).toEqual([
       "Обзор",
