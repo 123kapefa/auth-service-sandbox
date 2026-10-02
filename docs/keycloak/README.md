@@ -29,7 +29,7 @@ scripts/keycloak/check-stand.sh
 
 Ожидается `Итого: 44 ✓, 0 ✗`. Остальные проверки (сервис поднят: `docker compose up -d --build --wait`):
 `check-api.sh` 48, `check-login.sh` 16, `check-login-methods.sh` 21, `check-code-login.sh` 28, `check-admin.sh` 108,
-`check-roles.sh` 71; .NET-тестов — 325; тестов админки (Vitest) — 34.
+`check-roles.sh` 71, `check-admin-ui.sh` 25; .NET-тестов — 325; тестов админки (Vitest) — 34.
 
 | Что | Адрес | Доступ |
 |---|---|---|---|
@@ -64,7 +64,7 @@ scripts/keycloak/check-stand.sh
 | 3а | Способы входа: телефон или почта, сброс пароля, 2FA по желанию, passkey | ✅ | [03a-login-methods.md](03a-login-methods.md) |
 | 4 | Режимы, API администрирования, события, мгновенный отзыв доступа | ✅ | [04-admin.md](04-admin.md) |
 | 4а | Динамические роли и права в Keycloak, «умный рефреш», второе приложение и его админ | ✅ | [04a-roles.md](04a-roles.md) |
-| 4б | Своя админка доступа (UI): админ проекта и админ приложения | ⬜ | — |
+| 4б | Своя админка доступа (UI): админ проекта и админ приложения | ✅ | [04b-admin-ui.md](04b-admin-ui.md) |
 | 4в | Свой интерфейс входа (Keycloakify): страницы входа и письма | ⬜ | — |
 | 5 | Спайк: вход по коду — SMS и почта (Java-плагин) | ✅ | [05-code-login.md](05-code-login.md) |
 | 6 | Спайк: миграция пользователей с BCrypt | ⬜ | — |
@@ -88,7 +88,7 @@ Keycloak; проекты друг друга не видят. **Приложен
 | `infra/keycloak/realm/sandbox-realm.json` | весь realm как код |
 | `infra/keycloak/themes/sandbox` | тема страницы входа: `+` у номера, кнопка «Войти по коду», экран ввода кода |
 | `infra/keycloak/providers/code-login` | плагин Keycloak (Java): форма входа с нормализацией номера, вход по коду; собирается в `infra/keycloak/Dockerfile` |
-| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал; `check-roles.sh` — роли и права приложений, роли пользователей, умный рефреш, «Менеджер 1С» (этап 4а); `lib.sh` — общие помощники |
+| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал, пароль и 2FA; `check-roles.sh` — роли и права приложений, роли пользователей, умный рефреш, «Менеджер 1С» (этап 4а); `check-admin-ui.sh` — своя админка: раздача, CSP, путь админов (этап 4б); `lib.sh` — общие помощники, `master-token.sh` — токен мастер-админки изнутри контейнера |
 | `frontend/` | админка доступа на `/admin` (React, FSD) — см. `frontend/CLAUDE.md`; в образ сервиса попадает сборка |
 | `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права из токена, хук мгновенного отзыва и умного рефреша (`access_changed`) — переиспользуемая библиотека |
 | `src/Shared/Authentication.Redis` | отметки отзыва и версии доступа в Redis, кэш проверки, `AddPlatformTokenRevocation` |

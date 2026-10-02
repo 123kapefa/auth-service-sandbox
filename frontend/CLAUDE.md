@@ -17,10 +17,11 @@ Node 22 (`.nvmrc`), npm, `package-lock.json` в git. `sonner` закреплён
 
 ```
 src/app        — провайдеры, роутер, проверка сессии, плашка «доступ изменился»
-src/pages      — страницы (обзор, «нет доступа», 404)
-src/widgets    — каркас с меню (app-shell)
-src/features   — действия пользователя (появятся с разделами)
-src/entities   — данные: admin-session (GET /auth/admin/me)
+src/pages      — обзор, пользователи и карточка, журнал, раздел приложения (пользователи, роли, журнал), «нет доступа», 404
+src/widgets    — каркас с меню (app-shell), раздел приложения с вкладками (app-section), журнал действий (audit-log)
+src/features   — действия: блокировка, доступ к приложению, «выйти везде», пароль и 2FA, роли пользователя,
+                 роль (создать/изменить), удалить роль, своё право (создать/удалить)
+src/entities   — данные: admin-session («кто я»), user, app-user, app-catalog (роли и права), journal
 src/shared     — api (клиент, Envelope, ошибки), config, lib, ui
 ```
 
