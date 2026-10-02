@@ -50,7 +50,8 @@ public sealed class UserRolesHandler(
             return roles.Error;
         }
 
-        return new UserRolesResponse(userId, roles.Value.Assigned, roles.Value.Defaults, roles.Value.Modes, ActiveMode(clientId, user.Value));
+        return new UserRolesResponse(
+            userId, roles.Value.Assigned, roles.Value.Defaults, roles.Value.Modes, ActiveMode(clientId, user.Value), roles.Value.HasAccess);
     }
 
     public async Task<Result<UserRolesResponse, Error>> SetAsync(
@@ -135,7 +136,8 @@ public sealed class UserRolesHandler(
             AuditActions.USER_ROLE_CHANGED,
             user.Value,
             new { app = clientId, role = new { old = StaffRoles.Describe(roles.Value.Assigned), @new = StaffRoles.Describe(wanted) } },
-            cancellationToken);
+            cancellationToken,
+            clientId);
         return UnitResult.Success<Error>();
     }
 

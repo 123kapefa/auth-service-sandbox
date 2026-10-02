@@ -6,7 +6,8 @@ using StackExchange.Redis;
 namespace PlatformAuth.Redis;
 
 /// <summary>
-/// Отметки в Redis. Отзыв (неймспейс auth:revoked): user:{sub} = T, session:{sid} = 1, app:{azp}:{sub} = T —
+/// Отметки в Redis. Отзыв (неймспейс auth:revoked): user:{sub} = T, session:{sid} = 1, app:{приложение}:{sub} = T —
+/// приложение — клиент входа (azp) или клиент ролей (audience сервиса: у «Менеджера 1С» входит другой клиент) —
 /// T в секундах Unix. Доступ изменился (неймспейс auth:changed): user:{sub} = версия, mode:{клиент}:{роль} = версия.
 /// Все живут TokenLifetime: дольше старые токены не живут сами. Чтение — одним MGET.
 /// </summary>
@@ -27,9 +28,11 @@ internal sealed class RedisTokenRevocationStore(IConnectionMultiplexer redis, IO
             key.AuthorizedParty is null ? PREFIX + "app:-" : AppKey(key.AuthorizedParty, key.Subject),
             AccessKey(key.Subject),
             key.RolesClient is null || key.ActiveMode is null ? CHANGED + "mode:-" : ModeKey(key.RolesClient, key.ActiveMode),
+            key.RolesClient is null ? PREFIX + "app:-" : AppKey(key.RolesClient, key.Subject),
         ]);
 
-        return new RevocationMarks(Number(values[0]), values[1].HasValue, Number(values[2]), Number(values[3]), Number(values[4]));
+        return new RevocationMarks(
+            Number(values[0]), values[1].HasValue, Latest(Number(values[2]), Number(values[5])), Number(values[3]), Number(values[4]));
     }
 
     public Task RevokeUserAsync(string subject, DateTimeOffset at, CancellationToken cancellationToken) =>
@@ -59,6 +62,9 @@ internal sealed class RedisTokenRevocationStore(IConnectionMultiplexer redis, IO
     private static RedisKey AccessKey(string subject) => CHANGED + "user:" + subject;
 
     private static RedisKey ModeKey(string rolesClient, string role) => CHANGED + "mode:" + rolesClient + ":" + role;
+
+    private static long? Latest(long? first, long? second) =>
+        first is null ? second : second is null ? first : Math.Max(first.Value, second.Value);
 
     private static long? Number(RedisValue value) =>
         value.HasValue && long.TryParse(value.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out long number)

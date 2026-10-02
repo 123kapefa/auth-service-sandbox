@@ -20,10 +20,12 @@ public sealed class AuditEntryConfiguration : IEntityTypeConfiguration<AuditEntr
         builder.Property(entry => entry.ActorName).HasMaxLength(AuditEntry.MAX_NAME_LENGTH);
         builder.Property(entry => entry.ActorRole).HasMaxLength(AuditEntry.MAX_ACTION_LENGTH);
         builder.Property(entry => entry.CorrelationId).HasMaxLength(AuditEntry.MAX_ACTION_LENGTH);
+        builder.Property(entry => entry.App).HasMaxLength(AuditEntry.MAX_NAME_LENGTH);
 
         // Типовые выборки: «что делали с пользователем» и «что делал сотрудник», новые сверху.
         builder.HasIndex(entry => new { entry.ObjectId, entry.OccurredAt });
         builder.HasIndex(entry => new { entry.ActorId, entry.OccurredAt });
         builder.HasIndex(entry => entry.OccurredAt);
+        builder.HasIndex(entry => new { entry.App, entry.OccurredAt }); // журнал приложения — для его админа
     }
 }

@@ -14,8 +14,14 @@ namespace AuthService.Core.Features.Admin;
 /// </summary>
 public sealed class ManagedApps(IIdentityAdmin identityAdmin, AppCatalog catalog, IOptions<JwtAuthenticationOptions> authentication)
 {
-    /// <summary>Права, которые дают управлять приложением.</summary>
-    public static IReadOnlyList<string> AppPermissions { get; } = [AuthServicePermissions.Roles.MANAGE, AuthServicePermissions.Users.MANAGE_ROLES];
+    /// <summary>Права, которые дают управлять приложением: роли, роли пользователей, доступ к нему, его журнал.</summary>
+    public static IReadOnlyList<string> AppPermissions { get; } =
+    [
+        AuthServicePermissions.Roles.MANAGE,
+        AuthServicePermissions.Users.MANAGE_ROLES,
+        AuthServicePermissions.Users.BLOCK,
+        AuthServicePermissions.Audit.VIEW,
+    ];
 
     public async Task<Result<IReadOnlyList<ManagedAppResponse>, Error>> ListAsync(CurrentUser caller, CancellationToken cancellationToken)
     {

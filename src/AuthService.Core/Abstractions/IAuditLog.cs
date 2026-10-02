@@ -11,7 +11,7 @@ public interface IAuditLog
     Task<AuditPage> SearchAsync(AuditQuery query, CancellationToken cancellationToken);
 }
 
-/// <summary>Фильтр журнала: все поля необязательны; page — с 1.</summary>
+/// <summary>Фильтр журнала: все поля необязательны; page — с 1; App — только записи этого приложения.</summary>
 public sealed record AuditQuery(
     Guid? ObjectId,
     Guid? ActorId,
@@ -19,6 +19,7 @@ public sealed record AuditQuery(
     DateTimeOffset? From,
     DateTimeOffset? To,
     int Page,
-    int PageSize);
+    int PageSize,
+    string? App = null);
 
 public sealed record AuditPage(IReadOnlyList<AuditEntry> Items, bool HasMore);

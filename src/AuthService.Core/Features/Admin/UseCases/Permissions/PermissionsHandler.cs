@@ -60,7 +60,7 @@ public sealed class PermissionsHandler(
         Guid id = after.IsSuccess ? after.Value.FirstOrDefault(role => string.Equals(role.Name, permission.Name, StringComparison.Ordinal))?.Id ?? Guid.Empty : Guid.Empty;
         await audit.RecordAsync(
             AuditActions.PERMISSION_CREATED, AuditActions.PERMISSION_OBJECT, id, permission.Name,
-            new { app = clientId, description = permission.Description }, cancellationToken);
+            new { app = clientId, description = permission.Description }, cancellationToken, clientId);
         return list;
     }
 
@@ -124,7 +124,7 @@ public sealed class PermissionsHandler(
 
         await audit.RecordAsync(
             AuditActions.PERMISSION_DELETED, AuditActions.PERMISSION_OBJECT, found.Id ?? Guid.Empty, found.Name,
-            new { app = clientId }, cancellationToken);
+            new { app = clientId }, cancellationToken, clientId);
         return await ListAsync(clientId, cancellationToken);
     }
 

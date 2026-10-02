@@ -7,9 +7,10 @@ namespace AuthService.Core.Features.Admin;
 
 /// <summary>
 /// Роли пользователя в приложении. Assigned — выданные напрямую (их меняет админка), Defaults — по умолчанию realm
-/// (customer; снять нельзя). Роль = режим: режимы пользователя — все его роли.
+/// (customer; снять нельзя). Роль = режим: режимы пользователя — все его роли. HasAccess — открыт ли доступ к
+/// приложению (null — у приложения нет роли access-denied, закрыть нельзя).
 /// </summary>
-public sealed record UserRoles(IReadOnlyList<AppRole> Catalog, IReadOnlyList<string> Assigned, IReadOnlyList<string> Defaults)
+public sealed record UserRoles(IReadOnlyList<AppRole> Catalog, IReadOnlyList<string> Assigned, IReadOnlyList<string> Defaults, bool? HasAccess = null)
 {
     public IReadOnlyList<string> Modes => StaffRoles.Sort(Defaults.Concat(Assigned));
 
@@ -44,6 +45,9 @@ public sealed class UserAppRoles(IIdentityAdmin identityAdmin, AppCatalog catalo
 
         IReadOnlyList<string> assigned = StaffRoles.Of(direct.Value, roles.Value);
         IReadOnlyList<string> defaults = [.. StaffRoles.Of(effective.Value, roles.Value).Except(assigned, StringComparer.Ordinal)];
-        return new UserRoles(roles.Value, assigned, defaults);
+        bool? hasAccess = roles.Value.Any(role => string.Equals(role.Name, AppRoles.ACCESS_DENIED, StringComparison.Ordinal))
+            ? !direct.Value.Contains(AppRoles.ACCESS_DENIED, StringComparer.Ordinal)
+            : null;
+        return new UserRoles(roles.Value, assigned, defaults, hasAccess);
     }
 }

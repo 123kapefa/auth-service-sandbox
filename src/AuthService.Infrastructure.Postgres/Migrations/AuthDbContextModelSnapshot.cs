@@ -49,6 +49,11 @@ namespace AuthService.Infrastructure.Postgres.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("actor_role");
 
+                    b.Property<string>("App")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("app");
+
                     b.Property<string>("Changes")
                         .IsRequired()
                         .HasColumnType("jsonb")
@@ -86,6 +91,9 @@ namespace AuthService.Infrastructure.Postgres.Migrations
 
                     b.HasIndex("ActorId", "OccurredAt")
                         .HasDatabaseName("ix_audit_entries_actor_id_occurred_at");
+
+                    b.HasIndex("App", "OccurredAt")
+                        .HasDatabaseName("ix_audit_entries_app_occurred_at");
 
                     b.HasIndex("ObjectId", "OccurredAt")
                         .HasDatabaseName("ix_audit_entries_object_id_occurred_at");

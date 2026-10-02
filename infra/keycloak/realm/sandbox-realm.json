@@ -561,7 +561,9 @@
                 "orders.edit",
                 "reports.view",
                 "users.roles.manage",
-                "roles.manage"
+                "roles.manage",
+                "users.block",
+                "audit.view"
               ]
             }
           },
@@ -643,6 +645,40 @@
               "code"
             ]
           }
+        },
+        {
+          "name": "users.block",
+          "description": "Закрыть и открыть доступ к приложению",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "audit.view",
+          "description": "Журнал приложения",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "access-denied",
+          "description": "Доступ к «Менеджеру 1С» закрыт",
+          "composite": false,
+          "clientRole": true
         }
       ]
     }
@@ -932,7 +968,10 @@
         "manager-1c-contract",
         "openid-min"
       ],
-      "optionalClientScopes": []
+      "optionalClientScopes": [],
+      "attributes": {
+        "sandbox.app": "manager-1c"
+      }
     },
     {
       "clientId": "account",

@@ -33,6 +33,11 @@ internal sealed class EfAuditLog(AuthDbContext db) : IAuditLog
             entries = entries.Where(entry => entry.Action == query.Action);
         }
 
+        if (!string.IsNullOrWhiteSpace(query.App))
+        {
+            entries = entries.Where(entry => entry.App == query.App);
+        }
+
         if (query.From is { } from)
         {
             entries = entries.Where(entry => entry.OccurredAt >= from);

@@ -30,7 +30,7 @@ public sealed class JournalHandler(
         int page = request.Page ?? 1;
         int pageSize = request.PageSize ?? JournalPaging.DEFAULT_PAGE_SIZE;
         AuditPage found = await auditLog.SearchAsync(
-            new AuditQuery(request.ObjectId, request.ActorId, request.Action, request.From, request.To, page, pageSize),
+            new AuditQuery(request.ObjectId, request.ActorId, request.Action, request.From, request.To, page, pageSize, request.App),
             cancellationToken);
 
         return new AuditPageResponse([.. found.Items.Select(ToResponse)], page, pageSize, found.HasMore);
@@ -77,6 +77,7 @@ public sealed class JournalHandler(
             entry.ActorId,
             entry.ActorName,
             entry.ActorRole,
-            entry.CorrelationId);
+            entry.CorrelationId,
+            entry.App);
     }
 }

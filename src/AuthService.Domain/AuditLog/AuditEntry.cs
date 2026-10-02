@@ -41,6 +41,9 @@ public sealed class AuditEntry
     /// <summary>Id запроса — связать запись с логами.</summary>
     public string? CorrelationId { get; private set; }
 
+    /// <summary>Приложение (clientId), которого касается действие; null — уровень аккаунта (блокировка, «выйти везде»).</summary>
+    public string? App { get; private set; }
+
     public static AuditEntry Create(
         DateTimeOffset occurredAt,
         string action,
@@ -51,7 +54,8 @@ public sealed class AuditEntry
         Guid? actorId,
         string? actorName,
         string? actorRole,
-        string? correlationId) =>
+        string? correlationId,
+        string? app = null) =>
         new()
         {
             Id = Guid.CreateVersion7(occurredAt),
@@ -65,5 +69,6 @@ public sealed class AuditEntry
             ActorName = actorName,
             ActorRole = actorRole,
             CorrelationId = correlationId,
+            App = app,
         };
 }

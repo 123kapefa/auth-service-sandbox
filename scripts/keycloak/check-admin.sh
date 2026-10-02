@@ -186,12 +186,12 @@ status "$CUSTOMER" POST /auth/logout > /dev/null
 echo "5. Доступ к приложению (аккаунт рабочий, одно приложение закрыто)"
 app_access "$ADMIN" "$ID_CUSTOMER" sandbox-bff true > /dev/null   # на случай прошлого упавшего прогона
 APPS='",".join(a["clientId"] + ":" + str(a["hasAccess"]) for a in r)'
-check "приложения проекта и доступ" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER/apps" "$APPS")" "200 account-console:True,sandbox-bff:True"
+check "приложения проекта и доступ" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER/apps" "$APPS")" "200 account-console:True,manager-1c:True,sandbox-bff:True"
 CUSTOMER="$WORK/customer4"; : > "$CUSTOMER"
 login "$CUSTOMER" /me/ 79990000001 > /dev/null
 OLD_ACCESS=$(cookie "$CUSTOMER" accessToken)
 check "менеджер закрывает покупателю демо-приложение" "$(app_access "$MANAGER" "$ID_CUSTOMER" sandbox-bff false)" "200 False"
-check "личный кабинет остаётся открыт" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER/apps" "$APPS")" "200 account-console:True,sandbox-bff:False"
+check "личный кабинет остаётся открыт" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER/apps" "$APPS")" "200 account-console:True,manager-1c:True,sandbox-bff:False"
 check "уже выданный access-токен демо-приложения — 401 сразу" "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: accessToken=$OLD_ACCESS" "$API/me/")" 401
 check "открытая сессия демо-приложения: refresh — 401" "$(status "$CUSTOMER" POST /auth/refresh)" 401
 check "новый вход в демо-приложение — «доступ закрыт»" \

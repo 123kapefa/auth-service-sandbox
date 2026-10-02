@@ -66,6 +66,7 @@ call "$ADMIN" PUT "/auth/admin/users/$CUSTOMER_ID/role" '{"role":"customer"}' > 
 OPERATOR_ID=$(call "$ADMIN" GET '/auth/admin/users?search=79990000008' '' 'r["items"][0]["id"]' | cut -d' ' -f2)
 call "$ADMIN" PUT "/auth/admin/apps/manager-1c/users/$OPERATOR_ID/roles" '{"roles":[]}' > /dev/null
 call "$ADMIN" PUT "/auth/admin/apps/manager-1c/users/$OPERATOR_ID/roles" '{"roles":["operator"]}' > /dev/null   # и режим 1С — operator
+call "$ADMIN" PUT "/auth/admin/users/$OPERATOR_ID/apps/manager-1c/access" '{"hasAccess":true}' > /dev/null
 call "$ADMIN" DELETE "/auth/admin/apps/manager-1c/roles/logist" > /dev/null
 call "$ADMIN" DELETE "/auth/admin/apps/manager-1c/permissions/orders.export" > /dev/null
 login "$MANAGER" /me/ 0987654321 > /dev/null   # после очистки: состав manager уже не изменится до раздела 2
@@ -189,9 +190,23 @@ check "снять роль активного режима — режим 1С: �
 check "свои роли в 1С менять нельзя — 403" \
   "$(call "$APP_ADMIN" PUT "$APP/users/$APP_ADMIN_ID/roles" '{"roles":[]}')" \
   "403 users.self_role"
-check "в журнале — 4 действия админа 1С" \
+check "в журнале — 4 действия админа 1С с ролями" \
   "$(call "$ADMIN" GET "/auth/admin/audit?actorId=$APP_ADMIN_ID&from=$SECTION_STARTED&pageSize=50" '' '",".join(sorted(i["action"] for i in r["items"]))')" \
   "200 PermissionCreated,RoleCreated,UserRoleChanged,UserRoleChanged"
+check "админ 1С закрывает оператору доступ к 1С — видит только своё приложение" \
+  "$(call "$APP_ADMIN" PUT "/auth/admin/users/$OPERATOR_ID/apps/manager-1c/access" '{"hasAccess":false}' '",".join(a["clientId"] + ":" + str(a["hasAccess"]) for a in r)')" \
+  "200 manager-1c:False"
+check "доступ закрыт — токен 1С не выдаётся" "$(app_token 79990000008 'c["aud"]')" "—"
+check "в ролях пользователя — доступ закрыт" "$(call "$APP_ADMIN" GET "$APP/users/$OPERATOR_ID/roles" '' 'str(r["hasAccess"])')" "200 False"
+check "доступ демо-приложения сервиса — 403" \
+  "$(call "$APP_ADMIN" PUT "/auth/admin/users/$OPERATOR_ID/apps/sandbox-bff/access" '{"hasAccess":false}')" "403 apps.forbidden"
+check "доступ открыт — токен 1С снова выдаётся" \
+  "$(call "$APP_ADMIN" PUT "/auth/admin/users/$OPERATOR_ID/apps/manager-1c/access" '{"hasAccess":true}' > /dev/null; app_token 79990000008 'c["aud"]')" "manager-1c"
+check "журнал 1С — только записи приложения" \
+  "$(call "$APP_ADMIN" GET "$APP/audit?from=$SECTION_STARTED&pageSize=50" '' 'str(len(r["items"]) > 0 and all(i["app"] == "manager-1c" for i in r["items"]))')" "200 True"
+check "журнал проекта админу 1С — 403" "$(status "$APP_ADMIN" GET /auth/admin/audit)" 403
+check "журнал проекта по приложению (?app=)" \
+  "$(call "$ADMIN" GET "/auth/admin/audit?app=manager-1c&from=$SECTION_STARTED&pageSize=50" '' 'str(len(r["items"]) > 0 and all(i["app"] == "manager-1c" for i in r["items"]))')" "200 True"
 check "админ проекта управляет любым приложением" "$(call "$ADMIN" GET "$APP/roles" '' 'str(len(r) > 0)')" "200 True"
 call "$ADMIN" PUT "$APP/users/$OPERATOR_ID/roles" '{"roles":["operator"]}' > /dev/null
 call "$ADMIN" DELETE "$APP/roles/logist" > /dev/null

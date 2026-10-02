@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace AuthService.Contracts.Admin;
 
-/// <summary>GET /auth/admin/audit — фильтры журнала (все необязательны) и страница.</summary>
+/// <summary>GET /auth/admin/audit — фильтры журнала (все необязательны) и страница; app — записи одного приложения.</summary>
 public sealed record AuditRequest(
     Guid? ObjectId,
     Guid? ActorId,
@@ -10,7 +10,8 @@ public sealed record AuditRequest(
     DateTimeOffset? From,
     DateTimeOffset? To,
     int? Page,
-    int? PageSize);
+    int? PageSize,
+    string? App = null);
 
 /// <summary>Страница журнала, новые сверху.</summary>
 public sealed record AuditPageResponse(IReadOnlyList<AuditEntryResponse> Items, int Page, int PageSize, bool HasMore);
@@ -27,6 +28,7 @@ public sealed record AuditPageResponse(IReadOnlyList<AuditEntryResponse> Items, 
 /// <param name="ActorName">Телефон сотрудника.</param>
 /// <param name="ActorRole">Режим, в котором он действовал.</param>
 /// <param name="CorrelationId">Id запроса — найти в логах.</param>
+/// <param name="App">Приложение, которого касается действие; null — весь аккаунт.</param>
 public sealed record AuditEntryResponse(
     Guid Id,
     DateTimeOffset OccurredAt,
@@ -38,7 +40,8 @@ public sealed record AuditEntryResponse(
     Guid? ActorId,
     string? ActorName,
     string? ActorRole,
-    string? CorrelationId);
+    string? CorrelationId,
+    string? App);
 
 /// <summary>GET /auth/admin/login-events — события входа Keycloak; userId — одного пользователя.</summary>
 public sealed record LoginEventsRequest(Guid? UserId, int? Page, int? PageSize);

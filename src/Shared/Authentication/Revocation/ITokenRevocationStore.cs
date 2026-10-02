@@ -12,7 +12,10 @@ public interface ITokenRevocationStore
     /// <summary>Все токены сессии недействительны.</summary>
     Task RevokeSessionAsync(string sessionId, CancellationToken cancellationToken);
 
-    /// <summary>Токены приложения для пользователя, выданные до этого момента, недействительны.</summary>
+    /// <summary>
+    /// Токены приложения для пользователя, выданные до этого момента, недействительны. Приложение — клиент входа (azp)
+    /// или клиент ролей сервиса (его audience).
+    /// </summary>
     Task RevokeAppAsync(string authorizedParty, string subject, DateTimeOffset at, CancellationToken cancellationToken);
 
     /// <summary>Роли пользователя изменились: токены с версией доступа меньше этой надо обновить.</summary>

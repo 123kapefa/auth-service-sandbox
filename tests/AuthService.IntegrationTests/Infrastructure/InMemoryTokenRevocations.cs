@@ -39,7 +39,7 @@ public sealed class InMemoryTokenRevocations : ITokenRevocationStore
         return Task.FromResult(new RevocationMarks(
             _marks.TryGetValue($"user:{key.Subject}", out long user) ? user : null,
             key.SessionId is not null && _marks.ContainsKey($"session:{key.SessionId}"),
-            key.AuthorizedParty is not null && _marks.TryGetValue($"app:{key.AuthorizedParty}:{key.Subject}", out long app) ? app : null,
+            AppMark(key),
             _marks.TryGetValue($"changed:user:{key.Subject}", out long access) ? access : null,
             key.RolesClient is not null && key.ActiveMode is not null ? ModeVersion(key.RolesClient, key.ActiveMode) : null));
     }
@@ -54,6 +54,14 @@ public sealed class InMemoryTokenRevocations : ITokenRevocationStore
     {
         _marks[$"session:{sessionId}"] = 1;
         return Task.CompletedTask;
+    }
+
+    // Закрыт доступ: по клиенту входа (azp) или по клиенту ролей (audience сервиса) — позднейшая отметка.
+    private long? AppMark(TokenKey key)
+    {
+        long? byParty = key.AuthorizedParty is not null && _marks.TryGetValue($"app:{key.AuthorizedParty}:{key.Subject}", out long party) ? party : null;
+        long? byRoles = key.RolesClient is not null && _marks.TryGetValue($"app:{key.RolesClient}:{key.Subject}", out long roles) ? roles : null;
+        return byParty is null ? byRoles : byRoles is null ? byParty : Math.Max(byParty.Value, byRoles.Value);
     }
 
     public Task MarkAccessChangedAsync(string subject, long version, CancellationToken cancellationToken)

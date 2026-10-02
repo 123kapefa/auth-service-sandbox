@@ -142,7 +142,8 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
 
     public Task<Result<IReadOnlyList<string>, Error>> GetClientRolesAsync(Guid userId, string clientId, CancellationToken cancellationToken) =>
         Task.FromResult(_accounts.TryGetValue(userId, out Account? account)
-            ? Result.Success<IReadOnlyList<string>, Error>(account.RolesIn(clientId))
+            ? Result.Success<IReadOnlyList<string>, Error>(
+                account.DeniedApps.Contains(clientId) ? [.. account.RolesIn(clientId), AppRoles.ACCESS_DENIED] : account.RolesIn(clientId))
             : IdentityProviderErrors.UserNotFound());
 
     // Как в realm: customer — роль по умолчанию, плюс права в составе ролей.
@@ -233,7 +234,7 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
 
         // «Менеджер 1С»: свои права и роли, admin — с управлением ролями приложения.
         _appRoles[MANAGER_1C] = new(StringComparer.Ordinal);
-        foreach (string permission in new[] { "orders.view", "orders.edit", "reports.view", "users.roles.manage", "roles.manage" })
+        foreach (string permission in new[] { "orders.view", "orders.edit", "reports.view", "users.roles.manage", "roles.manage", "users.block", "audit.view" })
         {
             _appRoles[MANAGER_1C][permission] = new AppRole(Guid.NewGuid(), permission, permission, AppRoleKinds.PERMISSION, AppRoleKinds.SOURCE_CODE, false);
         }
@@ -242,12 +243,14 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         {
             ("operator", new[] { "orders.view", "orders.edit" }),
             ("accountant", new[] { "orders.view", "reports.view" }),
-            ("admin", new[] { "orders.view", "orders.edit", "reports.view", "users.roles.manage", "roles.manage" }),
+            ("admin", new[] { "orders.view", "orders.edit", "reports.view", "users.roles.manage", "roles.manage", "users.block", "audit.view" }),
         })
         {
             _appRoles[MANAGER_1C][role] = new AppRole(Guid.NewGuid(), role, role, AppRoleKinds.ROLE, null, true);
             _composites[$"{MANAGER_1C}/{role}"] = [.. permissions];
         }
+
+        _appRoles[MANAGER_1C][AppRoles.ACCESS_DENIED] = new AppRole(Guid.NewGuid(), AppRoles.ACCESS_DENIED, null, AppRoleKinds.ROLE, null, false);
 
         foreach (string app in Apps)
         {
@@ -328,7 +331,8 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         }
 
         RoleChanges.Add((userId, [.. grant], [.. revoke]));
-        _accounts[userId] = Apps.Contains(clientId)
+        bool access = Apps.Contains(clientId) || grant.Contains(AppRoles.ACCESS_DENIED) || revoke.Contains(AppRoles.ACCESS_DENIED);
+        _accounts[userId] = access
             ? account with { DeniedApps = grant.Count > 0 ? [.. account.DeniedApps.Append(clientId)] : [.. account.DeniedApps.Where(app => app != clientId)] }
             : account.WithRolesIn(clientId, [.. account.RolesIn(clientId).Except(revoke).Union(grant)]);
         return Task.FromResult(UnitResult.Success<Error>());
@@ -337,7 +341,7 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     public Task<Result<IReadOnlyList<AppAccessInfo>, Error>> GetAppAccessAsync(Guid userId, CancellationToken cancellationToken) =>
         Task.FromResult(_accounts.TryGetValue(userId, out Account? account)
             ? Result.Success<IReadOnlyList<AppAccessInfo>, Error>(
-                [.. Apps.Select(app => new AppAccessInfo(app, $"Приложение {app}", !account.DeniedApps.Contains(app)))])
+                [.. Apps.Append(MANAGER_1C).Order(StringComparer.Ordinal).Select(app => new AppAccessInfo(app, $"Приложение {app}", !account.DeniedApps.Contains(app)))])
             : IdentityProviderErrors.UserNotFound());
 
     public Task<Result<IReadOnlyList<LoginEvent>, Error>> GetLoginEventsAsync(

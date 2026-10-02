@@ -8,6 +8,7 @@ import org.keycloak.representations.AccessToken;
 import org.keycloak.representations.idm.ClientPolicyExecutorConfigurationRepresentation;
 import org.keycloak.services.clientpolicy.ClientPolicyContext;
 import org.keycloak.services.clientpolicy.ClientPolicyException;
+import org.keycloak.services.clientpolicy.context.ResourceOwnerPasswordCredentialsResponseContext;
 import org.keycloak.services.clientpolicy.context.TokenRefreshResponseContext;
 import org.keycloak.services.clientpolicy.context.TokenResponseContext;
 import org.keycloak.services.clientpolicy.executor.ClientPolicyExecutorProvider;
@@ -35,6 +36,14 @@ public final class AppAccessExecutor implements ClientPolicyExecutorProvider<Cli
         switch (context.getEvent()) {
             case TOKEN_RESPONSE -> {
                 TokenResponseContext tokens = (TokenResponseContext) context;
+                if (tokens.getClientSessionContext() != null) {
+                    check(tokens.getClientSessionContext().getClientSession().getClient(),
+                        tokens.getClientSessionContext().getClientSession().getUserSession().getUser());
+                }
+            }
+            case RESOURCE_OWNER_PASSWORD_CREDENTIALS_RESPONSE -> {
+                // токен по логину и паролю (клиенты отладки, например manager-1c-cli)
+                ResourceOwnerPasswordCredentialsResponseContext tokens = (ResourceOwnerPasswordCredentialsResponseContext) context;
                 if (tokens.getClientSessionContext() != null) {
                     check(tokens.getClientSessionContext().getClientSession().getClient(),
                         tokens.getClientSessionContext().getClientSession().getUserSession().getUser());

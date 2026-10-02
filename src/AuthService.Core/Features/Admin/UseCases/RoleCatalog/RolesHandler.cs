@@ -246,6 +246,6 @@ public sealed class RolesHandler(
             id = roles.IsSuccess ? roles.Value.FirstOrDefault(role => string.Equals(role.Name, name, StringComparison.Ordinal))?.Id ?? Guid.Empty : Guid.Empty;
         }
 
-        await audit.RecordAsync(action, AuditActions.ROLE_OBJECT, id, name, changes, cancellationToken);
+        await audit.RecordAsync(action, AuditActions.ROLE_OBJECT, id, name, changes, cancellationToken, clientId);
     }
 }

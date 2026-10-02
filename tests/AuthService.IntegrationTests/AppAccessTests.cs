@@ -29,7 +29,7 @@ public sealed class AppAccessTests : IClassFixture<AuthServiceWebFactory>
     {
         HttpResponseMessage response = await GetAsync(TestUser.AdminInAdminMode, TestUser.Customer);
 
-        Assert.Equal(["account-console:True", "sandbox-bff:True"], await AppsAsync(response));
+        Assert.Equal(["account-console:True", "manager-1c:True", "sandbox-bff:True"], await AppsAsync(response));
     }
 
     [Fact]
@@ -37,7 +37,7 @@ public sealed class AppAccessTests : IClassFixture<AuthServiceWebFactory>
     {
         HttpResponseMessage response = await PutAsync(TestUser.AdminInAdminMode, TestUser.Customer, "sandbox-bff", hasAccess: false);
 
-        Assert.Equal(["account-console:True", "sandbox-bff:False"], await AppsAsync(response));
+        Assert.Equal(["account-console:True", "manager-1c:True", "sandbox-bff:False"], await AppsAsync(response));
         (Guid user, string[] grant, string[] revoke) = Assert.Single(_keycloak.RoleChanges);
         Assert.Equal(TestUser.Customer.Id, user);
         Assert.Equal(["access-denied"], grant);
@@ -52,7 +52,7 @@ public sealed class AppAccessTests : IClassFixture<AuthServiceWebFactory>
 
         HttpResponseMessage response = await PutAsync(TestUser.AdminInAdminMode, TestUser.Customer, "sandbox-bff", hasAccess: true);
 
-        Assert.Equal(["account-console:True", "sandbox-bff:True"], await AppsAsync(response));
+        Assert.Equal(["account-console:True", "manager-1c:True", "sandbox-bff:True"], await AppsAsync(response));
         Assert.Equal(["access-denied"], _keycloak.RoleChanges[^1].Revoke);
     }
 

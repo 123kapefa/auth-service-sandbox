@@ -13,7 +13,8 @@ namespace AuthService.Core.Features.Admin.UseCases.AppAccess;
 
 /// <summary>
 /// GET /auth/admin/users/{userId}/apps — доступ к приложениям (право users.view);
-/// PUT /auth/admin/users/{userId}/apps/{clientId}/access { hasAccess } — открыть или закрыть (право users.block).
+/// PUT /auth/admin/users/{userId}/apps/{clientId}/access { hasAccess } — открыть или закрыть (право users.block: в токене
+/// — админ проекта и менеджер, или среди ролей в самом приложении — админ приложения, только своё приложение).
 /// </summary>
 public sealed class AppAccessEndpoints : IEndpoint
 {
@@ -22,7 +23,7 @@ public sealed class AppAccessEndpoints : IEndpoint
         app.MapGet("/auth/admin/users/{userId:guid}/apps", GetAsync)
             .RequirePermissions(AuthServicePermissions.Users.VIEW);
         app.MapPut("/auth/admin/users/{userId:guid}/apps/{clientId}/access", SetAsync)
-            .RequirePermissions(AuthServicePermissions.Users.BLOCK);
+            .RequireAppPermission(AuthServicePermissions.Users.BLOCK);
     }
 
     private static async Task<EndpointResult<IReadOnlyList<AppAccessResponse>>> GetAsync(
@@ -44,13 +45,18 @@ public sealed class AppAccessEndpoints : IEndpoint
         [FromServices] AppAccessHandler handler,
         CancellationToken cancellationToken)
     {
+        // Админ приложения действует только в своём приложении: аккаунт и другие приложения ему не видны.
+        bool project = caller.HasPermission(AuthServicePermissions.Users.BLOCK);
         Result<IReadOnlyList<AppAccessResponse>, Error> result = await handler.SetAsync(
             caller.Id,
             userId,
             clientId,
             request,
-            AdminScope.OnlyCustomers(caller),
+            project && AdminScope.OnlyCustomers(caller),
             cancellationToken);
-        return result;
+        return project || result.IsFailure
+            ? result
+            : Result.Success<IReadOnlyList<AppAccessResponse>, Error>(
+                [.. result.Value.Where(app => string.Equals(app.ClientId, clientId, StringComparison.Ordinal))]);
     }
 }

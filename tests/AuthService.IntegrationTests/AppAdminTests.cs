@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using AuthService.Domain.AuditLog;
 using AuthService.IntegrationTests.Infrastructure;
 using PlatformAuth;
 using Xunit;
@@ -127,7 +128,7 @@ public sealed class AppAdminTests : IClassFixture<AuthServiceWebFactory>
         JsonElement app = Assert.Single(me.GetProperty("apps").EnumerateArray());
         Assert.Equal("manager-1c", app.GetProperty("clientId").GetString());
         Assert.False(app.GetProperty("viaProject").GetBoolean());
-        Assert.Equal(["roles.manage", "users.roles.manage"], [.. Strings(app, "permissions").Order(StringComparer.Ordinal)]);
+        Assert.Equal(["audit.view", "roles.manage", "users.block", "users.roles.manage"], [.. Strings(app, "permissions").Order(StringComparer.Ordinal)]);
         Assert.Equal(["profile.view"], Strings(me, "permissions"));
     }
 
@@ -212,6 +213,73 @@ public sealed class AppAdminTests : IClassFixture<AuthServiceWebFactory>
         JsonElement logist = roles.EnumerateArray().Single(role => role.GetProperty("name").GetString() == "logist");
         Assert.Equal(["orders.export", "orders.view"], [.. Strings(logist, "permissions").Order(StringComparer.Ordinal)]);
         Assert.Equal(2, _factory.AuditLog.Entries.Count);
+    }
+
+    [Fact]
+    public async Task AppAdmin_ClosesAccessToOwnApp_SeesOnlyIt_TokensRevoked()
+    {
+        JsonElement apps = await ResultAsync(await SendAsync(_appAdmin, HttpMethod.Put, $"/auth/admin/users/{_operator.Id}/apps/manager-1c/access", new { hasAccess = false }));
+
+        JsonElement app = Assert.Single(apps.EnumerateArray());
+        Assert.Equal("manager-1c", app.GetProperty("clientId").GetString());
+        Assert.False(app.GetProperty("hasAccess").GetBoolean());
+        Assert.True(_factory.Revocations.HasApp("manager-1c", _operator.Id));
+        JsonElement roles = await ResultAsync(await SendAsync(_appAdmin, HttpMethod.Get, $"{APP}/users/{_operator.Id}/roles"));
+        Assert.False(roles.GetProperty("hasAccess").GetBoolean());
+        AuditEntry entry = Assert.Single(_factory.AuditLog.Entries);
+        Assert.Equal(("UserAppAccessChanged", "manager-1c"), (entry.Action, entry.App));
+    }
+
+    [Fact]
+    public async Task AppClosedByRolesClient_TokenOfAnyLoginClient_Revoked()
+    {
+        // Сервис приложения проверяет свои токены по audience (клиенту ролей): токен любого клиента входа отозван.
+        string token = _factory.CreateToken(TestUser.Customer, authorizedParty: "some-login-client");
+        await _factory.Revocations.RevokeAppAsync("sandbox-api", TestUser.Customer.Id.ToString(), DateTimeOffset.UtcNow, default);
+
+        using HttpClient client = _factory.CreateClientWithToken(token);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(new Uri("/me/", UriKind.Relative))).StatusCode);
+    }
+
+    [Fact]
+    public async Task AppAdmin_OtherAppAccess_Forbidden() =>
+        await AssertErrorAsync(
+            await SendAsync(_appAdmin, HttpMethod.Put, $"/auth/admin/users/{_operator.Id}/apps/sandbox-bff/access", new { hasAccess = false }),
+            HttpStatusCode.Forbidden,
+            "apps.forbidden");
+
+    [Fact]
+    public async Task ServiceAppUserRoles_HasAccessNull() =>
+        Assert.Equal(
+            JsonValueKind.Null,
+            (await ResultAsync(await SendAsync(TestUser.AdminInAdminMode, HttpMethod.Get, $"/auth/admin/apps/sandbox-api/users/{_operator.Id}/roles"))).GetProperty("hasAccess").ValueKind);
+
+    [Fact]
+    public async Task AppJournal_OnlyOwnAppEntries()
+    {
+        await SendAsync(_appAdmin, HttpMethod.Put, $"{APP}/users/{_operator.Id}/roles", new { roles = new[] { "accountant" } });
+        await SendAsync(TestUser.AdminInAdminMode, HttpMethod.Put, $"/auth/admin/apps/sandbox-api/users/{_operator.Id}/roles", new { roles = new[] { "manager" } });
+
+        JsonElement page = await ResultAsync(await SendAsync(_appAdmin, HttpMethod.Get, $"{APP}/audit"));
+
+        JsonElement entry = Assert.Single(page.GetProperty("items").EnumerateArray());
+        Assert.Equal("manager-1c", entry.GetProperty("app").GetString());
+        Assert.Equal(2, _factory.AuditLog.Entries.Count);
+    }
+
+    [Fact]
+    public async Task AppJournal_OtherApp_Forbidden() =>
+        await AssertErrorAsync(await SendAsync(_appAdmin, HttpMethod.Get, "/auth/admin/apps/sandbox-api/audit"), HttpStatusCode.Forbidden, "apps.forbidden");
+
+    [Fact]
+    public async Task ProjectJournal_FilterByApp()
+    {
+        await SendAsync(_appAdmin, HttpMethod.Put, $"{APP}/users/{_operator.Id}/roles", new { roles = new[] { "accountant" } });
+        await SendAsync(TestUser.AdminInAdminMode, HttpMethod.Put, $"/auth/admin/apps/sandbox-api/users/{_operator.Id}/roles", new { roles = new[] { "manager" } });
+
+        JsonElement page = await ResultAsync(await SendAsync(TestUser.AdminInAdminMode, HttpMethod.Get, "/auth/admin/audit?app=sandbox-api"));
+
+        Assert.Equal("sandbox-api", Assert.Single(page.GetProperty("items").EnumerateArray()).GetProperty("app").GetString());
     }
 
     [Fact]

@@ -6,12 +6,14 @@ namespace AuthService.Contracts.Admin;
 /// <param name="DefaultRoles">Роли по умолчанию (customer у всех) — снять нельзя.</param>
 /// <param name="Modes">Режимы: роли по умолчанию и выданные.</param>
 /// <param name="ActiveMode">Активный режим в приложении (null — не выбран).</param>
+/// <param name="HasAccess">Открыт ли доступ к приложению; null — доступ к нему не закрывается.</param>
 public sealed record UserRolesResponse(
     Guid UserId,
     IReadOnlyList<string> Roles,
     IReadOnlyList<string> DefaultRoles,
     IReadOnlyList<string> Modes,
-    string? ActiveMode);
+    string? ActiveMode,
+    bool? HasAccess);
 
 /// <summary>
 /// PUT /auth/admin/apps/{clientId}/users/{userId}/roles — выданные роли, ровно этот список (пустой — только роли по

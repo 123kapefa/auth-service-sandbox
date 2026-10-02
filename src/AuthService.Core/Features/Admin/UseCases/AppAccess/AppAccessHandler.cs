@@ -96,7 +96,8 @@ public sealed class AppAccessHandler(
                 AuditActions.USER_APP_ACCESS_CHANGED,
                 user.Value,
                 new { app = clientId, hasAccess = new { old = app.HasAccess, @new = hasAccess } },
-                cancellationToken);
+                cancellationToken,
+                clientId);
         }
 
         return await ListAsync(userId, cancellationToken);

@@ -15,10 +15,11 @@ public sealed partial class AdminAudit(IAuditLog log, CurrentUser actor, TimePro
 {
     private static readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
 
-    public Task RecordAsync(string action, IdentityUser target, object changes, CancellationToken cancellationToken)
+    /// <summary>Действие с пользователем; app — приложение, которого оно касается (null — весь аккаунт).</summary>
+    public Task RecordAsync(string action, IdentityUser target, object changes, CancellationToken cancellationToken, string? app = null)
     {
         ArgumentNullException.ThrowIfNull(target);
-        return RecordAsync(action, AuditActions.USER_OBJECT, target.Id, target.Username, changes, cancellationToken);
+        return RecordAsync(action, AuditActions.USER_OBJECT, target.Id, target.Username, changes, cancellationToken, app);
     }
 
     /// <summary>Действие над объектом любого типа: роль, право…</summary>
@@ -28,7 +29,8 @@ public sealed partial class AdminAudit(IAuditLog log, CurrentUser actor, TimePro
         Guid objectId,
         string? objectName,
         object changes,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? app = null)
     {
         AuditEntry entry = AuditEntry.Create(
             timeProvider.GetUtcNow(),
@@ -40,7 +42,8 @@ public sealed partial class AdminAudit(IAuditLog log, CurrentUser actor, TimePro
             actor.Id,
             actor.Phone,
             actor.ActiveMode,
-            Activity.Current?.TraceId.ToString());
+            Activity.Current?.TraceId.ToString(),
+            app);
         try
         {
             await log.RecordAsync(entry, cancellationToken);
