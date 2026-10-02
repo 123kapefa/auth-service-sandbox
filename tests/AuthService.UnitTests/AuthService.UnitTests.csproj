@@ -3,6 +3,7 @@
     <ProjectReference Include="../../src/AuthService.Api/AuthService.Api.csproj" />
     <ProjectReference Include="../../src/AuthService.Domain/AuthService.Domain.csproj" />
     <ProjectReference Include="../../src/AuthService.Infrastructure.Keycloak/AuthService.Infrastructure.Keycloak.csproj" />
+    <ProjectReference Include="../../src/AuthService.LegacyImport/AuthService.LegacyImport.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

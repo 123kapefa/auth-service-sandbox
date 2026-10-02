@@ -107,8 +107,9 @@ services:
       KC_HEALTH_ENABLED: "true"
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-      # Подставляется в realm JSON при импорте (${SANDBOX_BFF_CLIENT_SECRET}).
+      # Подставляются в realm JSON при импорте (${SANDBOX_BFF_CLIENT_SECRET}, ${LEGACY_IMPORT_CLIENT_SECRET}).
       SANDBOX_BFF_CLIENT_SECRET: ${SANDBOX_BFF_CLIENT_SECRET}
+      LEGACY_IMPORT_CLIENT_SECRET: ${LEGACY_IMPORT_CLIENT_SECRET}
     volumes:
       - ./infra/keycloak/realm:/opt/keycloak/data/import:ro
       # Тема входа — в образе (jar из login-theme/). Правки страниц без Keycloak — npm run dev в login-theme/.

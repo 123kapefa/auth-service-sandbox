@@ -1428,6 +1428,18 @@
           }
         }
       }
+    },
+    {
+      "clientId": "legacy-import",
+      "name": "Перенос пользователей из боевого сервиса (этап 6) — временный: в бою создать перед переездом и удалить после",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${LEGACY_IMPORT_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect"
     }
   ],
   "users": [
@@ -1723,6 +1735,18 @@
           "manage-users",
           "view-events",
           "query-clients"
+        ]
+      }
+    },
+    {
+      "username": "service-account-legacy-import",
+      "enabled": true,
+      "serviceAccountClientId": "legacy-import",
+      "clientRoles": {
+        "realm-management": [
+          "manage-realm",
+          "manage-users",
+          "view-users"
         ]
       }
     }
