@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../KcContext";
 import { useCountdown } from "../lib/use-countdown";
+import { useSubmitting } from "../lib/use-submitting";
 
 /**
  * Вход по коду (плагин code-login, sandbox-code-login.ftl): куда ушёл код, поле кода (только цифры; набрали все —
@@ -21,7 +22,8 @@ export default function CodeLogin(
   const length = Number(codeLength) || 6;
   const resendIn = useCountdown(Number(codeResendAfter) || 0);
   const [code, setCode] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const { submitting, markSubmitting, setSubmitting } = useSubmitting();
   const form = useRef<HTMLFormElement>(null);
 
   const type = (value: string) => {
@@ -52,24 +54,51 @@ export default function CodeLogin(
         action={url.loginAction}
         method="post"
         noValidate
-        onSubmit={() => setSubmitting(true)}
+        onSubmit={markSubmitting}
       >
         <div className={kcClsx("kcFormGroupClass")}>
           <label htmlFor="code" className={kcClsx("kcLabelClass")}>
             {msg(byEmail ? "sandboxCodeLabelEmail" : "sandboxCodeLabelSms")}
           </label>
-          <input
-            id="code"
-            name="code"
-            value={code}
-            onChange={(event) => type(event.target.value)}
-            className={`${kcClsx("kcInputClass")} text-center font-mono text-lg tracking-[0.5em]`}
-            autoComplete="one-time-code"
-            inputMode="numeric"
-            maxLength={length}
-            placeholder={"•".repeat(length)}
-            autoFocus
-          />
+          {/*
+            Ячейки по цифре — только вид; поле одно и прозрачное поверх них: автоподстановка кода из SMS, вставка
+            и ввод работают как у обычного поля.
+          */}
+          <div className="relative">
+            <div
+              aria-hidden
+              className="grid gap-2"
+              style={{ gridTemplateColumns: `repeat(${length}, 1fr)` }}
+            >
+              {Array.from({ length }, (_, i) => (
+                <div
+                  key={i}
+                  className={`flex h-12 items-center justify-center rounded-md border bg-card font-mono text-xl font-semibold transition-colors ${
+                    focused && i === Math.min(code.length, length - 1)
+                      ? "border-primary ring-2 ring-ring/40"
+                      : "border-border"
+                  }`}
+                >
+                  {code[i] ??
+                    (focused && i === code.length ? (
+                      <span className="h-6 w-px animate-pulse bg-foreground" />
+                    ) : null)}
+                </div>
+              ))}
+            </div>
+            <input
+              id="code"
+              name="code"
+              value={code}
+              onChange={(event) => type(event.target.value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              className="absolute inset-0 h-full w-full cursor-text bg-transparent text-transparent caret-transparent outline-none selection:bg-transparent"
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              autoFocus
+            />
+          </div>
         </div>
         <div className={kcClsx("kcFormButtonsClass")}>
           <button
@@ -84,12 +113,7 @@ export default function CodeLogin(
         </div>
       </form>
       {/* Отдельная форма: «ещё раз» не отправляет недописанный код. */}
-      <form
-        action={url.loginAction}
-        method="post"
-        className="mt-2"
-        onSubmit={() => setSubmitting(true)}
-      >
+      <form action={url.loginAction} method="post" className="mt-2" onSubmit={markSubmitting}>
         <button
           id="sandbox-code-resend"
           name="resend"

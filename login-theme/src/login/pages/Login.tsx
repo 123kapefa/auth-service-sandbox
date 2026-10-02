@@ -3,10 +3,10 @@ import { getKcClsx, type KcClsx } from "keycloakify/login/lib/kcClsx";
 import { useScript } from "keycloakify/login/pages/Login.useScript";
 import type { PageProps } from "keycloakify/login/pages/PageProps";
 import { useIsPasswordRevealed } from "keycloakify/tools/useIsPasswordRevealed";
-import { useState } from "react";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../KcContext";
-import { formatLogin, nextLogin, toLogin } from "../lib/phone";
+import { LoginInput } from "../components/LoginInput";
+import { useSubmitting } from "../lib/use-submitting";
 
 /**
  * Вход (login.ftl): телефон или почта и пароль; «Войти по коду» — тот же логин, без пароля (плагин code-login);
@@ -28,8 +28,7 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
     authenticators,
   } = kcContext;
   const { msg, msgStr } = i18n;
-  const [username, setUsername] = useState(() => formatLogin(login.username ?? ""));
-  const [submitting, setSubmitting] = useState(false);
+  const { submitting, markSubmitting } = useSubmitting();
   const webAuthnButtonId = "authenticateWebAuthnButton";
   const hasError = messagesPerField.existsError("username", "password");
 
@@ -60,25 +59,19 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
           action={url.loginAction}
           method="post"
           noValidate
-          onSubmit={() => setSubmitting(true)}
+          onSubmit={markSubmitting}
         >
           {!usernameHidden && (
             <div className={kcClsx("kcFormGroupClass")}>
               <label htmlFor="username" className={kcClsx("kcLabelClass")}>
                 {msg("usernameOrEmail")}
               </label>
-              {/* Видимое поле — как набрали (с «+»), на сервер уходит логин: номер цифрами, почта как есть. */}
-              <input type="hidden" name="username" value={toLogin(username)} />
-              <input
-                id="username"
+              <LoginInput
                 className={kcClsx("kcInputClass")}
-                value={username}
-                onChange={(event) => setUsername(nextLogin(username, event.target.value))}
-                type="text"
-                autoFocus
+                defaultValue={login.username ?? ""}
                 autoComplete={enableWebAuthnConditionalUI ? "username webauthn" : "username"}
-                aria-invalid={hasError || undefined}
-                aria-describedby={hasError ? "input-error" : undefined}
+                invalid={hasError}
+                describedBy="input-error"
               />
             </div>
           )}

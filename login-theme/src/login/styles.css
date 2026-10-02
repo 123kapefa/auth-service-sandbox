@@ -54,6 +54,13 @@ body {
   #kc-content ol {
     @apply my-3 grid list-decimal gap-3 pl-5;
   }
+  /*
+   * «Показать» у пароля на стандартных страницах (новый пароль, 2FA…): Keycloakify рисует пустой значок <i>, текст —
+   * только в aria-label (уже переведён). Показываем его, как на нашей странице входа.
+   */
+  .kcFormPasswordVisibilityButtonClass[aria-label]::after {
+    content: attr(aria-label);
+  }
   /* Коды восстановления пронумерованы в тексте («1: …») — без второго номера списка. */
   #kc-content #kc-recovery-codes-list {
     @apply list-none pl-0;

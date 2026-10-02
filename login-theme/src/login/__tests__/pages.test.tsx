@@ -116,6 +116,23 @@ describe("вход по коду", () => {
     submit.mockRestore();
   });
 
+  // Без maxLength у поля: браузер обрезал бы вставку до фильтра, и «352 948» стало бы «35294».
+  it("вставили код с пробелом и текстом — берутся цифры, форма уходит сама", async () => {
+    const submit = vi
+      .spyOn(HTMLFormElement.prototype, "requestSubmit")
+      .mockImplementation(() => undefined);
+    render(
+      <KcPage kcContext={getKcContextMock({ pageId: "sandbox-code-login.ftl", overrides: {} })} />,
+    );
+    const code = await screen.findByLabelText("Код из SMS");
+
+    await userEvent.click(code);
+    await userEvent.paste("Код: 352 948");
+    expect(code).toHaveValue("352948");
+    await waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    submit.mockRestore();
+  });
+
   it("письмом — свои подписи; паузы нет — кнопка «ещё раз» доступна", async () => {
     render(
       <KcPage
@@ -136,6 +153,51 @@ describe("вход по коду", () => {
     expect(screen.getByLabelText("Код из письма")).toBeInTheDocument();
     expect(screen.queryByText(/Новый код можно запросить/)).toBeNull();
     expect(screen.getByRole("button", { name: "Отправить код ещё раз" })).toBeEnabled();
+  });
+});
+
+describe("«Забыли пароль?»", () => {
+  it("номер — той же маской, на сервер уходит цифрами с 7", async () => {
+    const { container } = render(
+      <KcPage
+        kcContext={getKcContextMock({ pageId: "login-reset-password.ftl", overrides: {} })}
+      />,
+    );
+    const login = await screen.findByLabelText("Телефон или почта");
+
+    await userEvent.type(login, "8 999 000-00-05");
+    expect(login).toHaveValue("+7 (999) 000-00-05");
+    expect(container.querySelector<HTMLInputElement>('input[name="username"]')?.value).toBe(
+      "79990000005",
+    );
+  });
+});
+
+describe("отправка формы", () => {
+  // Заблокированная кнопка в отправку не попадает: блокировка — только после того, как браузер собрал данные.
+  it("«Войти по коду» попадает в отправку, кнопки блокируются после", async () => {
+    render(<KcPage kcContext={getKcContextMock({ pageId: "login.ftl", overrides: {} })} />);
+    const code = await screen.findByRole("button", { name: "Войти по коду" });
+
+    act(() => code.click());
+    expect(code).toBeEnabled();
+    await waitFor(() => expect(code).toBeDisabled());
+  });
+
+  it("«Отправить код ещё раз» попадает в отправку", async () => {
+    render(
+      <KcPage
+        kcContext={getKcContextMock({
+          pageId: "sandbox-code-login.ftl",
+          overrides: { codeResendAfter: "0" },
+        })}
+      />,
+    );
+    const resend = await screen.findByRole("button", { name: "Отправить код ещё раз" });
+
+    act(() => resend.click());
+    expect(resend).toBeEnabled();
+    await waitFor(() => expect(resend).toBeDisabled());
   });
 });
 
