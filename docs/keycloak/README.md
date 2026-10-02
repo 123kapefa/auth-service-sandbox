@@ -29,11 +29,12 @@ scripts/keycloak/check-stand.sh
 
 Ожидается `Итого: 44 ✓, 0 ✗`. Остальные проверки (сервис поднят: `docker compose up -d --build --wait`):
 `check-api.sh` 48, `check-login.sh` 16, `check-login-methods.sh` 21, `check-code-login.sh` 28, `check-admin.sh` 108,
-`check-roles.sh` 71; .NET-тестов — 321.
+`check-roles.sh` 71; .NET-тестов — 325; тестов админки (Vitest) — 11.
 
 | Что | Адрес | Доступ |
 |---|---|---|---|
 | Почта (Mailpit) — письма сброса пароля и коды входа | http://localhost:8025 | — |
+| Админка доступа (своя, этап 4б) | http://localhost:8080/admin/ | админ проекта `1234567890`, админ «Менеджера 1С» `79990000007` |
 | Админка Keycloak | http://localhost:8180/admin | `admin` / `admin`, слева выбрать realm **sandbox** |
 | Discovery | http://localhost:8180/realms/sandbox/.well-known/openid-configuration | — |
 | Личный кабинет пользователя | http://localhost:8180/realms/sandbox/account | тестовый пользователь |
@@ -88,6 +89,7 @@ Keycloak; проекты друг друга не видят. **Приложен
 | `infra/keycloak/themes/sandbox` | тема страницы входа: `+` у номера, кнопка «Войти по коду», экран ввода кода |
 | `infra/keycloak/providers/code-login` | плагин Keycloak (Java): форма входа с нормализацией номера, вход по коду; собирается в `infra/keycloak/Dockerfile` |
 | `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал; `check-roles.sh` — роли и права приложений, роли пользователей, умный рефреш, «Менеджер 1С» (этап 4а); `lib.sh` — общие помощники |
+| `frontend/` | админка доступа на `/admin` (React, FSD) — см. `frontend/CLAUDE.md`; в образ сервиса попадает сборка |
 | `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права из токена, хук мгновенного отзыва и умного рефреша (`access_changed`) — переиспользуемая библиотека |
 | `src/Shared/Authentication.Redis` | отметки отзыва и версии доступа в Redis, кэш проверки, `AddPlatformTokenRevocation` |
 | `src/AuthService.Core/Authorization` | константы прав сервиса (сам состав ролей — в Keycloak, с этапа 4а) |

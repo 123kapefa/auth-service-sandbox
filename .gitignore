@@ -5,3 +5,8 @@ obj/
 *.user
 *.suo
 .DS_Store
+
+# Админка: зависимости и сборка
+frontend/node_modules/
+frontend/dist/
+src/AuthService.Api/wwwroot/admin/

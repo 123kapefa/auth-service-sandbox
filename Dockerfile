@@ -1,3 +1,11 @@
+# Админка доступа (frontend/): собирается отдельно, в образ сервиса попадает готовая статика (wwwroot/admin).
+FROM node:22-alpine AS admin
+WORKDIR /admin
+COPY frontend/package.json frontend/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci --no-fund --no-audit
+COPY frontend/ ./
+RUN npm run build
+
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
@@ -27,6 +35,7 @@ RUN /root/.dotnet/tools/dotnet-ef migrations bundle \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS api
 WORKDIR /app
 COPY --from=build /out/api .
+COPY --from=admin /admin/dist ./wwwroot/admin
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
 ENTRYPOINT ["dotnet", "AuthService.Api.dll"]
