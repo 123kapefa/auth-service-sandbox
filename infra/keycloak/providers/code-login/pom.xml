@@ -39,6 +39,14 @@
       <scope>provided</scope>
     </dependency>
 
+    <!-- BCrypt для паролей из боевого сервиса: BouncyCastle — та же версия, что внутри Keycloak 26.4.7. -->
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+      <version>1.82</version>
+      <scope>provided</scope>
+    </dependency>
+
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
