@@ -168,6 +168,9 @@ public sealed class AppAdminTests : IClassFixture<AuthServiceWebFactory>
         Assert.Equal(["operator"], Strings(roles, "roles"));
         Assert.Empty(Strings(roles, "defaultRoles"));
         Assert.Equal("operator", roles.GetProperty("activeMode").GetString());
+        Assert.Equal(
+            ["admin", "accountant", "operator"],
+            [.. roles.GetProperty("assignableRoles").EnumerateArray().Select(role => role.GetProperty("name").GetString()!)]);
     }
 
     [Fact]

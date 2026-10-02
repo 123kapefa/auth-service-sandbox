@@ -50,8 +50,14 @@ public sealed class UserRolesHandler(
             return roles.Error;
         }
 
+        Dictionary<string, string?> catalog = roles.Value.Catalog.Where(AppCatalog.IsRole).ToDictionary(role => role.Name, role => role.Description, StringComparer.Ordinal);
+        AssignableRoleResponse[] assignable =
+        [
+            .. StaffRoles.Sort(catalog.Keys.Except(roles.Value.Defaults, StringComparer.Ordinal))
+                .Select(name => new AssignableRoleResponse(name, catalog[name])),
+        ];
         return new UserRolesResponse(
-            userId, roles.Value.Assigned, roles.Value.Defaults, roles.Value.Modes, ActiveMode(clientId, user.Value), roles.Value.HasAccess);
+            userId, roles.Value.Assigned, roles.Value.Defaults, roles.Value.Modes, ActiveMode(clientId, user.Value), roles.Value.HasAccess, assignable);
     }
 
     public async Task<Result<UserRolesResponse, Error>> SetAsync(

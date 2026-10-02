@@ -43,6 +43,10 @@ public sealed class UserRolesTests : IClassFixture<AuthServiceWebFactory>
         Assert.Empty(Strings(roles, "roles"));
         Assert.Equal(["customer"], Strings(roles, "defaultRoles"));
         Assert.Equal(["customer"], Strings(roles, "modes"));
+        // роль по умолчанию не выдаётся; порядок — встроенные, затем свои по алфавиту
+        Assert.Equal(
+            ["manager", "admin", "auditor", "support"],
+            [.. roles.GetProperty("assignableRoles").EnumerateArray().Select(role => role.GetProperty("name").GetString()!)]);
     }
 
     [Fact]

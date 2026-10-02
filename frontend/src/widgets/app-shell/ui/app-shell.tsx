@@ -23,7 +23,7 @@ export function AppShell({ session }: { session: AdminSession }) {
               <NavLink
                 key={item.to}
                 to={item.to}
-                end
+                end={item.end}
                 className={({ isActive }) =>
                   cn(
                     "rounded-md px-3 py-1.5 text-sm hover:bg-muted",

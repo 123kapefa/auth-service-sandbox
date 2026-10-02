@@ -122,7 +122,7 @@ internal sealed partial class KeycloakAdminClient(
         Result<ClientRepresentation[], Error> clients = await GetJsonAsync<ClientRepresentation[]>("clients", cancellationToken);
         return clients.IsSuccess
             ? Result.Success<IReadOnlyList<ClientInfo>, Error>(
-                [.. clients.Value.OrderBy(client => client.ClientId, StringComparer.Ordinal).Select(client => new ClientInfo(client.ClientId, client.Name))])
+                [.. clients.Value.OrderBy(client => client.ClientId, StringComparer.Ordinal).Select(client => new ClientInfo(client.ClientId, DisplayName(client)))])
             : clients.Error;
     }
 
@@ -235,7 +235,7 @@ internal sealed partial class KeycloakAdminClient(
             bool denied = assigned.Value.Any(role => string.Equals(role.Name, AppRoles.ACCESS_DENIED, StringComparison.Ordinal));
             if (denied || available.Value.Any(role => string.Equals(role.Name, AppRoles.ACCESS_DENIED, StringComparison.Ordinal)))
             {
-                apps.Add(new AppAccessInfo(client.ClientId, client.Name, !denied));
+                apps.Add(new AppAccessInfo(client.ClientId, DisplayName(client), !denied));
             }
         }
 
@@ -424,6 +424,10 @@ internal sealed partial class KeycloakAdminClient(
 
         return UnitResult.Success<Error>();
     }
+
+    // Встроенные клиенты Keycloak названы ключом перевода (${client_account-console}) — показывать его нельзя.
+    private static string? DisplayName(ClientRepresentation client) =>
+        client.Name is { } name && !name.StartsWith("${", StringComparison.Ordinal) ? name : null;
 
     private static AppRole ToAppRole(RoleRepresentation role) =>
         new(
