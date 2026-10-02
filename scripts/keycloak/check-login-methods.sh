@@ -89,6 +89,11 @@ JAR="$WORK/jar2"; : > "$JAR"
 check "запрос сброса принят" "$(reset_request "$JAR" 79990000005)" "В ближайшее время Вы должны получить письмо с дальнейшими инструкциями."
 LINK=$(mail_link reset@sandbox.test)
 check "письмо со ссылкой пришло на reset@sandbox.test" "$([ -n "$LINK" ] && echo да || echo нет)" да
+check "письмо — по шаблону темы sandbox" "$(curl -s "$MAILPIT/api/v1/search?query=to:reset@sandbox.test" | python3 -c '
+import json,sys,urllib.request
+m=json.load(sys.stdin)["messages"][0]
+body=json.load(urllib.request.urlopen(sys.argv[1] + "/api/v1/message/" + m["ID"]))
+print("yes" if "пароль останется прежним" in body["Text"] else "")' "$MAILPIT")" yes
 check "новый пароль сохранён → вход и возврат на return_to" "$(reset_complete "$JAR" "$LINK" "$NEW_PASSWORD")" /me/
 check "вошёл пользователь 79990000005" "$(me_phone "$JAR")" +79990000005
 status "$JAR" POST /auth/logout > /dev/null

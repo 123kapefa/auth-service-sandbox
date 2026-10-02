@@ -23,9 +23,6 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
       sandboxCodeExpired: "Код больше не действует — отправьте новый.",
       sandboxCodeTooEarly: "Код уже отправлен. Новый можно запросить через {0} с.",
       sandboxCodeSendFailed: "Не удалось отправить код. Попробуйте ещё раз позже.",
-      sandboxCodeEmailSubject: "Код для входа",
-      sandboxCodeEmailBody:
-        "Ваш код для входа: {0}\n\nКод действует {1} мин. Если вы не входили, просто проигнорируйте письмо.",
       sandboxAppAccessDenied:
         "Доступ к этому приложению для вас закрыт. Обратитесь к администратору приложения.",
       emailInstruction:
@@ -128,9 +125,6 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
       sandboxCodeExpired: "The code is no longer valid — send a new one.",
       sandboxCodeTooEarly: "The code has already been sent. You can request a new one in {0} s.",
       sandboxCodeSendFailed: "Could not send the code. Please try again later.",
-      sandboxCodeEmailSubject: "Your sign-in code",
-      sandboxCodeEmailBody:
-        "Your sign-in code: {0}\n\nThe code is valid for {1} min. If you did not try to sign in, just ignore this email.",
       sandboxAppAccessDenied:
         "Your access to this application is closed. Please contact the application administrator.",
       emailInstruction:

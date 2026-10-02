@@ -326,6 +326,7 @@ if m:
     body=json.load(urllib.request.urlopen(sys.argv[1] + "/api/v1/message/" + m[0]["ID"]))
     print("yes" if any("action-token" in l for l in re.findall(r"href=\"([^\"]+)\"", body["HTML"] or "")) else "")' "$MAILPIT")
   [ -n "$link" ] && { echo "$link"; break; }; sleep 1; done)" yes
+check "ссылка из админки — письмо темы sandbox «Обновите учётную запись»" "$(curl -s "$MAILPIT/api/v1/search?query=to:customer@sandbox.test" | python3 -c 'import json,sys; print(json.load(sys.stdin)["messages"][0]["Subject"])')" "Обновите учётную запись"
 check "в карточке — 2FA включена (79990000006)" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_OTP" 'str(r["hasTwoFactor"])')" "200 True"
 check "2FA нет — отключение без изменений" "$(post_admin "$ADMIN" DELETE "/auth/admin/users/$ID_CUSTOMER/two-factor")" "200 False"
 # 2FA вживую: мастер-админка выдаёт покупателю обязательное действие «настроить 2FA», он настраивает приложение-

@@ -16,6 +16,8 @@ src/login/classes.ts   — классы Keycloak → Tailwind (так станд
 src/login/i18n.ts      — свои тексты и тексты realm для страниц входа (только литералы: читаются при сборке)
 src/login/pages/       — Login (телефон или почта, «Войти по коду», ключ доступа), CodeLogin (экран кода)
 src/login/lib/phone.ts — «+» перед номером, логин цифрами
+src/email/            — тема писем (FreeMarker, без React): каркас html/template.ftl, сброс пароля, ссылка из админки,
+                         подтверждение почты, код входа плагина (sandbox-login-code.ftl); тексты — messages/*.properties
 ```
 
 - **Своя страница плагина**: ключ в `KcContextExtensionPerPage` (имя шаблона из `createForm(...)`), атрибуты
@@ -23,6 +25,9 @@ src/login/lib/phone.ts — «+» перед номером, логин цифр�
 - **Тексты**: ключи сервера (`form.setError("key")`) — тоже в `i18n.ts`: Keycloakify кладёт их в сообщения темы.
   Во всех языках — одинаковый набор ключей. Тексты из `localizationTexts` realm странице в браузере не видны —
   нужные продублированы.
+- **Письма** (`emailTheme: sandbox`): стили — в атрибутах (почтовые программы не читают `<style>`), к каждому HTML —
+  текстовый вариант в `text/`. Остальные письма Keycloak — его шаблоны в нашем каркасе. Письмо с кодом рисует плагин
+  (`EmailCodeSender`) этим же шаблоном: без темы писем код на почту не уйдёт. Посмотреть — Mailpit, `localhost:8025`.
 - **Поля форм**: имена — как читает сервер (`username`, `password`, `code`, `codeLogin`, `resend`…).
 
 ## Команды

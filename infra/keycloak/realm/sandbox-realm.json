@@ -28,6 +28,7 @@
   ],
   "defaultLocale": "ru",
   "loginTheme": "sandbox",
+  "emailTheme": "sandbox",
   "browserFlow": "sandbox browser",
   "webAuthnPolicyPasswordlessPasskeysEnabled": true,
   "authenticationFlows": [

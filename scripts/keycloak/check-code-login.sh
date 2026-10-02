@@ -94,6 +94,14 @@ if messages:
 
 # mail_subject <адрес> — тема последнего письма на адрес
 mail_subject() { curl -s "$MAILPIT/api/v1/search?query=to:$1" | python3 -c 'import json,sys; m=json.load(sys.stdin)["messages"]; print(m[0]["Subject"] if m else "")'; }
+# mail_html_has <адрес> <текст> — «yes», если HTML последнего письма на адрес содержит текст
+mail_html_has() {
+  curl -s "$MAILPIT/api/v1/search?query=to:$1" | python3 -c '
+import json,sys,urllib.request
+m=json.load(sys.stdin)["messages"]
+body=json.load(urllib.request.urlopen(sys.argv[1] + "/api/v1/message/" + m[0]["ID"])) if m else {}
+print("yes" if sys.argv[2] and sys.argv[2] in (body.get("HTML") or "") else "")' "$MAILPIT" "$2"
+}
 
 me() { curl -s -b "$1" "$API/me/" | python3 -c 'import json,sys; r=json.load(sys.stdin)["result"]; v=r[sys.argv[1]]; print(",".join(v) if isinstance(v,list) else v)' "$2" 2>/dev/null; }
 
@@ -146,7 +154,11 @@ JAR="$WORK/jar8"; : > "$JAR"
 SCREEN=$(code_start_fresh "$JAR" " Customer@Sandbox.test ")
 check "экран кода: «$SCREEN»" "$SCREEN" "Отправили код письмом на customer@sandbox.test."
 check "письмо «Код для входа» пришло" "$(mail_subject customer@sandbox.test)" "Код для входа"
-check "верный код из письма → вход" "$(code_submit "$JAR" "$(mail_code customer@sandbox.test)")" /me/
+CODE=$(mail_code customer@sandbox.test)
+# Письмо — шаблон темы писем (sandbox-login-code.ftl): HTML-часть с кодом и подписью темы.
+check "письмо с кодом — по шаблону темы (HTML с кодом)" "$(mail_html_has customer@sandbox.test "$CODE")" yes
+check "в письме — подпись темы" "$(mail_html_has customer@sandbox.test "отвечать на него не нужно")" yes
+check "верный код из письма → вход" "$(code_submit "$JAR" "$CODE")" /me/
 check "вошёл пользователь с этой почтой" "$(me "$JAR" phone)" +79990000001
 status "$JAR" POST /auth/logout > /dev/null
 
