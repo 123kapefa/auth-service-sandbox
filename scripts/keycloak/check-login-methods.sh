@@ -36,10 +36,12 @@ reset_request() {
   local jar=$1 h="$WORK/h" page="$WORK/page.html" url action
   curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" "$API/auth/login?return_to=/me/"
   curl -s -o "$page" -b "$jar" -c "$jar" "$(header "$h" location)"
-  url=$(python3 -c 'import re,sys,html; m=re.search(r"href=\"([^\"]*reset-credentials[^\"]*)\"", open(sys.argv[1]).read()); print(html.unescape(m.group(1)) if m else "")' "$page")
+  # Ссылку «Забыли пароль?» рисует тема — адрес из kcContext страницы входа (если сброс разрешён в realm).
+  url=$(kc "$page" 'c["url"]["loginResetCredentialsUrl"] if c["realm"]["resetPasswordAllowed"] else ""')
   [ -n "$url" ] || { echo "нет ссылки «Забыли пароль?»"; return; }
   curl -s -o "$page" -b "$jar" -c "$jar" "$KC$url"
-  action=$(form_action "$page" kc-reset-password-form)
+  [ "$(kc_page "$page")" = login-reset-password.ftl ] || { echo "нет формы сброса"; return; }
+  action=$(form_action "$page")
   curl -s -o "$page" -b "$jar" -c "$jar" --data-urlencode "username=$2" "$action"
   feedback "$page"
 }
@@ -50,7 +52,7 @@ reset_complete() {
   curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" "$2"
   curl -s -o "$page" -b "$jar" -c "$jar" "$(header "$h" location)"
   curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" \
-    --data-urlencode "password-new=$3" --data-urlencode "password-confirm=$3" "$(form_action "$page" kc-passwd-update-form)"
+    --data-urlencode "password-new=$3" --data-urlencode "password-confirm=$3" "$(form_action "$page")"
   url=$(header "$h" location)
   [ -n "$url" ] || { echo "пароль не сохранён"; return; }
   curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" "$url"
@@ -61,8 +63,8 @@ reset_complete() {
 otp_login() {
   local jar=$1 h="$WORK/h" page="$WORK/page.html" url
   url=$(login_until_done "$jar" /me/ "$2" "$PASSWORD") && { echo "код не спросили"; return; }
-  grep -q 'kc-otp-login-form' "$page" || { echo "код не спросили ($url)"; return; }
-  curl -s -o "$page" -D "$h" -b "$jar" -c "$jar" --data-urlencode "otp=$3" "$(form_action "$page" kc-otp-login-form)"
+  [ "$(kc_page "$page")" = login-otp.ftl ] || { echo "код не спросили ($url)"; return; }
+  curl -s -o "$page" -D "$h" -b "$jar" -c "$jar" --data-urlencode "otp=$3" "$(form_action "$page")"
   url=$(header "$h" location)
   [ -n "$url" ] || { echo "keycloak: $(feedback "$page")"; return; }
   curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" "$url"
@@ -95,7 +97,7 @@ check "вход с новым паролем" "$(login "$JAR" /me/ 79990000005 "
 status "$JAR" POST /auth/logout > /dev/null
 # Ссылка одноразовая: второй переход — 400 и никакой формы смены пароля.
 check "повторно ссылка из письма не работает" \
-  "$(curl -s -o "$WORK/p.html" -w '%{http_code}' "$LINK"; grep -q 'kc-passwd-update-form' "$WORK/p.html" && echo ' есть форма' || echo ' без формы')" "400 без формы"
+  "$(curl -s -o "$WORK/p.html" -w '%{http_code}' "$LINK"; [ "$(kc_page "$WORK/p.html")" = login-update-password.ftl ] && echo ' есть форма' || echo ' без формы')" "400 без формы"
 
 echo "3. Сброс для неизвестного пользователя — ничего не раскрывает"
 JAR="$WORK/jar4"; : > "$JAR"

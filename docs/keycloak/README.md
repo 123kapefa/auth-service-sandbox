@@ -86,9 +86,9 @@ Keycloak; проекты друг друга не видят. **Приложен
 | `compose.yaml` → `keycloak`, `keycloak-postgres` | Keycloak 26.4 и его отдельная БД |
 | `compose.yaml` → `redis`, `auth-migrator` | отметки мгновенного отзыва токенов; миграции базы сервиса (`efbundle`) до старта сервиса |
 | `infra/keycloak/realm/sandbox-realm.json` | весь realm как код |
-| `infra/keycloak/themes/sandbox` | тема страницы входа: `+` у номера, кнопка «Войти по коду», экран ввода кода |
 | `infra/keycloak/providers/code-login` | плагин Keycloak (Java): форма входа с нормализацией номера, вход по коду; собирается в `infra/keycloak/Dockerfile` |
 | `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал, пароль и 2FA; `check-roles.sh` — роли и права приложений, роли пользователей, умный рефреш, «Менеджер 1С» (этап 4а); `check-admin-ui.sh` — своя админка: раздача, CSP, путь админов (этап 4б); `lib.sh` — общие помощники, `master-token.sh` — токен мастер-админки изнутри контейнера |
+| `login-theme/` | страницы входа Keycloak на React (Keycloakify, тема `sandbox`) — см. `login-theme/CLAUDE.md`; jar собирается в образе Keycloak |
 | `frontend/` | админка доступа на `/admin` (React, FSD) — см. `frontend/CLAUDE.md`; в образ сервиса попадает сборка |
 | `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права из токена, хук мгновенного отзыва и умного рефреша (`access_changed`) — переиспользуемая библиотека |
 | `src/Shared/Authentication.Redis` | отметки отзыва и версии доступа в Redis, кэш проверки, `AddPlatformTokenRevocation` |

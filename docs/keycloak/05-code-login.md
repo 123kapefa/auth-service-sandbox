@@ -69,7 +69,7 @@ sandbox browser
 
 ### Тема
 
-`infra/keycloak/themes/sandbox/login`:
+`infra/keycloak/themes/sandbox/login`: _(до этапа 4в; с 4в тема — `login-theme/` на React)_
 
 - `login.ftl` — **копия** шаблона `keycloak.v2` с одной добавленной кнопкой «Войти по коду» (иначе кнопку не добавить);
 - `sandbox-code-login.ftl` — экран кода, из макросов `keycloak.v2`;

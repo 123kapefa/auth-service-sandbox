@@ -47,11 +47,11 @@ login_until_done() {
   url=$(header "$h" location)
   [ -z "$url" ] || { echo "$url"; return 0; }
 
-  action=$(form_action "$page" kc-form-login)
-  [ -n "$action" ] || { echo "нет формы входа"; return 1; }
+  [ "$(kc_page "$page")" = login.ftl ] || { echo "нет формы входа"; return 1; }
+  action=$(form_action "$page")
   curl -s -o "$page" -D "$h" -b "$jar" -c "$jar" --data-urlencode "username=$3" --data-urlencode "password=$4" "$action"
   url=$(header "$h" location)
-  # Текст ошибки Keycloak (тема keycloak.v2) — в элементе с классом kc-feedback-text.
+  # Не вошли — сообщение Keycloak из kcContext страницы.
   [ -n "$url" ] || { echo "keycloak: $(feedback "$page" | sed 's/^$/осталась форма/')"; return 1; }
   echo "$url"
 }
@@ -72,19 +72,18 @@ fresh_totp() {
   totp "$1"
 }
 
-# form_action <html> [id формы] — адрес отправки формы (html-экранирование снято)
-form_action() {
-  python3 -c 'import re,sys,html; m=re.search(r"<form[^>]*" + (("id=\"" + sys.argv[2] + "\"[^>]*") if len(sys.argv) > 2 else "") + r"action=\"([^\"]+)\"", open(sys.argv[1]).read()); print(html.unescape(m.group(1)) if m else "")' "$@"
-}
+# Страницы входа рисует тема Keycloakify (React) в браузере: в HTML форм нет, всё нужное — в kcContext страницы.
+# kc <html> <python-выражение над c> — значение из kcContext (нет контекста — пусто); c["templateName"] — страница.
+kc() { python3 "$(dirname "${BASH_SOURCE[0]}")/kc_context.py" "$1" "$2"; }
 
-# feedback <html> — текст сообщения Keycloak: на форме (класс kc-feedback-text) или на странице ошибки (kc-error-message)
-feedback() {
-  python3 -c '
-import re,sys,html
-s = open(sys.argv[1]).read()
-m = re.search(r"kc-feedback-text[^\"]*\"[^>]*>\s*([^<]+)", s) or re.search(r"id=\"kc-error-message\"[\s\S]*?<p[^>]*>\s*([^<]+)", s)
-print(html.unescape(m.group(1)).strip() if m else "")' "$1"
-}
+# kc_page <html> — какая страница Keycloak: login.ftl, login-otp.ftl, sandbox-code-login.ftl… (пусто — не страница входа)
+kc_page() { kc "$1" 'c["templateName"]'; }
+
+# form_action <html> — адрес отправки формы страницы входа (у всех форм страницы — url.loginAction)
+form_action() { kc "$1" 'c["url"]["loginAction"]'; }
+
+# feedback <html> — сообщение Keycloak на странице (ошибка поля, предупреждение, страница ошибки) — message.summary
+feedback() { kc "$1" 'get("message", "summary") or ""'; }
 
 # require_service — сервис должен отвечать, иначе проверять нечего
 require_service() {

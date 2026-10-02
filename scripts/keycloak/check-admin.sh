@@ -193,7 +193,7 @@ check "менеджеру нельзя — 403" "$(curl -s -o /dev/null -w '%{ht
 curl -s -o /dev/null -D "$WORK/h" -b "$ADMIN" -c "$ADMIN" "$API/auth/login?return_to=/"
 check "обычный вход при живой сессии — без формы" "$(curl -s -o /dev/null -w '%{http_code}' -b "$ADMIN" -c "$ADMIN" "$(header "$WORK/h" location)")" 302
 curl -s -o /dev/null -D "$WORK/h" -b "$ADMIN" -c "$ADMIN" "$API/auth/login?return_to=/&reauth=true"
-check "reauth=true — Keycloak снова показывает форму" "$(curl -s -b "$ADMIN" -c "$ADMIN" "$(header "$WORK/h" location)" | grep -q 'id="kc-form-login"' && echo форма || echo нет)" форма
+check "reauth=true — Keycloak снова показывает форму" "$(curl -s -o "$WORK/page.html" -b "$ADMIN" -c "$ADMIN" "$(header "$WORK/h" location)"; [ "$(kc_page "$WORK/page.html")" = login.ftl ] && echo форма || echo нет)" форма
 status "$CUSTOMER" POST /auth/logout > /dev/null
 
 echo "5. Доступ к приложению (аккаунт рабочий, одно приложение закрыто)"
@@ -309,7 +309,7 @@ setup_otp() {
   curl -s -o "$page" -b "$jar" -c "$jar" "$(header "$h" location)"
   curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" --data-urlencode "username=$1" --data-urlencode "password=$PASSWORD" "$(form_action "$page")"
   curl -s -o "$page" -b "$jar" -c "$jar" "$(header "$h" location)"
-  secret=$(python3 -c 'import re,sys; m=re.search(r"name=\"totpSecret\" value=\"([^\"]+)\"", open(sys.argv[1]).read()); print(m.group(1) if m else "")' "$page")
+  secret=$(kc "$page" 'c["totp"]["totpSecret"]')
   [ -n "$secret" ] || { echo "нет страницы настройки 2FA"; return; }
   curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" --data-urlencode "totp=$(totp "$secret")" --data-urlencode "totpSecret=$secret" \
     --data-urlencode "userLabel=check-admin" "$(form_action "$page")"

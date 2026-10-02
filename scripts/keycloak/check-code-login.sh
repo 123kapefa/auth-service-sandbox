@@ -18,8 +18,7 @@ code_start() {
   local jar=$1 h="$WORK/h" page="$WORK/page.html"
   curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" "$API/auth/login?return_to=/me/"
   curl -s -o "$page" -b "$jar" -c "$jar" "$(header "$h" location)"
-  curl -s -o "$page" -b "$jar" -c "$jar" --data-urlencode "username=$2" --data-urlencode "codeLogin=" \
-    "$(form_action "$page" kc-form-login)"
+  curl -s -o "$page" -b "$jar" -c "$jar" --data-urlencode "username=$2" --data-urlencode "codeLogin=" "$(form_action "$page")"
   code_screen "$page"
 }
 
@@ -28,8 +27,8 @@ code_start() {
 code_start_fresh() {
   local screen wait
   screen=$(code_start "$1" "$2")
-  if grep -q 'Код уже отправлен' "$WORK/page.html"; then
-    wait=$(grep -o 'через [0-9]* с' "$WORK/page.html" | head -1 | grep -o '[0-9]*')
+  if [[ "$(feedback "$WORK/page.html")" == "Код уже отправлен"* ]]; then
+    wait=$(feedback "$WORK/page.html" | grep -o 'через [0-9]* с' | head -1 | grep -o '[0-9]*')
     echo "  … пауза перед повтором от прошлого прогона: ждём ${wait} с" >&2
     sleep "$((wait + 1))"
     code_send_again "$1" > /dev/null
@@ -37,27 +36,27 @@ code_start_fresh() {
   echo "$screen"
 }
 
-# code_screen <html> — «куда отправили» с экрана кода; иначе — ошибка со страницы
+# code_screen <html> — «куда отправили» с экрана кода (теми же словами, что страница темы: из codeChannel и
+# codeTarget); не экран кода — ошибка со страницы
 code_screen() {
-  python3 -c '
-import re,sys,html
-s = open(sys.argv[1]).read()
-m = re.search(r"<p id=\"sandbox-code-target\">([^<]+)", s)
-e = re.search(r"kc-feedback-text[^>]*>\s*([^<]+)", s) or re.search(r"id=\"input-error-username\"[^>]*>\s*([^<]+)", s)
-print(html.unescape(m.group(1)).strip() if m else "ошибка: " + (html.unescape(e.group(1)).strip() if e else "нет экрана кода"))' "$1"
+  if [ "$(kc_page "$1")" = sandbox-code-login.ftl ]; then
+    kc "$1" '("Отправили код письмом на " if c["codeChannel"] == "EMAIL" else "Отправили код в SMS на ") + c["codeTarget"] + "."'
+  else
+    echo "ошибка: $(feedback "$1" | sed 's/^$/нет экрана кода/')"
+  fi
 }
 
 # code_send_again <jar> — «Отправить код ещё раз»; печатает сообщение Keycloak
 code_send_again() {
   local jar=$1 page="$WORK/page.html"
-  curl -s -o "$page" -b "$jar" -c "$jar" --data-urlencode "resend=" "$(form_action "$page" sandbox-code-form)"
+  curl -s -o "$page" -b "$jar" -c "$jar" --data-urlencode "resend=" "$(form_action "$page")"
   feedback "$page"
 }
 
 # code_submit <jar> <код> — ввод кода; печатает, куда сервис вернул браузер, или «keycloak: <ошибка>»
 code_submit() {
   local jar=$1 h="$WORK/h" page="$WORK/page.html" url
-  curl -s -o "$page" -D "$h" -b "$jar" -c "$jar" --data-urlencode "code=$2" "$(form_action "$page" sandbox-code-form)"
+  curl -s -o "$page" -D "$h" -b "$jar" -c "$jar" --data-urlencode "code=$2" "$(form_action "$page")"
   url=$(header "$h" location)
   [ -n "$url" ] || { echo "keycloak: $(feedback "$page")"; return; }
   curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" "$url"
@@ -105,7 +104,10 @@ docker compose ps keycloak --format '{{.State}}' 2>/dev/null | grep -q running |
 echo "1. На форме входа — кнопка «Войти по коду»"
 JAR="$WORK/jar"; : > "$JAR"
 curl -s -o /dev/null -D "$WORK/h" -b "$JAR" -c "$JAR" "$API/auth/login?return_to=/me/"
-check "кнопка на странице входа" "$(curl -s -b "$JAR" -c "$JAR" "$(header "$WORK/h" location)" | grep -q 'name="codeLogin"' && echo да || echo нет)" да
+# Кнопку рисует тема в браузере (её проверяют тесты login-theme); здесь — что страница входа из нашей темы.
+check "страница входа — тема sandbox" \
+  "$(curl -s -o "$WORK/page.html" -b "$JAR" -c "$JAR" "$(header "$WORK/h" location)"; kc "$WORK/page.html" 'c["templateName"] + " " + c["url"]["resourcesUrl"].split("/")[-1]')" \
+  "login.ftl sandbox"
 
 echo "2. Вход по коду существующего пользователя (номер как набрали, без скрипта темы)"
 JAR="$WORK/jar2"; : > "$JAR"
@@ -160,11 +162,11 @@ echo "6. 2FA после кода — только у тех, кто её вкл�
 JAR="$WORK/jar11"; : > "$JAR"
 code_start_fresh "$JAR" 79990000006 > /dev/null
 code_submit "$JAR" "$(sms_code 79990000006)" > /dev/null
-check "после верного кода из SMS спрашивают код 2FA" "$(grep -q 'kc-otp-login-form' "$WORK/page.html" && echo да || echo нет)" да
-curl -s -o "$WORK/page.html" -b "$JAR" -c "$JAR" --data-urlencode "otp=000000" "$(form_action "$WORK/page.html" kc-otp-login-form)"
-check "неверный код 2FA отклонён" "$(grep -q 'kc-otp-login-form' "$WORK/page.html" && echo "форма осталась: $(feedback "$WORK/page.html")" || echo пустили)" "форма осталась: Неверный код аутентификатора."
+check "после верного кода из SMS спрашивают код 2FA" "$(kc_page "$WORK/page.html")" login-otp.ftl
+curl -s -o "$WORK/page.html" -b "$JAR" -c "$JAR" --data-urlencode "otp=000000" "$(form_action "$WORK/page.html")"
+check "неверный код 2FA отклонён" "$([ "$(kc_page "$WORK/page.html")" = login-otp.ftl ] && echo "форма осталась: $(feedback "$WORK/page.html")" || echo пустили)" "форма осталась: Неверный код аутентификатора."
 curl -s -o "$WORK/page.html" -D "$WORK/h" -b "$JAR" -c "$JAR" --data-urlencode "otp=$(fresh_totp sandbox-otp-test-secret)" \
-  "$(form_action "$WORK/page.html" kc-otp-login-form)"
+  "$(form_action "$WORK/page.html")"
 URL=$(header "$WORK/h" location)
 curl -s -o /dev/null -D "$WORK/h" -b "$JAR" -c "$JAR" "$URL"
 check "верный код 2FA → вход" "$(header "$WORK/h" location)" /me/

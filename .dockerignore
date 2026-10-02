@@ -6,3 +6,7 @@
 .secrets
 frontend/node_modules
 frontend/dist
+login-theme/node_modules
+login-theme/dist
+login-theme/dist_keycloak
+infra/keycloak/providers/*/target

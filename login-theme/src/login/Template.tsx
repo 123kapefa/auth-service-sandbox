@@ -1,0 +1,131 @@
+import { kcSanitize } from "keycloakify/lib/kcSanitize";
+import type { TemplateProps } from "keycloakify/login/TemplateProps";
+import { getKcClsx } from "keycloakify/login/lib/kcClsx";
+import { useInitialize } from "keycloakify/login/Template.useInitialize";
+import { useEffect } from "react";
+import type { I18n } from "./i18n";
+import type { KcContext } from "./KcContext";
+
+const ALERT = {
+  error: "border-destructive/40 text-destructive",
+  warning: "border-warning/50 text-warning",
+  success: "border-success/40 text-success",
+  info: "border-border text-foreground",
+} as const;
+
+/**
+ * Каркас страниц входа: название, карточка с заголовком, сообщение Keycloak, форма, «другой способ», ссылки внизу,
+ * выбор языка. Стили — Tailwind (classes.ts), без CSS Keycloak.
+ */
+export default function Template(props: TemplateProps<KcContext, I18n>) {
+  const {
+    displayInfo = false,
+    displayMessage = true,
+    headerNode,
+    socialProvidersNode = null,
+    infoNode = null,
+    documentTitle,
+    kcContext,
+    i18n,
+    doUseDefaultCss,
+    classes,
+    children,
+  } = props;
+  const { kcClsx } = getKcClsx({ doUseDefaultCss, classes });
+  const { msg, msgStr, currentLanguage, enabledLanguages } = i18n;
+  const { realm, auth, url, message, isAppInitiatedAction } = kcContext;
+
+  useEffect(() => {
+    document.title = documentTitle ?? msgStr("loginTitle", realm.displayName || realm.name);
+  }, [documentTitle, msgStr, realm.displayName, realm.name]);
+
+  const { isReadyToRender } = useInitialize({ kcContext, doUseDefaultCss });
+  if (!isReadyToRender) {
+    return null;
+  }
+
+  const showUsername = auth !== undefined && auth.showUsername && !auth.showResetCredentials;
+  return (
+    <div className={kcClsx("kcLoginClass")}>
+      <div id="kc-header" className={kcClsx("kcHeaderClass")}>
+        <div id="kc-header-wrapper" className={kcClsx("kcHeaderWrapperClass")}>
+          {realm.displayName || realm.name}
+        </div>
+      </div>
+      <div className={kcClsx("kcFormCardClass")}>
+        <header className={kcClsx("kcFormHeaderClass")}>
+          {showUsername ? (
+            <div id="kc-username" className="flex items-center justify-between gap-2 text-sm">
+              <span id="kc-attempted-username" className="font-medium">
+                {auth.attemptedUsername}
+              </span>
+              <a
+                id="reset-login"
+                href={url.loginRestartFlowUrl}
+                className="text-primary hover:underline"
+              >
+                {msg("restartLoginTooltip")}
+              </a>
+            </div>
+          ) : (
+            <h1 id="kc-page-title" className="text-xl font-semibold">
+              {headerNode}
+            </h1>
+          )}
+        </header>
+        <div id="kc-content">
+          {displayMessage &&
+            message !== undefined &&
+            (message.type !== "warning" || !isAppInitiatedAction) && (
+              <div role="alert" className={`${kcClsx("kcAlertClass")} ${ALERT[message.type]}`}>
+                <span
+                  className={kcClsx("kcAlertTitleClass")}
+                  dangerouslySetInnerHTML={{ __html: kcSanitize(message.summary) }}
+                />
+              </div>
+            )}
+          {children}
+          {auth?.showTryAnotherWayLink && (
+            <form
+              id="kc-select-try-another-way-form"
+              action={url.loginAction}
+              method="post"
+              className="mt-4 text-center text-sm"
+            >
+              <input type="hidden" name="tryAnotherWay" value="on" />
+              <button type="submit" id="try-another-way" className="text-primary hover:underline">
+                {msg("doTryAnotherWay")}
+              </button>
+            </form>
+          )}
+          {socialProvidersNode}
+          {displayInfo && (
+            <div id="kc-info" className={kcClsx("kcSignUpClass")}>
+              <div id="kc-info-wrapper" className={kcClsx("kcInfoAreaWrapperClass")}>
+                {infoNode}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      {enabledLanguages.length > 1 && (
+        <nav
+          id="kc-locale"
+          aria-label={msgStr("languages")}
+          className="flex justify-center gap-3 text-xs text-muted-foreground"
+        >
+          {enabledLanguages.map(({ languageTag, label, href }) => (
+            <a
+              key={languageTag}
+              href={href}
+              aria-current={label === currentLanguage.label ? "true" : undefined}
+              className="hover:text-foreground aria-[current=true]:font-semibold aria-[current=true]:text-foreground"
+            >
+              {label}
+            </a>
+          ))}
+        </nav>
+      )}
+    </div>
+  );
+}

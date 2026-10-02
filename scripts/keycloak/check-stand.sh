@@ -59,14 +59,17 @@ echo "5. Способы входа"
 check "вход по почте — тот же пользователь" "$(token admin@sandbox.test | claim phone)" +71234567890
 check "вход по телефону по-прежнему работает" "$(token 71234567890 | claim phone)" +71234567890
 AUTH_URL="$KC/realms/$REALM/protocol/openid-connect/auth?client_id=sandbox-bff&response_type=code&scope=openid&redirect_uri=http://localhost:8080/auth/callback&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256"
-LOGIN_PAGE=$(curl -s "$AUTH_URL")
-check "поле входа подписано «Телефон или почта»" "$(echo "$LOGIN_PAGE" | grep -q 'Телефон или почта' && echo да || echo нет)" да
-SCRIPT=$(echo "$LOGIN_PAGE" | grep -o 'src="[^"]*phone-login.js"' | head -1 | cut -d'"' -f2)
-check "тема sandbox подключает скрипт телефона" "$([ -n "$SCRIPT" ] && echo да || echo нет)" да
-check "скрипт телефона отдаётся" "$(curl -s -o /dev/null -w '%{http_code}' "${SCRIPT/#\//$KC/}")" 200
-check "вход по ключу доступа (passkey) на странице" "$(echo "$LOGIN_PAGE" | grep -q 'Войти с ключом доступа' && echo да || echo нет)" да
-check "нет неверного перевода «Войти с помощью пароля»" "$(echo "$LOGIN_PAGE" | grep -q 'Войти с помощью пароля' && echo есть || echo нет)" нет
-check "на странице входа есть «Забыли пароль?»" "$(echo "$LOGIN_PAGE" | grep -q 'reset-credentials' && echo да || echo нет)" да
+# Страницу рисует тема Keycloakify (React) в браузере; подписи и кнопки проверяют тесты login-theme, здесь — что
+# Keycloak отдаёт нашу тему с нужными настройками (kcContext страницы).
+LOGIN_PAGE="$(mktemp)"; curl -s -o "$LOGIN_PAGE" "$AUTH_URL"
+page() { python3 "$(dirname "$0")/kc_context.py" "$LOGIN_PAGE" "$1"; }
+check "страница входа — тема sandbox (Keycloakify)" "$(page 'c["templateName"] + " " + c["url"]["resourcesUrl"].split("/")[-1]')" "login.ftl sandbox"
+SCRIPT=$(grep -o 'src="[^"]*/assets/index-[^"]*\.js"' "$LOGIN_PAGE" | head -1 | cut -d'"' -f2)
+check "скрипт темы отдаётся" "$(curl -s -o /dev/null -w '%{http_code} %{content_type}' "$KC$SCRIPT" | cut -d';' -f1)" "200 text/javascript"
+check "язык по умолчанию — русский" "$(page 'c["locale"]["currentLanguageTag"]')" ru
+check "вход по ключу доступа (passkey) предложен" "$(page 'c["enableWebAuthnConditionalUI"]')" True
+check "«Забыли пароль?» — сброс разрешён" "$(page 'str(c["realm"]["resetPasswordAllowed"]) + " " + str("reset-credentials" in c["url"]["loginResetCredentialsUrl"])')" "True True"
+rm -f "$LOGIN_PAGE"
 
 echo "6. Вход в приложение (клиент sandbox-bff)"
 # authorize <redirect_uri> [pkce] → "<HTTP-код> <куда редирект>"

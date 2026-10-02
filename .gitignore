@@ -10,3 +10,8 @@ obj/
 frontend/node_modules/
 frontend/dist/
 src/AuthService.Api/wwwroot/admin/
+
+# Тема входа: зависимости и сборка
+login-theme/node_modules/
+login-theme/dist/
+login-theme/dist_keycloak/
