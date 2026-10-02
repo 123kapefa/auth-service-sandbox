@@ -38,7 +38,7 @@ docker compose up -d --wait keycloak
 scripts/keycloak/check-stand.sh
 ```
 
-Ожидается `Итого: 44 ✓, 0 ✗`.
+Ожидается `Итого: 43 ✓, 0 ✗` (с этапа 4в страница входа проверяется через `kcContext` темы).
 
 Посмотреть токен целиком:
 

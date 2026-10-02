@@ -51,6 +51,14 @@ check "iss не зависит от адреса запроса" "$(echo "$D" | 
 check "jwks_uri — по адресу запроса" "$(echo "$D" | claim jwks_uri)" "http://keycloak:8180/realms/$REALM/protocol/openid-connect/certs"
 
 echo "4. Защита"
+# Мастер-админка (логин и пароль — из .env): нужна здесь и в разделе 5.
+# shellcheck source=master-token.sh
+source "$(dirname "$0")/master-token.sh"
+MASTER=$(master_token)
+# Каждая попытка заблокированного — неудача для защиты от перебора: после многих прогонов подряд его временно
+# запирает, и Keycloak отвечает «Invalid user credentials» вместо «Account disabled». Счётчик — с нуля.
+BLOCKED_ID=$(curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/users?username=79990000004&exact=true" | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["id"])')
+curl -s -o /dev/null -X DELETE -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/attack-detection/brute-force/users/$BLOCKED_ID"
 check "заблокированный не получает токен" "$(token 79990000004 | claim error_description)" "Account disabled"
 check "неверный пароль отклонён" "$(curl -s -d grant_type=password -d client_id=dev-cli -d username=79990000001 -d password=wrong \
   "$KC/realms/$REALM/protocol/openid-connect/token" | claim error)" invalid_grant
@@ -95,10 +103,7 @@ check "читает события входа (view-events)" "$(admin_api 'event
 # Точечные права (FGAP v2): из клиентов — только клиенты приложений (выдавать их роли), чужие клиенты и их секреты не видны.
 check "из клиентов видит только клиенты приложений" "$(curl -s -H "Authorization: Bearer $SA" "$KC/admin/realms/$REALM/clients" | python3 -c 'import json,sys; print(",".join(sorted(c["clientId"] for c in json.load(sys.stdin))))')" account-console,manager-1c,sandbox-api,sandbox-bff
 check "чужой клиент (broker) даже не находит" "$(curl -s -H "Authorization: Bearer $SA" "$KC/admin/realms/$REALM/clients?clientId=broker&search=true")" "[]"
-# Настоящий id broker — мастер-админкой (логин и пароль — из .env), чтобы проверить сам запрет на секрет.
-# shellcheck source=master-token.sh
-source "$(dirname "$0")/master-token.sh"
-MASTER=$(master_token)
+# Настоящий id broker — мастер-админкой, чтобы проверить сам запрет на секрет.
 BROKER_ID=$(curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/clients?clientId=broker" | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["id"])')
 check "секрет чужого клиента не читает" "$(admin_api "clients/$BROKER_ID/client-secret")" 403
 check "не меняет настройки realm" "$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H "Authorization: Bearer $SA" \

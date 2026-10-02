@@ -79,8 +79,8 @@ sandbox browser
 
 `infra/keycloak/Dockerfile`: стадия Maven собирает плагин и **прогоняет юнит-тесты** (упавший тест — упавшая сборка
 образа), затем плагин и тема кладутся в `quay.io/keycloak/keycloak:26.4.7`. Java и Maven на машине не нужны.
-`compose.yaml` собирает этот образ (`auth_service-keycloak:26.4.7-sandbox`); тему на стенде поверх монтирует папкой,
-чтобы править без пересборки.
+`compose.yaml` собирает этот образ (`auth_service-keycloak:26.4.7-sandbox`). _(До этапа 4в тема монтировалась
+папкой; с 4в — jar `login-theme/`, письмо с кодом — шаблон темы писем, см. [04v-login-ui.md](04v-login-ui.md).)_
 
 ### Новые пользователи
 
