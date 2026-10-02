@@ -14,6 +14,7 @@ namespace AuthService.Contracts.Admin;
 /// <param name="RestrictedAt">Когда заблокирован.</param>
 /// <param name="HasPassword">Задан ли пароль.</param>
 /// <param name="LastLoginAt">Последний вход (события Keycloak хранятся 30 дней; раньше — null).</param>
+/// <param name="HasTwoFactor">Включена ли 2FA (приложение-аутентификатор или коды восстановления).</param>
 public sealed record UserDetailResponse(
     Guid Id,
     string Username,
@@ -27,4 +28,5 @@ public sealed record UserDetailResponse(
     string? RestrictionReason,
     DateTimeOffset? RestrictedAt,
     bool HasPassword,
-    DateTimeOffset? LastLoginAt);
+    DateTimeOffset? LastLoginAt,
+    bool HasTwoFactor);

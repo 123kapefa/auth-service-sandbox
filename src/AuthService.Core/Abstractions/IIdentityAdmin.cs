@@ -101,6 +101,22 @@ public interface IIdentityAdmin
     /// <summary>Удалить роль клиента приложения; Keycloak убирает её и из составных ролей.</summary>
     Task<UnitResult<Error>> DeleteAppRoleAsync(string clientId, string name, CancellationToken cancellationToken);
 
+    /// <summary>Типы учётных данных пользователя: password, otp, recovery-authn-codes, webauthn-passwordless…</summary>
+    Task<Result<IReadOnlyList<string>, Error>> GetCredentialTypesAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>Удалить учётные данные этих типов; вернуть, сколько удалено.</summary>
+    Task<Result<int, Error>> RemoveCredentialsAsync(Guid userId, IReadOnlyCollection<string> types, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Письмо Keycloak со ссылкой на действия (UPDATE_PASSWORD…): почта realm (SMTP), ссылка живёт lifespan. Нет почты
+    /// у пользователя — Conflict.
+    /// </summary>
+    Task<UnitResult<Error>> SendActionsEmailAsync(
+        Guid userId,
+        IReadOnlyCollection<string> actions,
+        TimeSpan lifespan,
+        CancellationToken cancellationToken);
+
     /// <summary>Задан ли пароль (пользователь мог войти только по коду).</summary>
     Task<Result<bool, Error>> HasPasswordAsync(Guid userId, CancellationToken cancellationToken);
 
@@ -208,6 +224,20 @@ public static class AppRoleKinds
 
     public const string SOURCE_CODE = "code";
     public const string SOURCE_ADMIN = "admin";
+}
+
+/// <summary>Типы учётных данных Keycloak и действия из письма.</summary>
+public static class Credentials
+{
+    public const string PASSWORD = "password";
+    public const string OTP = "otp";
+    public const string RECOVERY_CODES = "recovery-authn-codes";
+
+    /// <summary>Вторые факторы: OTP и коды восстановления (ключ доступа — способ входа, не 2FA).</summary>
+    public static IReadOnlyList<string> TwoFactor { get; } = [OTP, RECOVERY_CODES];
+
+    /// <summary>Действие из письма: задать новый пароль.</summary>
+    public const string UPDATE_PASSWORD = "UPDATE_PASSWORD";
 }
 
 /// <summary>Клиент Keycloak: clientId и название.</summary>

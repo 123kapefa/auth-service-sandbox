@@ -22,6 +22,14 @@ public static class AdminErrors
             "auth.reauthentication_required",
             "Подтвердите, что это вы: войдите заново (GET /auth/login?reauth=true) и повторите действие.");
 
+    /// <summary>Свой пароль и 2FA — в личном кабинете, не через админку.</summary>
+    public static Error SelfCredentials() =>
+        Error.Authorization("users.self_credentials", "Свой пароль и 2FA меняются в «Настройках входа».");
+
+    /// <summary>У пользователя нет почты — ссылку на смену пароля отправить некуда.</summary>
+    public static Error NoEmail() =>
+        Error.Conflict("users.no_email", "У пользователя нет почты — ссылку на смену пароля отправить некуда.");
+
     /// <summary>Свой доступ к приложению закрывать нельзя.</summary>
     public static Error SelfAccess() =>
         Error.Authorization("users.self_access", "Нельзя менять свой доступ к приложению.");

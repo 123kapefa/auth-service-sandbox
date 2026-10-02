@@ -39,6 +39,12 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     /// <summary>События входа «Keycloak», новые сверху.</summary>
     public Collection<LoginEvent> LoginEvents { get; } = [];
 
+    /// <summary>У кого включена 2FA (OTP и коды восстановления).</summary>
+    private readonly ConcurrentDictionary<Guid, bool> _twoFactor = new();
+
+    /// <summary>Письма Keycloak с действиями: (пользователь, действия, срок ссылки).</summary>
+    public Collection<(Guid UserId, string[] Actions, TimeSpan Lifespan)> ActionEmails { get; } = [];
+
     /// <summary>Какие сессии сервис завершил по одной.</summary>
     public Collection<string> DeletedSessions { get; } = [];
 
@@ -66,9 +72,25 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         _accounts[user.Id] = _accounts[user.Id].WithRolesIn(clientId, roles);
     }
 
+    /// <summary>Включить пользователю 2FA (как приложение-аутентификатор и коды восстановления).</summary>
+    public void EnableTwoFactor(TestUser user)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        _twoFactor[user.Id] = true;
+    }
+
+    /// <summary>Почта пользователя.</summary>
+    public void SetEmail(TestUser user, string email)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        _accounts[user.Id] = _accounts[user.Id] with { User = _accounts[user.Id].User with { Email = email } };
+    }
+
     public void Reset()
     {
         _accounts.Clear();
+        _twoFactor.Clear();
+        ActionEmails.Clear();
         SeedAppRoles();
         AttributeChanges.Clear();
         Logouts.Clear();
@@ -168,6 +190,39 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     private static string[] DefaultRolesOf(string clientId) =>
         string.Equals(clientId, SERVICE_APP, StringComparison.Ordinal) ? ["customer"] : [];
 
+    public Task<Result<IReadOnlyList<string>, Error>> GetCredentialTypesAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        if (!_accounts.TryGetValue(userId, out Account? account))
+        {
+            return Task.FromResult(Result.Failure<IReadOnlyList<string>, Error>(IdentityProviderErrors.UserNotFound()));
+        }
+
+        List<string> types = account.HasPassword ? [Credentials.PASSWORD] : [];
+        if (_twoFactor.ContainsKey(userId))
+        {
+            types.AddRange(Credentials.TwoFactor);
+        }
+
+        return Task.FromResult(Result.Success<IReadOnlyList<string>, Error>(types));
+    }
+
+    public Task<Result<int, Error>> RemoveCredentialsAsync(Guid userId, IReadOnlyCollection<string> types, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(types);
+        int removed = types.Contains(Credentials.OTP) && _twoFactor.TryRemove(userId, out _) ? Credentials.TwoFactor.Count : 0;
+        return Task.FromResult(Result.Success<int, Error>(removed));
+    }
+
+    public Task<UnitResult<Error>> SendActionsEmailAsync(
+        Guid userId,
+        IReadOnlyCollection<string> actions,
+        TimeSpan lifespan,
+        CancellationToken cancellationToken)
+    {
+        ActionEmails.Add((userId, [.. actions], lifespan));
+        return Task.FromResult(UnitResult.Success<Error>());
+    }
+
     public Task<Result<bool, Error>> HasPasswordAsync(Guid userId, CancellationToken cancellationToken) =>
         Task.FromResult(_accounts.TryGetValue(userId, out Account? account)
             ? Result.Success<bool, Error>(account.HasPassword)
@@ -226,7 +281,7 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         _composites["sandbox-api/customer"] = ["profile.view"];
         _composites["sandbox-api/manager"] = ["profile.view", "users.view", "users.block"];
         _composites["sandbox-api/admin"] =
-            ["profile.view", "users.view", "users.block", "users.roles.manage", "users.sessions.manage", "audit.view", "roles.manage"];
+            ["profile.view", "users.view", "users.block", "users.roles.manage", "users.sessions.manage", "users.credentials.manage", "audit.view", "roles.manage"];
         foreach (string role in new[] { "customer", "manager", "admin" })
         {
             _appRoles["sandbox-api"][role] = new AppRole(Guid.NewGuid(), role, role, AppRoleKinds.ROLE, null, true);

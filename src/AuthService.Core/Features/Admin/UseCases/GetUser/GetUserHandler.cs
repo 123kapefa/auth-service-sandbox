@@ -33,10 +33,10 @@ public sealed class GetUserHandler(IIdentityAdmin identityAdmin, UserAppRoles us
             return AdminErrors.StaffNotAllowed();
         }
 
-        Result<bool, Error> hasPassword = await identityAdmin.HasPasswordAsync(userId, cancellationToken);
-        if (hasPassword.IsFailure)
+        Result<IReadOnlyList<string>, Error> credentials = await identityAdmin.GetCredentialTypesAsync(userId, cancellationToken);
+        if (credentials.IsFailure)
         {
-            return hasPassword.Error;
+            return credentials.Error;
         }
 
         Result<IReadOnlyList<LoginEvent>, Error> lastLogin =
@@ -58,7 +58,8 @@ public sealed class GetUserHandler(IIdentityAdmin identityAdmin, UserAppRoles us
             !user.Value.Enabled,
             user.Value.RestrictionReason,
             user.Value.RestrictedAt,
-            hasPassword.Value,
-            lastLogin.Value.Count > 0 ? lastLogin.Value[0].Time : null);
+            credentials.Value.Contains(Credentials.PASSWORD, StringComparer.Ordinal),
+            lastLogin.Value.Count > 0 ? lastLogin.Value[0].Time : null,
+            credentials.Value.Intersect(Credentials.TwoFactor, StringComparer.Ordinal).Any());
     }
 }

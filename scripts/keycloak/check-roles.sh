@@ -74,7 +74,7 @@ login "$MANAGER" /me/ 0987654321 > /dev/null   # после очистки: со
 echo "1. Каталог прав: системные из кода и свои из админки"
 check "системные права приложения (из кода, source=code)" \
   "$(call "$ADMIN" GET "$PERMS" '' '",".join(sorted(p["name"] for p in r if p["source"] == "code"))')" \
-  "200 audit.view,profile.view,roles.manage,users.block,users.roles.manage,users.sessions.manage,users.view"
+  "200 audit.view,profile.view,roles.manage,users.block,users.credentials.manage,users.roles.manage,users.sessions.manage,users.view"
 check "у права есть описание" "$(call "$ADMIN" GET "$PERMS" '' '[p["description"] for p in r if p["name"] == "users.view"][0]')" "200 Пользователи: список и карточка"
 check "своё право создаётся (source=admin)" \
   "$(call "$ADMIN" POST "$PERMS" '{"name":"reports.export","description":"Выгрузка отчётов"}' '[p["source"] for p in r if p["name"] == "reports.export"][0]')" "200 admin"
@@ -96,7 +96,7 @@ check "создать роль support с правами" \
   "$(call "$ADMIN" POST "$ROLES" '{"name":"support","description":"Поддержка","permissions":["users.view","profile.view"]}' "$(printf "$ROLE_PERMS" support)")" \
   "200 profile.view,users.view"
 check "роль в Keycloak — составная из этих прав" \
-  "$(curl -s -H "Authorization: Bearer $(curl -s -d grant_type=password -d client_id=admin-cli -d username=admin --data-urlencode "password=$(grep -s '^KEYCLOAK_ADMIN_PASSWORD=' "$(dirname "$0")/../../.env" | cut -d= -f2)" "${KC:-http://localhost:8180}/realms/master/protocol/openid-connect/token" | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')" \
+  "$(curl -s -H "Authorization: Bearer $(master_token)" \
      "${KC:-http://localhost:8180}/admin/realms/sandbox/clients/2631bc45-b176-4774-927a-b6dd4e310582/roles/support/composites" | python3 -c 'import json,sys; print(",".join(sorted(r["name"] for r in json.load(sys.stdin))))')" \
   "profile.view,users.view"
 check "неизвестное право — 400" "$(call "$ADMIN" POST "$ROLES" '{"name":"helpdesk","permissions":["no.such"]}')" "400 roles.unknown_permission"

@@ -7,6 +7,9 @@ PASSWORD='Test1234!'
 PASS=0; FAIL=0
 WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
 
+# shellcheck source=master-token.sh
+source "$(dirname "${BASH_SOURCE[0]}")/master-token.sh"
+
 ok()    { PASS=$((PASS+1)); printf '  \033[32m✓\033[0m %s\n' "$1"; }
 bad()   { FAIL=$((FAIL+1)); printf '  \033[31m✗\033[0m %s\n' "$1"; }
 check() { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (ожидали '$3', получили '$2')"; fi; }

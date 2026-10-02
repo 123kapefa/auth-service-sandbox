@@ -10,6 +10,7 @@ using AuthService.Core.Features.Admin.UseCases.Permissions;
 using AuthService.Core.Features.Admin.UseCases.RoleCatalog;
 using AuthService.Core.Features.Admin.UseCases.SetRestriction;
 using AuthService.Core.Features.Admin.UseCases.SetRole;
+using AuthService.Core.Features.Admin.UseCases.UserCredentials;
 using AuthService.Core.Features.Auth.Cookies;
 using AuthService.Core.Features.Auth.UseCases.BackchannelLogout;
 using AuthService.Core.Features.Auth.ReturnUrls;
@@ -65,6 +66,7 @@ public static class Registration
         services.AddScoped<UserRolesHandler>();
         services.AddScoped<AppUsersHandler>();
         services.AddScoped<ManagedApps>();
+        services.AddScoped<CredentialsHandler>();
         services.AddHostedService<PermissionCatalogSync>();
         services.AddScoped<SessionsHandler>();
 

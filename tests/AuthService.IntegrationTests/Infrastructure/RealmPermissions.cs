@@ -28,6 +28,7 @@ public static class RealmPermissions
                 AuthServicePermissions.Users.BLOCK,
                 AuthServicePermissions.Users.MANAGE_ROLES,
                 AuthServicePermissions.Users.MANAGE_SESSIONS,
+                AuthServicePermissions.Users.MANAGE_CREDENTIALS,
                 AuthServicePermissions.Audit.VIEW,
                 AuthServicePermissions.Roles.MANAGE,
             ],

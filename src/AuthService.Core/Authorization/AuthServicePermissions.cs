@@ -21,6 +21,9 @@ public static class AuthServicePermissions
 
         /// <summary>Завершать сессии пользователя («выйти везде») — уровень аккаунта, только админ проекта.</summary>
         public const string MANAGE_SESSIONS = "users.sessions.manage";
+
+        /// <summary>Сброс пароля (письмо со ссылкой) и отключение 2FA — уровень аккаунта, только админ проекта.</summary>
+        public const string MANAGE_CREDENTIALS = "users.credentials.manage";
     }
 
     public static class Audit
@@ -41,6 +44,7 @@ public static class AuthServicePermissions
         new(Users.BLOCK, "Блокировка аккаунта и доступ к приложению"),
         new(Users.MANAGE_ROLES, "Смена ролей пользователей"),
         new(Users.MANAGE_SESSIONS, "«Выйти везде» за пользователя"),
+        new(Users.MANAGE_CREDENTIALS, "Сброс пароля и 2FA"),
         new(Audit.VIEW, "Журнал действий и входов"),
         new(Roles.MANAGE, "Роли и права приложения"),
     ];

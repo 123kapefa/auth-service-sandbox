@@ -466,6 +466,54 @@ internal sealed partial class KeycloakAdminClient(
     private static string? First(Dictionary<string, string[]>? attributes, string name) =>
         attributes is not null && attributes.TryGetValue(name, out string[]? values) && values.Length > 0 ? values[0] : null;
 
+    public async Task<Result<IReadOnlyList<string>, Error>> GetCredentialTypesAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        Result<Credential[], Error> credentials = await GetJsonAsync<Credential[]>($"users/{userId}/credentials", cancellationToken);
+        return credentials.IsSuccess
+            ? Result.Success<IReadOnlyList<string>, Error>([.. credentials.Value.Select(credential => credential.Type).Distinct(StringComparer.Ordinal)])
+            : credentials.Error;
+    }
+
+    public async Task<Result<int, Error>> RemoveCredentialsAsync(
+        Guid userId,
+        IReadOnlyCollection<string> types,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(types);
+
+        Result<Credential[], Error> credentials = await GetJsonAsync<Credential[]>($"users/{userId}/credentials", cancellationToken);
+        if (credentials.IsFailure)
+        {
+            return credentials.Error;
+        }
+
+        Credential[] selected = [.. credentials.Value.Where(credential => types.Contains(credential.Type))];
+        foreach (Credential credential in selected)
+        {
+            UnitResult<Error> removed = await SendExpectingSuccessAsync(
+                HttpMethod.Delete, $"users/{userId}/credentials/{Uri.EscapeDataString(credential.Id ?? string.Empty)}", cancellationToken);
+            if (removed.IsFailure)
+            {
+                return removed.Error;
+            }
+        }
+
+        return selected.Length;
+    }
+
+    public Task<UnitResult<Error>> SendActionsEmailAsync(
+        Guid userId,
+        IReadOnlyCollection<string> actions,
+        TimeSpan lifespan,
+        CancellationToken cancellationToken)
+    {
+        string path = QueryHelpers.AddQueryString(
+            $"users/{userId}/execute-actions-email",
+            "lifespan",
+            ((int)lifespan.TotalSeconds).ToString(CultureInfo.InvariantCulture));
+        return SendExpectingSuccessAsync(HttpMethod.Put, path, cancellationToken, JsonContent.Create(actions));
+    }
+
     public async Task<Result<bool, Error>> HasPasswordAsync(Guid userId, CancellationToken cancellationToken)
     {
         Result<Credential[], Error> credentials = await GetJsonAsync<Credential[]>($"users/{userId}/credentials", cancellationToken);
@@ -670,7 +718,7 @@ internal sealed partial class KeycloakAdminClient(
         [property: JsonPropertyName("error")] string? Error,
         [property: JsonPropertyName("details")] Dictionary<string, string>? Details);
 
-    private sealed record Credential([property: JsonPropertyName("type")] string Type);
+    private sealed record Credential([property: JsonPropertyName("type")] string Type, [property: JsonPropertyName("id")] string? Id = null);
 
     // Представление пользователя Admin API (UserRepresentation) — только нужные поля.
     private sealed record UserRepresentation(

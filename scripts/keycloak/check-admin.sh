@@ -85,6 +85,19 @@ me() { curl -s -b "$1" "$API/me/" | python3 -c 'import json,sys; v=json.load(sys
 
 require_service
 
+# На случай прошлого упавшего прогона: 2FA покупателя из раздела 9 (или невыполненное «настроить 2FA») мешала бы
+# всем его входам — убираем мастер-админкой до начала.
+KC="${KC:-http://localhost:${KEYCLOAK_PORT:-8180}}"
+MASTER=$(master_token)
+CUSTOMER_KC_ID=$(curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/sandbox/users?username=79990000001&exact=true" |
+  python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["id"])')
+curl -s -o /dev/null -X PUT -H "Authorization: Bearer $MASTER" -H 'Content-Type: application/json' -d '{"requiredActions":[]}' \
+  "$KC/admin/realms/sandbox/users/$CUSTOMER_KC_ID"
+for CREDENTIAL in $(curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/sandbox/users/$CUSTOMER_KC_ID/credentials" |
+  python3 -c 'import json,sys; print(" ".join(c["id"] for c in json.load(sys.stdin) if c["type"] in ("otp", "recovery-authn-codes")))'); do
+  curl -s -o /dev/null -X DELETE -H "Authorization: Bearer $MASTER" "$KC/admin/realms/sandbox/users/$CUSTOMER_KC_ID/credentials/$CREDENTIAL"
+done
+
 echo "1. Переключение режима (POST /auth/mode)"
 JAR="$WORK/jar"; : > "$JAR"
 check "вход админа 79990000002 (режим customer)" "$(login "$JAR" /me/ 79990000002)" /me/
@@ -241,9 +254,7 @@ TABLET_SID=$(my_sessions "$TABLET" "$CURRENT")
 check "до: access-токен работает" "$(status "$TABLET" GET /me/)" 200
 # Мастер-админка Keycloak удаляет сессию напрямую, мимо нашего API; Keycloak шлёт logout_token на /auth/backchannel-logout.
 KC="${KC:-http://localhost:${KEYCLOAK_PORT:-8180}}"
-ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-$(grep -s '^KEYCLOAK_ADMIN_PASSWORD=' "$(dirname "$0")/../../.env" | cut -d= -f2)}"
-MASTER=$(curl -s -d grant_type=password -d client_id=admin-cli -d "username=${KEYCLOAK_ADMIN:-admin}" --data-urlencode "password=$ADMIN_PASSWORD" \
-  "$KC/realms/master/protocol/openid-connect/token" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("access_token",""))')
+MASTER=$(master_token)
 check "сессия удалена в админке Keycloak" "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer $MASTER" "$KC/admin/realms/sandbox/sessions/$TABLET_SID")" 204
 sleep 1
 check "после: access-токен — 401 (Keycloak сообщил сервису)" "$(status "$TABLET" GET /me/)" 401
@@ -252,7 +263,8 @@ echo "8. Журнал: действия сотрудников и входы"
 ADMIN="$WORK/admin3"; MANAGER="$WORK/manager3"; : > "$ADMIN"; : > "$MANAGER"
 login "$ADMIN" /me/ 1234567890 > /dev/null
 login "$MANAGER" /me/ 0987654321 > /dev/null
-ACTIONS='",".join(sorted({i["action"] for i in r["items"]}))'
+# Только действия разделов 3–5: у покупателя в журнале есть и другие (сброс пароля из раздела 9 прошлых прогонов).
+ACTIONS='",".join(sorted({i["action"] for i in r["items"]} & {"UserAppAccessChanged", "UserRestrictionChanged", "UserRoleChanged"}))'
 check "действия с покупателем записаны (разделы 3–5)" \
   "$(admin_get "$ADMIN" "/auth/admin/audit?objectId=$ID_CUSTOMER&pageSize=100" "$ACTIONS")" \
   "200 UserAppAccessChanged,UserRestrictionChanged,UserRoleChanged"
@@ -278,7 +290,63 @@ check "ошибка входа с причиной" \
   "$(admin_get "$ADMIN" "/auth/admin/login-events?userId=$ID_CUSTOMER&pageSize=100" '[i for i in r["items"] if i["type"] == "LOGIN_ERROR"][0]["error"]')" \
   "200 invalid_user_credentials"
 check "в карточке — последний вход" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER" 'str(r["lastLoginAt"] is not None)')" "200 True"
-for JAR in "$ADMIN" "$MANAGER"; do status "$JAR" POST /auth/logout > /dev/null; done
+
+echo "9. Пароль и 2FA (право users.credentials.manage — только админ проекта)"
+MAILPIT="${MAILPIT:-http://localhost:${MAILPIT_UI_PORT:-8025}}"
+ID_OTP=$(curl -s -b "$ADMIN" "$API/auth/admin/users?search=79990000006" | python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["items"][0]["id"])')
+# post_admin <jar> <метод> <путь> — запрос к API админки без тела; печатает «<код> <hasTwoFactor или код ошибки>»
+post_admin() {
+  curl -s -o "$WORK/admin.json" -w '%{http_code}' -b "$1" -X "$2" "$API$3"
+  printf ' '
+  python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["result"]["hasTwoFactor"] if d.get("result") else d["error"]["messages"][0]["code"])' "$WORK/admin.json"
+}
+# setup_otp <логин> — вход с обязательным действием «настроить 2FA»: секрет — со страницы Keycloak, код — по нему;
+# печатает, куда сервис вернул браузер
+setup_otp() {
+  local jar="$WORK/otp-setup" page="$WORK/page.html" h="$WORK/h" secret
+  : > "$jar"
+  curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" "$API/auth/login?return_to=/me/"
+  curl -s -o "$page" -b "$jar" -c "$jar" "$(header "$h" location)"
+  curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" --data-urlencode "username=$1" --data-urlencode "password=$PASSWORD" "$(form_action "$page")"
+  curl -s -o "$page" -b "$jar" -c "$jar" "$(header "$h" location)"
+  secret=$(python3 -c 'import re,sys; m=re.search(r"name=\"totpSecret\" value=\"([^\"]+)\"", open(sys.argv[1]).read()); print(m.group(1) if m else "")' "$page")
+  [ -n "$secret" ] || { echo "нет страницы настройки 2FA"; return; }
+  curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" --data-urlencode "totp=$(totp "$secret")" --data-urlencode "totpSecret=$secret" \
+    --data-urlencode "userLabel=check-admin" "$(form_action "$page")"
+  curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" "$(header "$h" location)"
+  header "$h" location
+}
+curl -s -o /dev/null -X DELETE "$MAILPIT/api/v1/search?query=to:customer@sandbox.test"
+check "сброс пароля: письмо отправлено" "$(post_admin "$ADMIN" POST "/auth/admin/users/$ID_CUSTOMER/password-reset")" "200 False"
+check "в письме — ссылка Keycloak на смену пароля" "$(for _ in 1 2 3 4 5 6 7 8 9 10; do
+  link=$(curl -s "$MAILPIT/api/v1/search?query=to:customer@sandbox.test" | python3 -c '
+import html,json,re,sys,urllib.request
+m=json.load(sys.stdin)["messages"]
+if m:
+    body=json.load(urllib.request.urlopen(sys.argv[1] + "/api/v1/message/" + m[0]["ID"]))
+    print("yes" if any("action-token" in l for l in re.findall(r"href=\"([^\"]+)\"", body["HTML"] or "")) else "")' "$MAILPIT")
+  [ -n "$link" ] && { echo "$link"; break; }; sleep 1; done)" yes
+check "в карточке — 2FA включена (79990000006)" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_OTP" 'str(r["hasTwoFactor"])')" "200 True"
+check "2FA нет — отключение без изменений" "$(post_admin "$ADMIN" DELETE "/auth/admin/users/$ID_CUSTOMER/two-factor")" "200 False"
+# 2FA вживую: мастер-админка выдаёт покупателю обязательное действие «настроить 2FA», он настраивает приложение-
+# аутентификатор при входе, админ отключает 2FA через наш API.
+MASTER=$(master_token)
+curl -s -o /dev/null -X PUT -H "Authorization: Bearer $MASTER" -H 'Content-Type: application/json' \
+  -d '{"requiredActions":["CONFIGURE_TOTP"]}' "$KC/admin/realms/sandbox/users/$ID_CUSTOMER"
+check "покупатель настроил 2FA при входе" "$(setup_otp 79990000001)" /me/
+check "в карточке — 2FA включена" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER" 'str(r["hasTwoFactor"])')" "200 True"
+check "вход теперь спрашивает код" "$(: > "$WORK/otp-login"; login "$WORK/otp-login" /me/ 79990000001)" "keycloak: осталась форма"
+check "админ отключил 2FA" "$(post_admin "$ADMIN" DELETE "/auth/admin/users/$ID_CUSTOMER/two-factor")" "200 False"
+check "вход снова без кода" "$(: > "$WORK/otp-login"; login "$WORK/otp-login" /me/ 79990000001)" /me/
+check "в журнале — 2FA отключена" \
+  "$(admin_get "$ADMIN" "/auth/admin/audit?objectId=$ID_CUSTOMER&action=UserTwoFactorDisabled&pageSize=1" 'str(r["items"][0]["changes"]["removed"] > 0)')" \
+  "200 True"
+check "себе — нельзя (403)" "$(post_admin "$ADMIN" DELETE "/auth/admin/users/$ID_ADMIN/two-factor")" "403 users.self_credentials"
+check "менеджеру — нельзя (403)" "$(status "$MANAGER" POST "/auth/admin/users/$ID_CUSTOMER/password-reset")" 403
+check "в журнале — запрос сброса пароля" \
+  "$(admin_get "$ADMIN" "/auth/admin/audit?objectId=$ID_CUSTOMER&action=UserPasswordResetRequested&pageSize=1" 'r["items"][0]["changes"]["email"]')" \
+  "200 customer@sandbox.test"
+
 for JAR in "$ADMIN" "$MANAGER"; do status "$JAR" POST /auth/logout > /dev/null; done
 
 summary

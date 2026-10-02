@@ -93,9 +93,9 @@ check "читает события входа (view-events)" "$(admin_api 'event
 check "из клиентов видит только клиенты приложений" "$(curl -s -H "Authorization: Bearer $SA" "$KC/admin/realms/$REALM/clients" | python3 -c 'import json,sys; print(",".join(sorted(c["clientId"] for c in json.load(sys.stdin))))')" account-console,manager-1c,sandbox-api,sandbox-bff
 check "чужой клиент (broker) даже не находит" "$(curl -s -H "Authorization: Bearer $SA" "$KC/admin/realms/$REALM/clients?clientId=broker&search=true")" "[]"
 # Настоящий id broker — мастер-админкой (логин и пароль — из .env), чтобы проверить сам запрет на секрет.
-ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-$(grep -s '^KEYCLOAK_ADMIN_PASSWORD=' "$(dirname "$0")/../../.env" | cut -d= -f2)}"
-MASTER=$(curl -s -d grant_type=password -d client_id=admin-cli -d "username=${KEYCLOAK_ADMIN:-admin}" --data-urlencode "password=$ADMIN_PASSWORD" \
-  "$KC/realms/master/protocol/openid-connect/token" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("access_token",""))')
+# shellcheck source=master-token.sh
+source "$(dirname "$0")/master-token.sh"
+MASTER=$(master_token)
 BROKER_ID=$(curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/clients?clientId=broker" | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["id"])')
 check "секрет чужого клиента не читает" "$(admin_api "clients/$BROKER_ID/client-secret")" 403
 check "не меняет настройки realm" "$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H "Authorization: Bearer $SA" \
@@ -109,13 +109,13 @@ composites() { curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REA
   | python3 -c 'import json,sys; print(",".join(sorted(r["name"] for r in json.load(sys.stdin))))'; }
 check "customer = profile.view" "$(composites customer)" profile.view
 check "manager = просмотр и блокировка пользователей" "$(composites manager)" profile.view,users.block,users.view
-check "admin = все права" "$(composites admin)" audit.view,profile.view,roles.manage,users.block,users.roles.manage,users.sessions.manage,users.view
+check "admin = все права" "$(composites admin)" audit.view,profile.view,roles.manage,users.block,users.credentials.manage,users.roles.manage,users.sessions.manage,users.view
 check "права помечены kind=permission" "$(curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/clients/$API_ID/roles?briefRepresentation=false" \
   | python3 -c 'import json,sys; r=json.load(sys.stdin); print(",".join(sorted(x["name"] for x in r if x.get("attributes",{}).get("kind")==["permission"])))')" \
-  audit.view,profile.view,roles.manage,users.block,users.roles.manage,users.sessions.manage,users.view
+  audit.view,profile.view,roles.manage,users.block,users.credentials.manage,users.roles.manage,users.sessions.manage,users.view
 check "в role токена — только роли, без прав" "$(token 71234567890 | claim role)" admin,customer
 check "permissions — права активного режима: админ в режиме admin" "$(token 71234567890 | claim permissions)" \
-  audit.view,profile.view,roles.manage,users.block,users.roles.manage,users.sessions.manage,users.view
+  audit.view,profile.view,roles.manage,users.block,users.credentials.manage,users.roles.manage,users.sessions.manage,users.view
 check "админ в режиме customer — только права покупателя" "$(token 79990000002 | claim permissions)" profile.view
 check "менеджер в режиме manager" "$(token 70987654321 | claim permissions)" profile.view,users.block,users.view
 

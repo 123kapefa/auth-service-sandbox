@@ -7,6 +7,8 @@ public static class AuditActions
     public const string USER_ROLE_CHANGED = "UserRoleChanged";
     public const string USER_APP_ACCESS_CHANGED = "UserAppAccessChanged";
     public const string USER_LOGGED_OUT_EVERYWHERE = "UserLoggedOutEverywhere";
+    public const string USER_PASSWORD_RESET_REQUESTED = "UserPasswordResetRequested";
+    public const string USER_TWO_FACTOR_DISABLED = "UserTwoFactorDisabled";
 
     public const string PERMISSION_CREATED = "PermissionCreated";
     public const string PERMISSION_DELETED = "PermissionDeleted";

@@ -303,6 +303,7 @@
                 "users.block",
                 "users.roles.manage",
                 "users.sessions.manage",
+                "users.credentials.manage",
                 "audit.view",
                 "roles.manage"
               ]
@@ -376,6 +377,20 @@
         {
           "name": "users.sessions.manage",
           "description": "«Выйти везде» за пользователя",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "users.credentials.manage",
+          "description": "Сброс пароля и 2FA",
           "composite": false,
           "clientRole": true,
           "attributes": {
