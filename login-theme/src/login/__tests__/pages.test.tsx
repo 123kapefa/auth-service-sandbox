@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import KcPage from "../KcPage";
 import { getKcContextMock } from "../mocks";
 
@@ -68,23 +68,55 @@ describe("страница входа", () => {
 });
 
 describe("вход по коду", () => {
-  it("куда отправлен код и через сколько можно повторить", async () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("куда отправлен код; «ещё раз» — после паузы, отсчёт идёт", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     render(
-      <KcPage kcContext={getKcContextMock({ pageId: "sandbox-code-login.ftl", overrides: {} })} />,
+      <KcPage
+        kcContext={getKcContextMock({
+          pageId: "sandbox-code-login.ftl",
+          overrides: { codeResendAfter: "2" },
+        })}
+      />,
     );
 
     await waitFor(() =>
       expect(screen.getByText("Отправили код в SMS на +7 999 *** ** 01.")).toBeInTheDocument(),
     );
     expect(screen.getByLabelText("Код из SMS")).toHaveAttribute("autocomplete", "one-time-code");
-    expect(screen.getByText("Новый код можно запросить через 42 с.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Отправить код ещё раз" })).toHaveAttribute(
-      "name",
-      "resend",
-    );
+    expect(screen.getByText("Новый код можно запросить через 2 с.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Отправить код ещё раз" })).toBeDisabled();
+
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(screen.getByText("Новый код можно запросить через 1 с.")).toBeInTheDocument();
+
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(screen.queryByText(/Новый код можно запросить/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Отправить код ещё раз" })).toBeEnabled();
   });
 
-  it("письмом — свои подписи", async () => {
+  it("в поле — только цифры и не больше длины кода; набрали все — форма уходит сама", async () => {
+    const submit = vi
+      .spyOn(HTMLFormElement.prototype, "requestSubmit")
+      .mockImplementation(() => undefined);
+    render(
+      <KcPage kcContext={getKcContextMock({ pageId: "sandbox-code-login.ftl", overrides: {} })} />,
+    );
+    const code = await screen.findByLabelText("Код из SMS");
+
+    await userEvent.type(code, "12a3");
+    expect(code).toHaveValue("123");
+    expect(screen.getByRole("button", { name: "Вход" })).toBeDisabled();
+    expect(submit).not.toHaveBeenCalled();
+
+    await userEvent.type(code, "45678");
+    expect(code).toHaveValue("123456");
+    await waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    submit.mockRestore();
+  });
+
+  it("письмом — свои подписи; паузы нет — кнопка «ещё раз» доступна", async () => {
     render(
       <KcPage
         kcContext={getKcContextMock({
@@ -103,5 +135,6 @@ describe("вход по коду", () => {
     );
     expect(screen.getByLabelText("Код из письма")).toBeInTheDocument();
     expect(screen.queryByText(/Новый код можно запросить/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Отправить код ещё раз" })).toBeEnabled();
   });
 });

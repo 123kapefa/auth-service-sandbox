@@ -18,6 +18,8 @@ export type KcContextExtensionPerPage = {
     codeTarget: string;
     /** Через сколько секунд можно запросить новый код ("0" — уже можно). */
     codeResendAfter: string;
+    /** Сколько цифр в коде (политика плагина). */
+    codeLength: string;
   };
 };
 

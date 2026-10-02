@@ -185,7 +185,8 @@ public final class CodeLoginAuthenticator implements Authenticator {
             .setExecution(context.getExecution().getId())
             .setAttribute("codeChannel", target.channel().name())
             .setAttribute("codeTarget", target.display())
-            .setAttribute("codeResendAfter", Long.toString(resendAfter));
+            .setAttribute("codeResendAfter", Long.toString(resendAfter))
+            .setAttribute("codeLength", Integer.toString(rules.codeLength()));
     }
 
     @Override

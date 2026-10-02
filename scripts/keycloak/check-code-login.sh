@@ -113,6 +113,7 @@ echo "2. Вход по коду существующего пользовате�
 JAR="$WORK/jar2"; : > "$JAR"
 SCREEN=$(code_start_fresh "$JAR" "8 (999) 000-00-03")
 check "экран кода: «$SCREEN»" "$SCREEN" "Отправили код в SMS на +79990000003."
+check "экран знает длину кода и паузу до повтора" "$(kc "$WORK/page.html" 'c["codeLength"] + " " + str(0 < int(c["codeResendAfter"]) <= 60)')" "6 True"
 check "неверный код отклонён" "$(code_submit "$JAR" 000000)" "keycloak: Неверный код. Осталось попыток: 4."
 check "повтор раньше 60 с — не отправляется" "$(starts "$(code_send_again "$JAR")" "Код уже отправлен")" "Код уже отправлен"
 check "верный код → вход и возврат на return_to" "$(code_submit "$JAR" "$(sms_code 79990000003)")" /me/

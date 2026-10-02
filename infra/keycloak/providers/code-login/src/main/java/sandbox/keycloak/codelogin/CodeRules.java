@@ -51,6 +51,11 @@ public final class CodeRules {
         record NoActiveCode() implements VerifyResult { }
     }
 
+    /** Сколько цифр в коде — экрану кода (подсказка и автоотправка). */
+    public int codeLength() {
+        return policy.length();
+    }
+
     public SendResult send(CodeState current) {
         Instant now = clock.instant();
 

@@ -13,6 +13,7 @@ export const { getKcContextMock } = createGetKcContextMock({
       codeChannel: "SMS" as "SMS" | "EMAIL",
       codeTarget: "+7 999 *** ** 01",
       codeResendAfter: "42",
+      codeLength: "6",
     },
   } satisfies KcContextExtensionPerPage,
   overrides: {
