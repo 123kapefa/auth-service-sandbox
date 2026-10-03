@@ -75,7 +75,7 @@ describe("вход по коду", () => {
     render(
       <KcPage
         kcContext={getKcContextMock({
-          pageId: "sandbox-code-login.ftl",
+          pageId: "platform-code-login.ftl",
           overrides: { codeResendAfter: "2" },
         })}
       />,
@@ -101,7 +101,7 @@ describe("вход по коду", () => {
       .spyOn(HTMLFormElement.prototype, "requestSubmit")
       .mockImplementation(() => undefined);
     render(
-      <KcPage kcContext={getKcContextMock({ pageId: "sandbox-code-login.ftl", overrides: {} })} />,
+      <KcPage kcContext={getKcContextMock({ pageId: "platform-code-login.ftl", overrides: {} })} />,
     );
     const code = await screen.findByLabelText("Код из SMS");
 
@@ -122,7 +122,7 @@ describe("вход по коду", () => {
       .spyOn(HTMLFormElement.prototype, "requestSubmit")
       .mockImplementation(() => undefined);
     render(
-      <KcPage kcContext={getKcContextMock({ pageId: "sandbox-code-login.ftl", overrides: {} })} />,
+      <KcPage kcContext={getKcContextMock({ pageId: "platform-code-login.ftl", overrides: {} })} />,
     );
     const code = await screen.findByLabelText("Код из SMS");
 
@@ -137,7 +137,7 @@ describe("вход по коду", () => {
     render(
       <KcPage
         kcContext={getKcContextMock({
-          pageId: "sandbox-code-login.ftl",
+          pageId: "platform-code-login.ftl",
           overrides: {
             codeChannel: "EMAIL",
             codeTarget: "c***@sandbox.test",
@@ -188,7 +188,7 @@ describe("отправка формы", () => {
     render(
       <KcPage
         kcContext={getKcContextMock({
-          pageId: "sandbox-code-login.ftl",
+          pageId: "platform-code-login.ftl",
           overrides: { codeResendAfter: "0" },
         })}
       />,

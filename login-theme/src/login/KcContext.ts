@@ -11,7 +11,7 @@ export type KcContextExtension = {
  * аутентификатор (form.setAttribute). Keycloakify по ключу собирает .ftl в тему.
  */
 export type KcContextExtensionPerPage = {
-  "sandbox-code-login.ftl": {
+  "platform-code-login.ftl": {
     /** SMS или EMAIL — куда ушёл код. */
     codeChannel: "SMS" | "EMAIL";
     /** Куда отправлен код — как показать пользователю. */

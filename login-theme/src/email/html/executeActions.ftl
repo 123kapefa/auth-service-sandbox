@@ -4,9 +4,9 @@
 </#outputformat>
 <#import "template.ftl" as layout>
 <@layout.emailLayout>
-<@layout.title msg("sandboxExecuteActionsTitle")/>
-<@layout.paragraph msg("sandboxExecuteActionsText", realmName, requiredActionsText)/>
-<@layout.button link msg("sandboxExecuteActionsButton")/>
-<@layout.note msg("sandboxEmailLinkExpires", linkExpirationFormatter(linkExpiration))/>
-<@layout.note msg("sandboxExecuteActionsIgnore")/>
+<@layout.title msg("platformExecuteActionsTitle")/>
+<@layout.paragraph msg("platformExecuteActionsText", realmName, requiredActionsText)/>
+<@layout.button link msg("platformExecuteActionsButton")/>
+<@layout.note msg("platformEmailLinkExpires", linkExpirationFormatter(linkExpiration))/>
+<@layout.note msg("platformExecuteActionsIgnore")/>
 </@layout.emailLayout>

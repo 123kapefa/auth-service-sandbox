@@ -131,13 +131,13 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
             </button>
             {/* Вход по коду: пароль не нужен, номер или почта — из поля выше. */}
             <button
-              id="sandbox-code-login"
+              id="platform-code-login"
               name="codeLogin"
               type="submit"
               disabled={submitting}
               className={kcClsx("kcButtonClass", "kcButtonSecondaryClass")}
             >
-              {msgStr("sandboxCodeLoginDo")}
+              {msgStr("platformCodeLoginDo")}
             </button>
           </div>
         </form>

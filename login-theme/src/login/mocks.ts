@@ -5,11 +5,11 @@ import { kcEnvDefaults } from "../kc.gen";
 /** Макеты контекста Keycloak: npm run dev (?page=login.ftl) и тесты — страницы без Keycloak. */
 export const { getKcContextMock } = createGetKcContextMock({
   kcContextExtension: {
-    themeName: "sandbox",
+    themeName: "platform",
     properties: { ...kcEnvDefaults },
   } satisfies KcContextExtension,
   kcContextExtensionPerPage: {
-    "sandbox-code-login.ftl": {
+    "platform-code-login.ftl": {
       codeChannel: "SMS" as "SMS" | "EMAIL",
       codeTarget: "+7 999 *** ** 01",
       codeResendAfter: "42",
@@ -27,7 +27,7 @@ export const { getKcContextMock } = createGetKcContextMock({
     },
     realm: { displayName: "Auth Sandbox", registrationEmailAsUsername: false },
   },
-  // Как в realm sandbox: вход по телефону или почте, сброс пароля, без регистрации и «запомнить меня».
+  // Как в демо-проекте (realm sandbox): вход по телефону или почте, сброс пароля, без регистрации и «запомнить меня».
   overridesPerPage: {
     "login.ftl": {
       realm: {

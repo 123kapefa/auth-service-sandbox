@@ -21,7 +21,7 @@
           </td>
         </tr>
         <tr>
-          <td style="padding:16px 0 0;text-align:center;font-size:12px;color:#677383;">${msg("sandboxEmailFooter")}</td>
+          <td style="padding:16px 0 0;text-align:center;font-size:12px;color:#677383;">${msg("platformEmailFooter")}</td>
         </tr>
       </table>
     </td>
@@ -52,5 +52,5 @@
     </td>
   </tr>
 </table>
-<p style="margin:0 0 12px;font-size:12px;color:#677383;">${msg("sandboxEmailLinkFallback")}<br><a href="${href}" target="_blank" style="color:#1e49b7;word-break:break-all;">${href}</a></p>
+<p style="margin:0 0 12px;font-size:12px;color:#677383;">${msg("platformEmailLinkFallback")}<br><a href="${href}" target="_blank" style="color:#1e49b7;word-break:break-all;">${href}</a></p>
 </#macro>

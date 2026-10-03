@@ -84,7 +84,7 @@ services:
       - keycloak_postgres_data:/var/lib/postgresql/data
 
   keycloak:
-    # Свой образ: Keycloak 26.4.7 + плагин «вход по коду» и тема входа sandbox (Keycloakify) — собираются в Docker.
+    # Свой образ: Keycloak 26.4.7 + плагин «вход по коду» и тема входа platform (Keycloakify) — собираются в Docker.
     build:
       context: .
       dockerfile: infra/keycloak/Dockerfile

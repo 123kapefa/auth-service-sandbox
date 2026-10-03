@@ -76,7 +76,7 @@ fresh_totp() {
 # kc <html> <python-выражение над c> — значение из kcContext (нет контекста — пусто); c["templateName"] — страница.
 kc() { python3 "$(dirname "${BASH_SOURCE[0]}")/kc_context.py" "$1" "$2"; }
 
-# kc_page <html> — какая страница Keycloak: login.ftl, login-otp.ftl, sandbox-code-login.ftl… (пусто — не страница входа)
+# kc_page <html> — какая страница Keycloak: login.ftl, login-otp.ftl, platform-code-login.ftl… (пусто — не страница входа)
 kc_page() { kc "$1" 'c["templateName"]'; }
 
 # form_action <html> — адрес отправки формы страницы входа (у всех форм страницы — url.loginAction)
@@ -99,7 +99,7 @@ code_start() {
 # code_screen <html> — «куда отправили» с экрана кода (теми же словами, что страница темы: из codeChannel и
 # codeTarget); не экран кода — ошибка со страницы
 code_screen() {
-  if [ "$(kc_page "$1")" = sandbox-code-login.ftl ]; then
+  if [ "$(kc_page "$1")" = platform-code-login.ftl ]; then
     kc "$1" '("Отправили код письмом на " if c["codeChannel"] == "EMAIL" else "Отправили код в SMS на ") + c["codeTarget"] + "."'
   else
     echo "ошибка: $(feedback "$1" | sed 's/^$/нет экрана кода/')"
@@ -141,7 +141,7 @@ code_send_again() {
 sms_code() {
   local i code
   for i in 1 2 3 4 5 6 7 8 9 10; do
-    code=$(docker compose logs keycloak --since 10m 2>/dev/null | grep "\[SANDBOX SMS\] +$1: код входа" | tail -1 | grep -o '[0-9]\{6\}$')
+    code=$(docker compose logs keycloak --since 10m 2>/dev/null | grep "\[DEV SMS\] +$1: код входа" | tail -1 | grep -o '[0-9]\{6\}$')
     [ -n "$code" ] && { echo "$code"; return; }
     sleep 1
   done

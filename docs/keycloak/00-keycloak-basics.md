@@ -84,7 +84,7 @@ Client — приложение, зарегистрированное в Keycloa
 **Protocol mapper** — правило «возьми X у пользователя и положи в claim Y».
 **Client scope** — набор мапперов, подключаемый к клиентам.
 
-Scope `sandbox-contract` (*Client scopes → sandbox-contract → Mappers*):
+Scope `platform-contract` (*Client scopes → platform-contract → Mappers*):
 
 | Маппер | Тип | Claim |
 |---|---|---|

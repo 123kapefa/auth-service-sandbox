@@ -1,9 +1,9 @@
 <#ftl output_format="plainText">
-${msg("sandboxEmailVerificationTitle")}
+${msg("platformEmailVerificationTitle")}
 
-${msg("sandboxEmailVerificationText", realmName)}
+${msg("platformEmailVerificationText", realmName)}
 
 ${link}
 
-${msg("sandboxEmailLinkExpires", linkExpirationFormatter(linkExpiration))}
-${msg("sandboxEmailVerificationIgnore")}
+${msg("platformEmailLinkExpires", linkExpirationFormatter(linkExpiration))}
+${msg("platformEmailVerificationIgnore")}

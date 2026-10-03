@@ -27,13 +27,13 @@
     "en"
   ],
   "defaultLocale": "ru",
-  "loginTheme": "sandbox",
-  "emailTheme": "sandbox",
-  "browserFlow": "sandbox browser",
+  "loginTheme": "platform",
+  "emailTheme": "platform",
+  "browserFlow": "platform browser",
   "webAuthnPolicyPasswordlessPasskeysEnabled": true,
   "authenticationFlows": [
     {
-      "alias": "sandbox browser",
+      "alias": "platform browser",
       "description": "Вход в браузере: способ входа, затем — открыт ли доступ к этому приложению",
       "providerId": "basic-flow",
       "topLevel": true,
@@ -44,19 +44,19 @@
           "requirement": "REQUIRED",
           "userSetupAllowed": false,
           "priority": 10,
-          "flowAlias": "sandbox who"
+          "flowAlias": "platform who"
         },
         {
           "authenticatorFlow": false,
           "requirement": "REQUIRED",
           "userSetupAllowed": false,
-          "authenticator": "sandbox-app-access-check",
+          "authenticator": "platform-app-access-check",
           "priority": 20
         }
       ]
     },
     {
-      "alias": "sandbox who",
+      "alias": "platform who",
       "description": "Кто вы: живая сессия, внешний провайдер или форма входа",
       "providerId": "basic-flow",
       "topLevel": false,
@@ -81,12 +81,12 @@
           "requirement": "ALTERNATIVE",
           "userSetupAllowed": false,
           "priority": 30,
-          "flowAlias": "sandbox forms"
+          "flowAlias": "platform forms"
         }
       ]
     },
     {
-      "alias": "sandbox forms",
+      "alias": "platform forms",
       "description": "Телефон или почта + пароль (или «Войти по коду»), затем 2FA, если пользователь её включил",
       "providerId": "basic-flow",
       "topLevel": false,
@@ -96,7 +96,7 @@
           "authenticatorFlow": false,
           "requirement": "REQUIRED",
           "userSetupAllowed": false,
-          "authenticator": "sandbox-password-login",
+          "authenticator": "platform-password-login",
           "priority": 10
         },
         {
@@ -104,19 +104,19 @@
           "requirement": "CONDITIONAL",
           "userSetupAllowed": false,
           "priority": 20,
-          "flowAlias": "sandbox code login"
+          "flowAlias": "platform code login"
         },
         {
           "authenticatorFlow": true,
           "requirement": "CONDITIONAL",
           "userSetupAllowed": false,
           "priority": 30,
-          "flowAlias": "sandbox conditional 2FA"
+          "flowAlias": "platform conditional 2FA"
         }
       ]
     },
     {
-      "alias": "sandbox code login",
+      "alias": "platform code login",
       "description": "Вход по коду из SMS — только если на форме нажали «Войти по коду»",
       "providerId": "basic-flow",
       "topLevel": false,
@@ -126,20 +126,20 @@
           "authenticatorFlow": false,
           "requirement": "REQUIRED",
           "userSetupAllowed": false,
-          "authenticator": "sandbox-condition-code-requested",
+          "authenticator": "platform-condition-code-requested",
           "priority": 10
         },
         {
           "authenticatorFlow": false,
           "requirement": "REQUIRED",
           "userSetupAllowed": false,
-          "authenticator": "sandbox-code-login",
+          "authenticator": "platform-code-login",
           "priority": 20
         }
       ]
     },
     {
-      "alias": "sandbox conditional 2FA",
+      "alias": "platform conditional 2FA",
       "description": "2FA только для тех, кто её настроил; вошедшим по passkey не нужна",
       "providerId": "basic-flow",
       "topLevel": false,
@@ -157,7 +157,7 @@
           "requirement": "REQUIRED",
           "userSetupAllowed": false,
           "authenticator": "conditional-credential",
-          "authenticatorConfig": "sandbox-conditional-credential",
+          "authenticatorConfig": "platform-conditional-credential",
           "priority": 20
         },
         {
@@ -179,7 +179,7 @@
   ],
   "authenticatorConfig": [
     {
-      "alias": "sandbox-conditional-credential",
+      "alias": "platform-conditional-credential",
       "config": {
         "credentials": "webauthn-passwordless"
       }
@@ -747,7 +747,7 @@
   },
   "clientScopes": [
     {
-      "name": "sandbox-contract",
+      "name": "platform-contract",
       "protocol": "openid-connect",
       "description": "Контракт токена: role, available_roles, active_mode, phone, aud",
       "attributes": {
@@ -758,7 +758,7 @@
         {
           "name": "роли приложения (role, available_roles)",
           "protocol": "openid-connect",
-          "protocolMapper": "sandbox-app-roles",
+          "protocolMapper": "platform-app-roles",
           "consentRequired": false,
           "config": {
             "roles.client": "sandbox-api",
@@ -826,7 +826,7 @@
         {
           "name": "роли приложения (role, available_roles, permissions)",
           "protocol": "openid-connect",
-          "protocolMapper": "sandbox-app-roles",
+          "protocolMapper": "platform-app-roles",
           "consentRequired": false,
           "config": {
             "roles.client": "manager-1c",
@@ -943,7 +943,7 @@
     }
   ],
   "defaultDefaultClientScopes": [
-    "sandbox-contract",
+    "platform-contract",
     "openid-min"
   ],
   "clients": [
@@ -996,7 +996,7 @@
       },
       "fullScopeAllowed": true,
       "defaultClientScopes": [
-        "sandbox-contract",
+        "platform-contract",
         "openid-min"
       ],
       "optionalClientScopes": []
@@ -1010,7 +1010,7 @@
       "directAccessGrantsEnabled": true,
       "fullScopeAllowed": true,
       "defaultClientScopes": [
-        "sandbox-contract",
+        "platform-contract",
         "openid-min"
       ],
       "optionalClientScopes": []
@@ -1029,7 +1029,7 @@
       ],
       "optionalClientScopes": [],
       "attributes": {
-        "sandbox.app": "manager-1c"
+        "platform.app": "manager-1c"
       }
     },
     {
@@ -1821,11 +1821,11 @@
   "clientProfiles": {
     "profiles": [
       {
-        "name": "sandbox-app-access",
+        "name": "platform-app-access",
         "description": "Не выдавать токены приложения тем, у кого закрыт доступ к нему (роль access-denied клиента)",
         "executors": [
           {
-            "executor": "sandbox-app-access",
+            "executor": "platform-app-access",
             "configuration": {}
           }
         ]
@@ -1835,7 +1835,7 @@
   "clientPolicies": {
     "policies": [
       {
-        "name": "sandbox-app-access",
+        "name": "platform-app-access",
         "description": "Доступ к приложению — для всех клиентов realm",
         "enabled": true,
         "conditions": [
@@ -1845,7 +1845,7 @@
           }
         ],
         "profiles": [
-          "sandbox-app-access"
+          "platform-app-access"
         ]
       }
     ]

@@ -5,7 +5,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>sandbox.keycloak</groupId>
+  <groupId>platform.keycloak</groupId>
   <artifactId>code-login</artifactId>
   <version>0.1.0</version>
   <packaging>jar</packaging>

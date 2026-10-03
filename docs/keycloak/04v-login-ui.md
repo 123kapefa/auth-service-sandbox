@@ -24,7 +24,7 @@ Keycloakify 11: страницы — React-компоненты, при сбор
 
 | Что | Как |
 |---|---|
-| Свои страницы | `login.ftl` — телефон или почта и пароль, «Войти по коду», «Войти с ключом доступа»; `sandbox-code-login.ftl` — экран кода плагина |
+| Свои страницы | `login.ftl` — телефон или почта и пароль, «Войти по коду», «Войти с ключом доступа»; `platform-code-login.ftl` — экран кода плагина |
 | Остальные страницы Keycloak | стандартные компоненты Keycloakify в нашем каркасе (`Template.tsx`) с нашими классами (`classes.ts`): 2FA (ввод и настройка), коды восстановления, ключ доступа, сброс и новый пароль, выбор способа входа, «Страница устарела», информация и ошибки |
 | Тексты | `i18n.ts`: тексты плагина (ключи `form.setError(...)` сервера), тексты realm, которых нет у страниц в браузере, и около 40 ключей Keycloak без русского перевода |
 | Атрибуты плагина | приходят в `kcContext` страницы сами (`codeChannel`, `codeTarget`, `codeResendAfter`, `codeLength`) — нужны только типы |
@@ -39,14 +39,14 @@ Keycloakify 11: страницы — React-компоненты, при сбор
 
 ### Тема писем (login-theme/src/email/)
 
-Шаблоны FreeMarker без React (Keycloakify кладёт их в тот же jar как есть), `emailTheme: sandbox` в realm.
+Шаблоны FreeMarker без React (Keycloakify кладёт их в тот же jar как есть), `emailTheme: platform` в realm.
 
 | Письмо | Шаблон | Когда |
 |---|---|---|
 | Сброс пароля | `password-reset.ftl` | «Забыли пароль?» на странице входа |
 | Обновите учётную запись | `executeActions.ftl` | админка: «Сбросить пароль» (`execute-actions-email`) |
 | Подтвердите почту | `email-verification.ftl` | подтверждение адреса |
-| Код для входа | `sandbox-login-code.ftl` | вход по коду на почту (плагин) |
+| Код для входа | `platform-login-code.ftl` | вход по коду на почту (плагин) |
 | Остальные (уведомления, приглашения) | шаблоны Keycloak | в нашем каркасе `template.ftl` |
 
 Каркас — таблицы и стили в атрибутах: почтовые программы не читают `<style>` и плохо понимают flex. Под кнопкой —
@@ -60,7 +60,7 @@ Keycloakify 11: страницы — React-компоненты, при сбор
 ### Сборка
 
 `infra/keycloak/Dockerfile`, стадия `node:22-alpine` с Java и Maven: `npm ci`, `npm run build-keycloak-theme` →
-`sandbox-login-theme.jar` в `/opt/keycloak/providers/`. Node, Java и Maven на машине не нужны. Старая тема
+`platform-login-theme.jar` в `/opt/keycloak/providers/`. Node, Java и Maven на машине не нужны. Старая тема
 `infra/keycloak/themes/sandbox` (FreeMarker поверх `keycloak.v2`, этапы 3а и 5) удалена.
 
 ## Сравнение с боевым сервисом
@@ -86,7 +86,7 @@ docker compose up -d --build --wait keycloak redis mailpit auth-service
 scripts/keycloak/check-stand.sh && scripts/keycloak/check-login.sh && scripts/keycloak/check-login-methods.sh && scripts/keycloak/check-code-login.sh
 ```
 
-Что именно про тему: страница входа — тема `sandbox`; экран кода знает длину кода и паузу до повтора; письмо с
+Что именно про тему: страница входа — тема `platform`; экран кода знает длину кода и паузу до повтора; письмо с
 кодом — HTML по шаблону темы с этим кодом; письмо сброса — по нашему шаблону; ссылка из админки — письмо
 «Обновите учётную запись» (`check-admin.sh`). Без темы писем у realm эти проверки падают.
 
@@ -126,7 +126,7 @@ Mailpit, http://localhost:8025.
 - **Обновление Keycloak** может потребовать обновления Keycloakify (типы `kcContext` страниц).
 - **Стандартные страницы** — компоненты Keycloakify: разметка их, оформление — наше через классы и стили
   `#kc-content`. Свои версии — только для страницы входа и экрана кода.
-- **Письмо с кодом зависит от темы писем**: без `emailTheme: sandbox` код на почту не уйдёт (экран покажет «Не
+- **Письмо с кодом зависит от темы писем**: без `emailTheme: platform` код на почту не уйдёт (экран покажет «Не
   удалось отправить код»).
 - **Одна тема**: оформление под приложение (логотип, цвета по `client_id`) — следующий шаг, не сделан.
 - **Нет E2E-тестов в браузере** — Vitest на страницы, скрипты на путь через стенд, просмотр глазами.

@@ -1,10 +1,10 @@
 <#ftl output_format="plainText">
 <#assign requiredActionsText><#if requiredActions??><#list requiredActions><#items as reqActionItem>${msg("requiredAction.${reqActionItem}")}<#sep>, </#sep></#items></#list></#if></#assign>
-${msg("sandboxExecuteActionsTitle")}
+${msg("platformExecuteActionsTitle")}
 
-${msg("sandboxExecuteActionsText", realmName, requiredActionsText)}
+${msg("platformExecuteActionsText", realmName, requiredActionsText)}
 
 ${link}
 
-${msg("sandboxEmailLinkExpires", linkExpirationFormatter(linkExpiration))}
-${msg("sandboxExecuteActionsIgnore")}
+${msg("platformEmailLinkExpires", linkExpirationFormatter(linkExpiration))}
+${msg("platformExecuteActionsIgnore")}

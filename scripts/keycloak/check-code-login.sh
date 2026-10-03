@@ -13,7 +13,7 @@ source "$(dirname "$0")/lib.sh"
 MAILPIT="${MAILPIT:-http://localhost:${MAILPIT_UI_PORT:-8025}}"
 
 # sms_count <логин> — сколько «SMS» ушло на номер за 10 минут
-sms_count() { docker compose logs keycloak --since 10m 2>/dev/null | grep -c "\[SANDBOX SMS\] +$1: код входа"; }
+sms_count() { docker compose logs keycloak --since 10m 2>/dev/null | grep -c "\[DEV SMS\] +$1: код входа"; }
 
 # mail_code <адрес> — код из последнего письма на адрес (Mailpit), ждём до 10 секунд
 mail_code() {
@@ -52,9 +52,9 @@ echo "1. На форме входа — кнопка «Войти по коду�
 JAR="$WORK/jar"; : > "$JAR"
 curl -s -o /dev/null -D "$WORK/h" -b "$JAR" -c "$JAR" "$API/auth/login?return_to=/me/"
 # Кнопку рисует тема в браузере (её проверяют тесты login-theme); здесь — что страница входа из нашей темы.
-check "страница входа — тема sandbox" \
+check "страница входа — тема platform" \
   "$(curl -s -o "$WORK/page.html" -b "$JAR" -c "$JAR" "$(header "$WORK/h" location)"; kc "$WORK/page.html" 'c["templateName"] + " " + c["url"]["resourcesUrl"].split("/")[-1]')" \
-  "login.ftl sandbox"
+  "login.ftl platform"
 
 echo "2. Вход по коду существующего пользователя (номер как набрали, без скрипта темы)"
 JAR="$WORK/jar2"; : > "$JAR"
@@ -94,7 +94,7 @@ SCREEN=$(code_start_fresh "$JAR" " Customer@Sandbox.test ")
 check "экран кода: «$SCREEN»" "$SCREEN" "Отправили код письмом на customer@sandbox.test."
 check "письмо «Код для входа» пришло" "$(mail_subject customer@sandbox.test)" "Код для входа"
 CODE=$(mail_code customer@sandbox.test)
-# Письмо — шаблон темы писем (sandbox-login-code.ftl): HTML-часть с кодом и подписью темы.
+# Письмо — шаблон темы писем (platform-login-code.ftl): HTML-часть с кодом и подписью темы.
 check "письмо с кодом — по шаблону темы (HTML с кодом)" "$(mail_html_has customer@sandbox.test "$CODE")" yes
 check "в письме — подпись темы" "$(mail_html_has customer@sandbox.test "отвечать на него не нужно")" yes
 check "верный код из письма → вход" "$(code_submit "$JAR" "$CODE")" /me/

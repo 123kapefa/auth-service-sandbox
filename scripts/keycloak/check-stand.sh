@@ -71,7 +71,7 @@ AUTH_URL="$KC/realms/$REALM/protocol/openid-connect/auth?client_id=sandbox-bff&r
 # Keycloak отдаёт нашу тему с нужными настройками (kcContext страницы).
 LOGIN_PAGE="$(mktemp)"; curl -s -o "$LOGIN_PAGE" "$AUTH_URL"
 page() { python3 "$(dirname "$0")/kc_context.py" "$LOGIN_PAGE" "$1"; }
-check "страница входа — тема sandbox (Keycloakify)" "$(page 'c["templateName"] + " " + c["url"]["resourcesUrl"].split("/")[-1]')" "login.ftl sandbox"
+check "страница входа — тема platform (Keycloakify)" "$(page 'c["templateName"] + " " + c["url"]["resourcesUrl"].split("/")[-1]')" "login.ftl platform"
 SCRIPT=$(grep -o 'src="[^"]*/assets/index-[^"]*\.js"' "$LOGIN_PAGE" | head -1 | cut -d'"' -f2)
 check "скрипт темы отдаётся" "$(curl -s -o /dev/null -w '%{http_code} %{content_type}' "$KC$SCRIPT" | cut -d';' -f1)" "200 text/javascript"
 check "язык по умолчанию — русский" "$(page 'c["locale"]["currentLanguageTag"]')" ru

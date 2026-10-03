@@ -25,7 +25,7 @@
 | `KC_HOSTNAME=http://localhost:8180` | от этого адреса зависит `iss`. Браузер и приложения должны видеть один адрес |
 | Секрет клиента — плейсхолдер `${SANDBOX_BFF_CLIENT_SECRET}` в JSON | импорт подставляет переменные окружения. В git нет секрета, в проде значение придёт из хранилища |
 | Роли — client roles `sandbox-api` | в токен не попадают служебные роли Keycloak |
-| Scope `sandbox-contract` по умолчанию у всех клиентов | любой токен realm соответствует контракту |
+| Scope `platform-contract` по умолчанию у всех клиентов | любой токен realm соответствует контракту |
 | Events включены в JSON | журнал нужен на этапе 4, и он должен работать без ручной настройки |
 
 ## Как проверить
@@ -65,7 +65,7 @@ curl -s -d grant_type=password -d client_id=dev-cli -d username=79990000002 -d '
 2. *Users* → `79990000002` → вкладки *Attributes*, *Role mapping*, *Sessions*.
 3. *Clients → sandbox-bff → Client scopes → Evaluate* → пользователь `79990000003` →
    *Generated access token*. Сравните с таблицей мапперов в [00-keycloak-basics.md](00-keycloak-basics.md).
-4. *Client scopes → sandbox-contract → Mappers → active_mode* — как атрибут становится claim.
+4. *Client scopes → platform-contract → Mappers → active_mode* — как атрибут становится claim.
 5. *Users → 79990000001* → выключить *Enabled* → повторить curl из «Как проверить» с этим
    логином: ответ `Account disabled`. Включить обратно.
 6. *Events → User events* — видны входы и ошибки, которые вы только что сделали.

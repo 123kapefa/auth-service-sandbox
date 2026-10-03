@@ -40,7 +40,7 @@ export default function KcPage({ kcContext }: { kcContext: KcContext }) {
                 doUseDefaultCss={false}
               />
             );
-          case "sandbox-code-login.ftl":
+          case "platform-code-login.ftl":
             return (
               <CodeLogin
                 kcContext={kcContext}

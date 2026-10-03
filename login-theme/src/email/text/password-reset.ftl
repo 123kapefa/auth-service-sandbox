@@ -1,9 +1,9 @@
 <#ftl output_format="plainText">
-${msg("sandboxPasswordResetTitle")}
+${msg("platformPasswordResetTitle")}
 
-${msg("sandboxPasswordResetText", realmName)}
+${msg("platformPasswordResetText", realmName)}
 
 ${link}
 
-${msg("sandboxEmailLinkExpires", linkExpirationFormatter(linkExpiration))}
-${msg("sandboxPasswordResetIgnore")}
+${msg("platformEmailLinkExpires", linkExpirationFormatter(linkExpiration))}
+${msg("platformPasswordResetIgnore")}

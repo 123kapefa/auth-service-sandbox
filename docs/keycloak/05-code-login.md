@@ -36,10 +36,10 @@ sandbox browser
 ├── cookie (уже вошёл)                          ALTERNATIVE
 ├── вход через внешнего провайдера              ALTERNATIVE
 └── sandbox forms                               ALTERNATIVE
-    ├── форма: телефон или почта + пароль       REQUIRED      sandbox-password-login   ← плагин
+    ├── форма: телефон или почта + пароль       REQUIRED      platform-password-login   ← плагин
     ├── sandbox code login                      CONDITIONAL
-    │   ├── условие: нажали «Войти по коду»     REQUIRED      sandbox-condition-code-requested  ← плагин
-    │   └── код: отправка, экран, проверка      REQUIRED      sandbox-code-login       ← плагин
+    │   ├── условие: нажали «Войти по коду»     REQUIRED      platform-condition-code-requested  ← плагин
+    │   └── код: отправка, экран, проверка      REQUIRED      platform-code-login       ← плагин
     └── sandbox conditional 2FA                 CONDITIONAL   (без изменений, этап 3а)
 ```
 
@@ -72,8 +72,8 @@ sandbox browser
 `infra/keycloak/themes/sandbox/login`: _(до этапа 4в; с 4в тема — `login-theme/` на React)_
 
 - `login.ftl` — **копия** шаблона `keycloak.v2` с одной добавленной кнопкой «Войти по коду» (иначе кнопку не добавить);
-- `sandbox-code-login.ftl` — экран кода, из макросов `keycloak.v2`;
-- `messages/messages_{ru,en}.properties` — тексты экрана и письма (`sandboxCode*`).
+- `platform-code-login.ftl` — экран кода, из макросов `keycloak.v2`;
+- `messages/messages_{ru,en}.properties` — тексты экрана и письма (`platformCode*`).
 
 ### Сборка
 
@@ -120,7 +120,7 @@ scripts/keycloak/check-code-login.sh
 Руками: http://localhost:8080 → «Войти» → номер → «Войти по коду» → код из лога:
 
 ```bash
-docker compose logs keycloak | grep "SANDBOX SMS"
+docker compose logs keycloak | grep "DEV SMS"
 ```
 
 Письма — http://localhost:8025.

@@ -10,12 +10,12 @@ export default defineConfig({
     react(),
     tailwindcss(),
     keycloakify({
-      themeName: "sandbox",
+      themeName: "platform",
       accountThemeImplementation: "none",
       // Keycloak 26 — «все остальные версии»; для 22–25 сборка не нужна.
       keycloakVersionTargets: {
         "22-to-25": false,
-        "all-other-versions": "sandbox-login-theme.jar",
+        "all-other-versions": "platform-login-theme.jar",
       },
     }),
   ],

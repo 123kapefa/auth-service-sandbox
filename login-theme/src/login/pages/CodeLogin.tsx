@@ -7,12 +7,12 @@ import { useCountdown } from "../lib/use-countdown";
 import { useSubmitting } from "../lib/use-submitting";
 
 /**
- * Вход по коду (плагин code-login, sandbox-code-login.ftl): куда ушёл код, поле кода (только цифры; набрали все —
+ * Вход по коду (плагин code-login, platform-code-login.ftl): куда ушёл код, поле кода (только цифры; набрали все —
  * форма уходит сама), «Отправить код ещё раз» — когда истечёт пауза (её же проверяет сервер), назад к паролю.
  * Ошибки (неверный код, блокировка, код истёк, рано) — сообщением Keycloak в каркасе.
  */
 export default function CodeLogin(
-  props: PageProps<Extract<KcContext, { pageId: "sandbox-code-login.ftl" }>, I18n>,
+  props: PageProps<Extract<KcContext, { pageId: "platform-code-login.ftl" }>, I18n>,
 ) {
   const { kcContext, i18n, doUseDefaultCss, Template, classes } = props;
   const { kcClsx } = getKcClsx({ doUseDefaultCss, classes });
@@ -42,14 +42,14 @@ export default function CodeLogin(
       i18n={i18n}
       doUseDefaultCss={doUseDefaultCss}
       classes={classes}
-      headerNode={msg("sandboxCodeTitle")}
+      headerNode={msg("platformCodeTitle")}
     >
-      <p id="sandbox-code-target" className="mb-4 text-sm text-muted-foreground">
-        {msg(byEmail ? "sandboxCodeSentToEmail" : "sandboxCodeSentToSms", codeTarget)}
+      <p id="platform-code-target" className="mb-4 text-sm text-muted-foreground">
+        {msg(byEmail ? "platformCodeSentToEmail" : "platformCodeSentToSms", codeTarget)}
       </p>
       <form
         ref={form}
-        id="sandbox-code-form"
+        id="platform-code-form"
         className={kcClsx("kcFormClass")}
         action={url.loginAction}
         method="post"
@@ -58,7 +58,7 @@ export default function CodeLogin(
       >
         <div className={kcClsx("kcFormGroupClass")}>
           <label htmlFor="code" className={kcClsx("kcLabelClass")}>
-            {msg(byEmail ? "sandboxCodeLabelEmail" : "sandboxCodeLabelSms")}
+            {msg(byEmail ? "platformCodeLabelEmail" : "platformCodeLabelSms")}
           </label>
           {/*
             Ячейки по цифре — только вид; поле одно и прозрачное поверх них: автоподстановка кода из SMS, вставка
@@ -115,31 +115,31 @@ export default function CodeLogin(
       {/* Отдельная форма: «ещё раз» не отправляет недописанный код. */}
       <form action={url.loginAction} method="post" className="mt-2" onSubmit={markSubmitting}>
         <button
-          id="sandbox-code-resend"
+          id="platform-code-resend"
           name="resend"
           type="submit"
           disabled={resendIn > 0 || submitting}
           className={kcClsx("kcButtonClass", "kcButtonSecondaryClass")}
         >
-          {msgStr("sandboxCodeResend")}
+          {msgStr("platformCodeResend")}
         </button>
       </form>
       {resendIn > 0 && (
         <p
-          id="sandbox-code-resend-after"
+          id="platform-code-resend-after"
           aria-live="polite"
           className="mt-3 text-sm text-muted-foreground"
         >
-          {msg("sandboxCodeResendIn", String(resendIn))}
+          {msg("platformCodeResendIn", String(resendIn))}
         </p>
       )}
       <p className="mt-4 text-center text-sm">
         <a
-          id="sandbox-code-back"
+          id="platform-code-back"
           href={url.loginRestartFlowUrl}
           className="text-primary hover:underline"
         >
-          {msg("sandboxCodeBackToPassword")}
+          {msg("platformCodeBackToPassword")}
         </a>
       </p>
     </Template>
