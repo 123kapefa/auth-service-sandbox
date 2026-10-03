@@ -29,7 +29,8 @@ scripts/keycloak/check-stand.sh
 
 Ожидается `Итого: 43 ✓, 0 ✗`. Остальные проверки (сервис поднят: `docker compose up -d --build --wait`):
 `check-api.sh` 48, `check-login.sh` 16, `check-login-methods.sh` 22, `check-code-login.sh` 31, `check-admin.sh` 109,
-`check-roles.sh` 71, `check-admin-ui.sh` 25; .NET-тестов — 325; тестов админки (Vitest) — 34, темы входа (Vitest) — 19.
+`check-roles.sh` 71, `check-admin-ui.sh` 25, `check-migration.sh` 26 (нужен .NET SDK); .NET-тестов — 338; тестов админки (Vitest) — 34,
+темы входа (Vitest) — 23.
 
 | Что | Адрес | Доступ |
 |---|---|---|---|
@@ -67,7 +68,7 @@ scripts/keycloak/check-stand.sh
 | 4б | Своя админка доступа (UI): админ проекта и админ приложения | ✅ | [04b-admin-ui.md](04b-admin-ui.md) |
 | 4в | Свой интерфейс входа (Keycloakify): страницы входа и письма | ✅ | [04v-login-ui.md](04v-login-ui.md) |
 | 5 | Спайк: вход по коду — SMS и почта (Java-плагин) | ✅ | [05-code-login.md](05-code-login.md) |
-| 6 | Спайк: миграция пользователей с BCrypt | ⬜ | — |
+| 6 | Спайк: миграция пользователей с BCrypt | ✅ | [06-bcrypt-migration.md](06-bcrypt-migration.md) |
 | 7 | Документация | идёт по ходу | — |
 | 8 | Выводы и ADR | ⬜ | — |
 
@@ -86,8 +87,8 @@ Keycloak; проекты друг друга не видят. **Приложен
 | `compose.yaml` → `keycloak`, `keycloak-postgres` | Keycloak 26.4 и его отдельная БД |
 | `compose.yaml` → `redis`, `auth-migrator` | отметки мгновенного отзыва токенов; миграции базы сервиса (`efbundle`) до старта сервиса |
 | `infra/keycloak/realm/sandbox-realm.json` | весь realm как код |
-| `infra/keycloak/providers/code-login` | плагин Keycloak (Java): форма входа с нормализацией номера, вход по коду; собирается в `infra/keycloak/Dockerfile` |
-| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал, пароль и 2FA; `check-roles.sh` — роли и права приложений, роли пользователей, умный рефреш, «Менеджер 1С» (этап 4а); `check-admin-ui.sh` — своя админка: раздача, CSP, путь админов (этап 4б); `lib.sh` — общие помощники, `master-token.sh` — токен мастер-админки изнутри контейнера |
+| `infra/keycloak/providers/code-login` | плагин Keycloak (Java): форма входа с нормализацией номера, вход по коду, проверка BCrypt-паролей из боевого сервиса; собирается в `infra/keycloak/Dockerfile` |
+| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал, пароль и 2FA; `check-roles.sh` — роли и права приложений, роли пользователей, умный рефреш, «Менеджер 1С» (этап 4а); `check-admin-ui.sh` — своя админка: раздача, CSP, путь админов (этап 4б); `check-migration.sh` — перенос пользователей с BCrypt-паролями (этап 6); `lib.sh` — общие помощники, `master-token.sh` — токен мастер-админки изнутри контейнера |
 | `login-theme/` | страницы входа Keycloak на React (Keycloakify) и письма (`src/email/`, FreeMarker) — тема `sandbox`, см. `login-theme/CLAUDE.md`; jar собирается в образе Keycloak |
 | `frontend/` | админка доступа на `/admin` (React, FSD) — см. `frontend/CLAUDE.md`; в образ сервиса попадает сборка |
 | `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права из токена, хук мгновенного отзыва и умного рефреша (`access_changed`) — переиспользуемая библиотека |
@@ -96,6 +97,8 @@ Keycloak; проекты друг друга не видят. **Приложен
 | `src/AuthService.Core/Features/Auth` | вход, callback, refresh, выход, режим, back-channel logout; cookie и `return_to` |
 | `src/AuthService.Core/Features/Admin`, `Features/Security` | API администрирования и своих сессий |
 | `src/AuthService.Infrastructure.Postgres` | база сервиса: журнал `auth.audit_entries`, миграции |
+| `src/AuthService.LegacyImport` | разовый перенос пользователей боевого сервиса в Keycloak (этап 6): Id, роли, блокировка, BCrypt-хэш |
+| `infra/legacy/`, `scripts/legacy/seed-legacy.sh` | «боевая» база для спайка этапа 6: таблица `users` как в боевом сервисе, выдуманные пользователи (база `legacy_auth`) |
 | `src/AuthService.Infrastructure.Keycloak` | клиент Keycloak: PKCE, обмен кода, refresh, выход, Admin API от служебной учётки |
 | `src/AuthService.Api/wwwroot` | демо-страница для тестов входа (`/`) |
 | `.env.example` → блок Keycloak | порты и dev-пароли |
