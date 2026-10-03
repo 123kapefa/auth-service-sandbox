@@ -31,6 +31,12 @@ public static class AuthServicePermissions
         public const string VIEW = "audit.view";
     }
 
+    public static class ProjectServices
+    {
+        /// <summary>Сервисы проекта и их ключи доступа: выдать, перевыпустить, отозвать — только админ проекта.</summary>
+        public const string MANAGE = "services.manage";
+    }
+
     public static class Roles
     {
         /// <summary>Роли и права приложения: создавать, менять состав, удалять.</summary>
@@ -47,5 +53,6 @@ public static class AuthServicePermissions
         new(Users.MANAGE_CREDENTIALS, "Сброс пароля и 2FA"),
         new(Audit.VIEW, "Журнал действий и входов"),
         new(Roles.MANAGE, "Роли и права приложения"),
+        new(ProjectServices.MANAGE, "Сервисы проекта и их ключи доступа"),
     ];
 }

@@ -306,7 +306,8 @@
                 "users.sessions.manage",
                 "users.credentials.manage",
                 "audit.view",
-                "roles.manage"
+                "roles.manage",
+                "services.manage"
               ]
             }
           },
@@ -420,6 +421,20 @@
         {
           "name": "roles.manage",
           "description": "Роли и права приложения",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "services.manage",
+          "description": "Сервисы проекта и их ключи доступа",
           "composite": false,
           "clientRole": true,
           "attributes": {

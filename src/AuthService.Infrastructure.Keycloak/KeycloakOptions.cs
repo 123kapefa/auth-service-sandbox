@@ -13,6 +13,12 @@ public sealed class KeycloakOptions
     public string ClientSecret { get; init; } = string.Empty;
 
     public string Scope { get; init; } = "openid";
+
+    /// <summary>
+    /// Разрешение на регистрацию клиентов (initial access token) — выдаёт техник (scripts/keycloak/registration-token.sh).
+    /// Без него выдача ключей сервисам выключена. Только из переменной окружения / хранилища секретов.
+    /// </summary>
+    public string RegistrationToken { get; init; } = string.Empty;
 }
 
 internal sealed class KeycloakOptionsValidator : IValidateOptions<KeycloakOptions>

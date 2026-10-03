@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -45,6 +46,12 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
 
     /// <summary>Подставной Admin API вместо Keycloak.</summary>
     public FakeIdentityAdmin IdentityAdmin { get; } = new();
+
+    /// <summary>Регистрация клиентов Keycloak (ключи сервисов) в памяти.</summary>
+    public FakeServiceRegistry ServiceRegistry { get; } = new();
+
+    /// <summary>Ключи сервисов в памяти вместо Postgres.</summary>
+    public InMemoryServiceKeyStore ServiceKeys { get; } = new();
 
     /// <summary>Клиент как браузер без автоматических переходов и cookie: тест видит каждый 302 и Set-Cookie.</summary>
     public HttpClient CreateBrowserClient() =>
@@ -132,6 +139,12 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
             services.AddSingleton<ITokenRevocationStore>(Revocations);
             services.RemoveAll<IIdentityAdmin>();
             services.AddSingleton<IIdentityAdmin>(IdentityAdmin);
+            services.RemoveAll<IServiceRegistry>();
+            services.AddSingleton<IServiceRegistry>(ServiceRegistry);
+            services.RemoveAll<IServiceKeyStore>();
+            services.AddSingleton<IServiceKeyStore>(ServiceKeys);
+            // Ключи шифрования — в памяти: база в тестах недоступна.
+            services.AddDataProtection().UseEphemeralDataProtectionProvider();
         });
     }
 

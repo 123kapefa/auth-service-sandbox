@@ -1,5 +1,7 @@
 using AuthService.Core.Abstractions;
 using AuthService.Infrastructure.Postgres.AuditLog;
+using AuthService.Infrastructure.Postgres.ServiceKeys;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +23,10 @@ public static class DependencyInjectionExtensions
             options.UseSnakeCaseNamingConvention();
         });
         services.AddScoped<IAuditLog, EfAuditLog>();
+        services.AddScoped<IServiceKeyStore, EfServiceKeyStore>();
+        services.AddDataProtection()
+            .SetApplicationName("auth-service")
+            .PersistKeysToDbContext<AuthDbContext>();
 
         return services;
     }

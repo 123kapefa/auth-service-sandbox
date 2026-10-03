@@ -35,6 +35,13 @@ internal sealed partial class KeycloakServiceAccount(
         return configuration.IsSuccess ? AdminBase(configuration.Value.TokenEndpoint) : configuration.Error;
     }
 
+    /// <summary>Внутренний адрес realm: …/realms/{realm}/ — регистрация клиентов и выдача токенов.</summary>
+    public async Task<Result<Uri, Error>> GetRealmBaseAsync(CancellationToken cancellationToken)
+    {
+        Result<OpenIdConnectConfiguration, Error> configuration = await GetConfigurationAsync(cancellationToken);
+        return configuration.IsSuccess ? RealmBase(configuration.Value.TokenEndpoint) : configuration.Error;
+    }
+
     public async Task<Result<string, Error>> GetTokenAsync(CancellationToken cancellationToken)
     {
         if (_token is not null && timeProvider.GetUtcNow() < _expiresAt)
@@ -59,6 +66,10 @@ internal sealed partial class KeycloakServiceAccount(
     }
 
     public void Dispose() => _lock.Dispose();
+
+    // …/realms/sandbox/protocol/openid-connect/token → …/realms/sandbox/
+    private static Uri RealmBase(string tokenEndpoint) =>
+        new(tokenEndpoint[..(tokenEndpoint.IndexOf("/protocol/", StringComparison.Ordinal) + 1)]);
 
     // …/realms/sandbox/protocol/openid-connect/token → …/admin/realms/sandbox/
     private static Uri AdminBase(string tokenEndpoint)

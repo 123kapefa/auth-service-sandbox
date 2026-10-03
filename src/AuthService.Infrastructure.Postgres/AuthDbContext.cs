@@ -1,11 +1,13 @@
 using AuthService.Domain.AuditLog;
+using AuthService.Domain.ServiceKeys;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
 
 namespace AuthService.Infrastructure.Postgres;
 
-public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(options)
+public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(options), IDataProtectionKeyContext
 {
     public const string SCHEMA = "auth";
 
@@ -13,6 +15,14 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
     public const string MIGRATIONS_HISTORY_TABLE = "__ef_migrations_history";
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
+    public DbSet<ServiceKey> ServiceKeys => Set<ServiceKey>();
+
+    /// <summary>
+    /// Ключи DataProtection (шифрование state входа, токенов управления ключами сервисов): в базе, а не в памяти —
+    /// иначе после рестарта или на втором экземпляре зашифрованное не прочитать.
+    /// </summary>
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     /// <summary>Общие настройки Npgsql: схема истории миграций и сборка с миграциями.</summary>
     public static void ConfigureNpgsql(NpgsqlDbContextOptionsBuilder npgsql)

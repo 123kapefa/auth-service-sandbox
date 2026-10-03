@@ -117,13 +117,13 @@ composites() { curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REA
   | python3 -c 'import json,sys; print(",".join(sorted(r["name"] for r in json.load(sys.stdin))))'; }
 check "customer = profile.view" "$(composites customer)" profile.view
 check "manager = просмотр и блокировка пользователей" "$(composites manager)" profile.view,users.block,users.view
-check "admin = все права" "$(composites admin)" audit.view,profile.view,roles.manage,users.block,users.credentials.manage,users.roles.manage,users.sessions.manage,users.view
+check "admin = все права" "$(composites admin)" audit.view,profile.view,roles.manage,services.manage,users.block,users.credentials.manage,users.roles.manage,users.sessions.manage,users.view
 check "права помечены kind=permission" "$(curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/clients/$API_ID/roles?briefRepresentation=false" \
   | python3 -c 'import json,sys; r=json.load(sys.stdin); print(",".join(sorted(x["name"] for x in r if x.get("attributes",{}).get("kind")==["permission"])))')" \
-  audit.view,profile.view,roles.manage,users.block,users.credentials.manage,users.roles.manage,users.sessions.manage,users.view
+  audit.view,profile.view,roles.manage,services.manage,users.block,users.credentials.manage,users.roles.manage,users.sessions.manage,users.view
 check "в role токена — только роли, без прав" "$(token 71234567890 | claim role)" admin,customer
 check "permissions — права активного режима: админ в режиме admin" "$(token 71234567890 | claim permissions)" \
-  audit.view,profile.view,roles.manage,users.block,users.credentials.manage,users.roles.manage,users.sessions.manage,users.view
+  audit.view,profile.view,roles.manage,services.manage,users.block,users.credentials.manage,users.roles.manage,users.sessions.manage,users.view
 check "админ в режиме customer — только права покупателя" "$(token 79990000002 | claim permissions)" profile.view
 check "менеджер в режиме manager" "$(token 70987654321 | claim permissions)" profile.view,users.block,users.view
 

@@ -17,7 +17,12 @@ public static class AuditActions
     public const string ROLE_UPDATED = "RoleUpdated";
     public const string ROLE_DELETED = "RoleDeleted";
 
+    public const string SERVICE_KEY_ISSUED = "ServiceKeyIssued";
+    public const string SERVICE_KEY_ROTATED = "ServiceKeyRotated";
+    public const string SERVICE_KEY_REVOKED = "ServiceKeyRevoked";
+
     public const string USER_OBJECT = "user";
     public const string ROLE_OBJECT = "role";
     public const string PERMISSION_OBJECT = "permission";
+    public const string SERVICE_OBJECT = "service";
 }

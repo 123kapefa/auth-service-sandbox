@@ -9,6 +9,7 @@ using AuthService.Core.Features.Admin.UseCases.Journal;
 using AuthService.Core.Features.Admin.UseCases.Permissions;
 using AuthService.Core.Features.Admin.UseCases.RoleCatalog;
 using AuthService.Core.Features.Admin.UseCases.SetRestriction;
+using AuthService.Core.Features.Admin.UseCases.ServiceKeys;
 using AuthService.Core.Features.Admin.UseCases.SetRole;
 using AuthService.Core.Features.Admin.UseCases.UserCredentials;
 using AuthService.Core.Features.Auth.Cookies;
@@ -69,6 +70,7 @@ public static class Registration
         services.AddScoped<CredentialsHandler>();
         services.AddHostedService<PermissionCatalogSync>();
         services.AddScoped<SessionsHandler>();
+        services.AddScoped<ServiceKeysHandler>();
 
         return services;
     }
