@@ -1,0 +1,144 @@
+# Сервис входа как компонент — вставить в свой проект (Docker Compose 2.20+):
+#   include:
+#     - path: auth/compose.yaml            # этот файл
+#       env_file: auth/.env                # по образцу deploy/.env.example
+# Порты публикуются на 127.0.0.1 (AUTH_BIND): снаружи — только через прокси с https.
+# Только готовые образы (scripts/package/build-images.sh или реестр компании), без сборки. Имена — с префиксом auth-,
+# чтобы не столкнуться с сервисами проекта. Проект (realm) создаётся после запуска: scripts/project/create-project.sh,
+# первый админ — add-admin.py, приложения — add-app.py (docs/keycloak/06a-embedding.md).
+name: ${AUTH_COMPOSE_PROJECT:-platform-auth}
+
+services:
+  auth-keycloak-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${AUTH_KEYCLOAK_DB_PASSWORD:?нужен AUTH_KEYCLOAK_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - auth_keycloak_db:/var/lib/postgresql/data
+
+  auth-keycloak:
+    image: ${AUTH_REGISTRY:-}platform-auth-keycloak:${AUTH_VERSION:?нужен AUTH_VERSION}
+    # Бой — start: https снаружи делает прокси (он же ставит X-Forwarded-*), до Keycloak — http внутри сети;
+    # порт Keycloak должен быть доступен только прокси. Локально без прокси — AUTH_KEYCLOAK_COMMAND=start-dev.
+    command: ${AUTH_KEYCLOAK_COMMAND:-start}
+    ports:
+      - "${AUTH_BIND:-127.0.0.1}:${AUTH_KEYCLOAK_PORT:-8180}:8180"
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: auth-keycloak-db
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${AUTH_KEYCLOAK_DB_PASSWORD}
+      # Внешний адрес сервера входа — от него iss в токенах; сервисы ходят за ключами по внутреннему.
+      KC_HOSTNAME: ${AUTH_KEYCLOAK_URL:?нужен AUTH_KEYCLOAK_URL — внешний адрес сервера входа}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HTTP_PORT: "8180"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: ${AUTH_KEYCLOAK_PROXY_HEADERS:-xforwarded}
+      # X-Forwarded-* принимаются только от прокси: по умолчанию — из сетей Docker и с самой машины.
+      KC_PROXY_TRUSTED_ADDRESSES: ${AUTH_KEYCLOAK_PROXY_TRUSTED:-172.16.0.0/12,127.0.0.1}
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${AUTH_KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${AUTH_KEYCLOAK_ADMIN_PASSWORD:?нужен AUTH_KEYCLOAK_ADMIN_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    depends_on:
+      auth-keycloak-db:
+        condition: service_healthy
+
+  # База сервиса входа (журнал, ключи сервисов) и Redis (отзыв токенов). Свои Postgres и Redis проекта — задайте
+  # AUTH_DB_CONNECTION и AUTH_REDIS; эти два сервиса тогда не нужны: удалите их из своей копии файла вместе с
+  # depends_on на них у auth-migrator и auth-service.
+  auth-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: auth_service
+      POSTGRES_USER: auth_service
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:?нужен AUTH_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_service -d auth_service"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - auth_db:/var/lib/postgresql/data
+
+  auth-redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  auth-migrator:
+    image: ${AUTH_REGISTRY:-}platform-auth-service:${AUTH_VERSION:?нужен AUTH_VERSION}
+    # Строка подключения — переменной окружения (её читает AuthDbContextFactory), не аргументом: аргументы с паролем
+    # видны в списке процессов.
+    entrypoint: ["./efbundle"]
+    environment:
+      AUTH_CONNECTION_STRING: ${AUTH_DB_CONNECTION:-Host=auth-db;Port=5432;Database=auth_service;Username=auth_service;Password=${AUTH_DB_PASSWORD}}
+    depends_on:
+      auth-db:
+        condition: service_healthy
+
+  auth-service:
+    image: ${AUTH_REGISTRY:-}platform-auth-service:${AUTH_VERSION:?нужен AUTH_VERSION}
+    init: true
+    ports:
+      - "${AUTH_BIND:-127.0.0.1}:${AUTH_SERVICE_PORT:-8080}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${AUTH_ENVIRONMENT:-Production}
+      ConnectionStrings__AuthDb: ${AUTH_DB_CONNECTION:-Host=auth-db;Port=5432;Database=auth_service;Username=auth_service;Password=${AUTH_DB_PASSWORD}}
+      ConnectionStrings__Redis: ${AUTH_REDIS:-auth-redis:6379}
+      # Проект (realm): клиенты auth-api и auth-bff — одинаковые во всех проектах (scripts/project/create-project.sh);
+      # заданы явно — не зависят от AUTH_ENVIRONMENT (в Docker/Development — демо-проект песочницы).
+      Authentication__Audience: auth-api
+      Keycloak__ClientId: auth-bff
+      Authentication__Authority: ${AUTH_KEYCLOAK_URL}/realms/${AUTH_REALM:?нужен AUTH_REALM — код проекта}
+      # Пусто — ключи берутся по Authority. Внутренний адрес (без https — с AUTH_REQUIRE_HTTPS=false):
+      # http://auth-keycloak:8180/realms/<realm>/.well-known/openid-configuration
+      Authentication__MetadataAddress: ${AUTH_KEYCLOAK_METADATA_URL:-}
+      Authentication__RequireHttpsMetadata: ${AUTH_REQUIRE_HTTPS:-true}
+      Keycloak__ClientSecret: ${AUTH_BFF_CLIENT_SECRET:?нужен AUTH_BFF_CLIENT_SECRET}
+      Keycloak__RegistrationToken: ${AUTH_REGISTRATION_TOKEN:-}
+      AllowedHosts: ${AUTH_ALLOWED_HOSTS:?нужен AUTH_ALLOWED_HOSTS — домен сервиса входа;localhost}
+      # Сертификат (PFX) шифрует ключи DataProtection в базе (ими защищены токены управления ключами сервисов);
+      # без него сервис в Production не стартует. Файл — AUTH_DATA_PROTECTION_CERT_FILE, монтируется ниже.
+      DataProtection__CertificatePath: /run/secrets/auth/data-protection.pfx
+      DataProtection__CertificatePassword: ${AUTH_DATA_PROTECTION_CERT_PASSWORD:-}
+      Cookies__Secure: ${AUTH_COOKIES_SECURE:-true}
+      Cookies__Domain: ${AUTH_COOKIES_DOMAIN:-}
+      ReturnUrls__AllowedOrigins__0: ${AUTH_RETURN_ORIGIN:?нужен AUTH_RETURN_ORIGIN — адрес приложения проекта}
+      ReturnUrls__Default: ${AUTH_RETURN_DEFAULT:-/}
+    volumes:
+      # Абсолютный путь на машине; файл доступен на чтение пользователю сервиса (uid 1654). Нет файла — compose
+      # не стартует (без create_host_path Docker создал бы на его месте пустой каталог).
+      - type: bind
+        source: ${AUTH_DATA_PROTECTION_CERT_FILE:?нужен AUTH_DATA_PROTECTION_CERT_FILE — сертификат DataProtection (PFX)}
+        target: /run/secrets/auth/data-protection.pfx
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      auth-redis:
+        condition: service_healthy
+      auth-migrator:
+        condition: service_completed_successfully
+      auth-keycloak:
+        condition: service_healthy
+
+volumes:
+  auth_keycloak_db:
+  auth_db:

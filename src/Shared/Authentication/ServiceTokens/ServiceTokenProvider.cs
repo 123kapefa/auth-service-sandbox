@@ -27,22 +27,23 @@ public sealed class ServiceTokenProvider(
     public const string HTTP_CLIENT = "PlatformAuth.ServiceTokens";
 
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private string? _token;
-    private DateTimeOffset _expiresAt;
+
+    // Токен и срок — одной неизменяемой парой: читается без блокировки, меняется целиком.
+    private volatile CachedToken? _cached;
 
     public async Task<string> GetTokenAsync(CancellationToken cancellationToken)
     {
-        if (_token is { } cached && timeProvider.GetUtcNow() < _expiresAt)
+        if (_cached is { } cached && timeProvider.GetUtcNow() < cached.RefreshAt)
         {
-            return cached;
+            return cached.Token;
         }
 
         await _lock.WaitAsync(cancellationToken);
         try
         {
-            if (_token is { } fresh && timeProvider.GetUtcNow() < _expiresAt)
+            if (_cached is { } fresh && timeProvider.GetUtcNow() < fresh.RefreshAt)
             {
-                return fresh;
+                return fresh.Token;
             }
 
             return await RequestAsync(cancellationToken);
@@ -55,9 +56,10 @@ public sealed class ServiceTokenProvider(
 
     public void Invalidate(string token)
     {
-        if (string.Equals(_token, token, StringComparison.Ordinal))
+        CachedToken? cached = _cached;
+        if (cached is not null && string.Equals(cached.Token, token, StringComparison.Ordinal))
         {
-            _token = null;
+            Interlocked.CompareExchange(ref _cached, null, cached);
         }
     }
 
@@ -83,10 +85,14 @@ public sealed class ServiceTokenProvider(
                 $"Сервер входа не выдал токен по ключу {settings.ClientId} ({(int)response.StatusCode}): ключ отозван, неверен или сервер недоступен.");
         }
 
-        _token = token.AccessToken;
-        _expiresAt = timeProvider.GetUtcNow().AddSeconds(token.ExpiresIn) - settings.RefreshMargin;
-        return _token;
+        // Запас до истечения — не больше половины срока: иначе короткий токен запрашивался бы на каждый вызов.
+        TimeSpan lifetime = TimeSpan.FromSeconds(token.ExpiresIn);
+        TimeSpan margin = settings.RefreshMargin < lifetime / 2 ? settings.RefreshMargin : lifetime / 2;
+        _cached = new CachedToken(token.AccessToken, timeProvider.GetUtcNow() + lifetime - margin);
+        return token.AccessToken;
     }
+
+    private sealed record CachedToken(string Token, DateTimeOffset RefreshAt);
 
     private sealed record TokenResponse(
         [property: JsonPropertyName("access_token")] string AccessToken,

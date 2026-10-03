@@ -25,6 +25,7 @@ export function IssueServiceKeyButton() {
           setOpen(false);
           form.reset();
           setIssued(result);
+          mutation.reset(); // секрет — только в окне, не в состоянии мутации
         },
       },
     ),
@@ -37,7 +38,12 @@ export function IssueServiceKeyButton() {
       </Button>
       <Dialog
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) {
+            form.reset();
+          }
+        }}
         title="Новый сервис"
         description="Сервис получит ключ: по нему он берёт токены и ходит к другим сервисам проекта."
       >
@@ -82,7 +88,14 @@ export function IssueServiceKeyButton() {
             ))}
           </fieldset>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setOpen(false);
+                form.reset();
+              }}
+            >
               Отмена
             </Button>
             <Button type="submit" disabled={mutation.isPending}>

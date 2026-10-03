@@ -50,7 +50,11 @@ export function ServicesPage() {
                 </span>
               </div>
               <div className="mt-2 flex flex-wrap gap-1">
-                {service.permissions.length === 0 ? (
+                {service.permissions === null ? (
+                  <span className="text-xs text-destructive">
+                    права не удалось получить — ключ можно отозвать
+                  </span>
+                ) : service.permissions.length === 0 ? (
                   <span className="text-xs text-muted-foreground">в сервисе входа — без прав</span>
                 ) : (
                   service.permissions.map((permission) => (

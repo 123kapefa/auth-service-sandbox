@@ -69,6 +69,7 @@ scripts/keycloak/check-stand.sh
 | 4в | Свой интерфейс входа (Keycloakify): страницы входа и письма | ✅ | [04v-login-ui.md](04v-login-ui.md) |
 | 5 | Спайк: вход по коду — SMS и почта (Java-плагин) | ✅ | [05-code-login.md](05-code-login.md) |
 | 6 | Спайк: миграция пользователей с BCrypt | ✅ | [06-bcrypt-migration.md](06-bcrypt-migration.md) |
+| 6а | Сервис входа как компонент: ключи сервисов, новый проект, поставка | 🔄 | [06a-embedding.md](06a-embedding.md) |
 | 7 | Документация | идёт по ходу | — |
 | 8 | Выводы и ADR | ⬜ | — |
 

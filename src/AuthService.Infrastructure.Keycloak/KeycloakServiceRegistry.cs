@@ -42,11 +42,27 @@ internal sealed partial class KeycloakServiceRegistry(
         using HttpRequestMessage request = Request(HttpMethod.Post, new Uri(realm.Value, REGISTRATIONS), options.Value.RegistrationToken);
         request.Content = JsonContent.Create(client);
 
-        Result<RegisteredClient, Error> registered = await SendAsync(request, clientId, cancellationToken);
-        return registered.IsSuccess ? await WithServiceAccountAsync(realm.Value, clientId, registered.Value, cancellationToken) : registered.Error;
+        Result<RegisteredClient, Error> registered = await SendAsync(request, clientId, registration: true, cancellationToken);
+        if (registered.IsFailure)
+        {
+            return registered.Error;
+        }
+
+        Result<RegisteredService, Error> service = await WithServiceAccountAsync(realm.Value, clientId, registered.Value, cancellationToken);
+        if (service.IsFailure)
+        {
+            // Учётку сервиса не узнать — ключ без неё не отозвать мгновенно: клиента убираем его же токеном.
+            UnitResult<Error> undone = await DeleteAsync(clientId, registered.Value.RegistrationAccessToken, CancellationToken.None);
+            if (undone.IsFailure)
+            {
+                LogOrphan(logger, clientId);
+            }
+        }
+
+        return service;
     }
 
-    public async Task<Result<RegisteredService, Error>> RotateSecretAsync(string clientId, string registrationToken, CancellationToken cancellationToken)
+    public async Task<Result<RotatedSecret, Error>> RotateSecretAsync(string clientId, string registrationToken, CancellationToken cancellationToken)
     {
         Result<Uri, Error> realm = await serviceAccount.GetRealmBaseAsync(cancellationToken);
         if (realm.IsFailure)
@@ -56,7 +72,7 @@ internal sealed partial class KeycloakServiceRegistry(
 
         Uri address = new(realm.Value, $"{REGISTRATIONS}/{Uri.EscapeDataString(clientId)}");
         using HttpRequestMessage read = Request(HttpMethod.Get, address, registrationToken);
-        Result<RegisteredClient, Error> current = await SendAsync(read, clientId, cancellationToken);
+        Result<RegisteredClient, Error> current = await SendAsync(read, clientId, registration: false, cancellationToken);
         if (current.IsFailure)
         {
             return current.Error;
@@ -65,8 +81,11 @@ internal sealed partial class KeycloakServiceRegistry(
         // Новый секрет задаёт сервис входа: Keycloak сразу перестаёт принимать старый.
         using HttpRequestMessage update = Request(HttpMethod.Put, address, current.Value.RegistrationAccessToken);
         update.Content = JsonContent.Create(current.Value.Representation with { Secret = NewSecret() });
-        Result<RegisteredClient, Error> rotated = await SendAsync(update, clientId, cancellationToken);
-        return rotated.IsSuccess ? await WithServiceAccountAsync(realm.Value, clientId, rotated.Value, cancellationToken) : rotated.Error;
+        // Сразу назад, без лишних запросов: Keycloak уже сменил секрет и токен управления — их нельзя потерять.
+        Result<RegisteredClient, Error> rotated = await SendAsync(update, clientId, registration: false, cancellationToken);
+        return rotated.IsSuccess
+            ? new RotatedSecret(rotated.Value.Representation.Secret ?? string.Empty, rotated.Value.RegistrationAccessToken)
+            : rotated.Error;
     }
 
     public async Task<UnitResult<Error>> DeleteAsync(string clientId, string registrationToken, CancellationToken cancellationToken)
@@ -84,7 +103,7 @@ internal sealed partial class KeycloakServiceRegistry(
             // Уже удалён (например, вручную в консоли) — ключа всё равно нет: считаем отозванным.
             return response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound
                 ? UnitResult.Success<Error>()
-                : Failure(response.StatusCode, clientId);
+                : Failure(response.StatusCode, clientId, registration: false);
         }
         catch (HttpRequestException exception)
         {
@@ -121,21 +140,38 @@ internal sealed partial class KeycloakServiceRegistry(
             LogUnreachable(logger, exception);
             return IdentityProviderErrors.Unavailable();
         }
+        catch (Exception exception) when (exception is JsonException or ArgumentException)
+        {
+            // Ответ не токен (не JSON или не JWT) — учётку не узнать.
+            LogUnreachable(logger, exception);
+            return IdentityProviderErrors.Unavailable();
+        }
     }
 
-    private async Task<Result<RegisteredClient, Error>> SendAsync(HttpRequestMessage request, string clientId, CancellationToken cancellationToken)
+    // registration — запрос по разрешению на регистрацию (401 — разрешение не принято), иначе — по токену управления.
+    private async Task<Result<RegisteredClient, Error>> SendAsync(
+        HttpRequestMessage request,
+        string clientId,
+        bool registration,
+        CancellationToken cancellationToken)
     {
         try
         {
             using HttpResponseMessage response = await http.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                return Failure(response.StatusCode, clientId);
+                return Failure(response.StatusCode, clientId, registration);
             }
 
             JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
-            ClientRepresentation representation = body.Deserialize<ClientRepresentation>()!;
+            ClientRepresentation? representation = body.Deserialize<ClientRepresentation>();
             string token = body.TryGetProperty("registrationAccessToken", out JsonElement value) ? value.GetString() ?? string.Empty : string.Empty;
+            if (representation is null || string.IsNullOrEmpty(token))
+            {
+                LogRejected(logger, clientId, (int)response.StatusCode);
+                return IdentityProviderErrors.Unavailable();
+            }
+
             return new RegisteredClient(representation, token);
         }
         catch (HttpRequestException exception)
@@ -143,15 +179,23 @@ internal sealed partial class KeycloakServiceRegistry(
             LogUnreachable(logger, exception);
             return IdentityProviderErrors.Unavailable();
         }
+        catch (JsonException exception)
+        {
+            LogUnreachable(logger, exception);
+            return IdentityProviderErrors.Unavailable();
+        }
     }
 
-    private Error Failure(HttpStatusCode status, string clientId)
+    private Error Failure(HttpStatusCode status, string clientId, bool registration)
     {
         LogRejected(logger, clientId, (int)status);
         return status switch
         {
-            HttpStatusCode.Unauthorized => ServiceRegistryErrors.RegistrationRejected(),
-            HttpStatusCode.Conflict or HttpStatusCode.BadRequest => ServiceRegistryErrors.ClientExists(clientId),
+            HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => registration
+                ? ServiceRegistryErrors.RegistrationRejected()
+                : ServiceRegistryErrors.ManagementTokenRejected(clientId),
+            HttpStatusCode.Conflict => ServiceRegistryErrors.ClientExists(clientId),
+            HttpStatusCode.BadRequest => ServiceRegistryErrors.RegistrationInvalid(clientId),
             _ => IdentityProviderErrors.Unavailable(),
         };
     }
@@ -173,6 +217,9 @@ internal sealed partial class KeycloakServiceRegistry(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "No service account token for registered client {ClientId}: {StatusCode}")]
     private static partial void LogNoServiceAccount(ILogger logger, string clientId, int statusCode);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Keycloak client {ClientId} was registered but could not be removed after a failure: remove it manually")]
+    private static partial void LogOrphan(ILogger logger, string clientId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Keycloak is unreachable for client registration")]
     private static partial void LogUnreachable(ILogger logger, Exception exception);

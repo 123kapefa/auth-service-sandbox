@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { notifyError } from "@/shared/lib/notify";
 import { Button, Dialog } from "@/shared/ui";
 import { type IssuedServiceKey } from "../types";
 
 /**
  * Ключ сервиса после выдачи или перевыпуска: client_id и секрет. Секрет больше нигде не показывается — его надо сразу
- * сохранить в настройки сервиса (переменная окружения, хранилище секретов). Закрыли окно — только перевыпуск.
+ * сохранить в настройки сервиса (переменная окружения, хранилище секретов). Закрыли окно — только перевыпуск, поэтому
+ * окно закрывается только кнопкой «Я сохранил ключ» (не кликом по фону и не Esc).
  */
 export function SecretDialog({
   issued,
@@ -19,13 +21,19 @@ export function SecretDialog({
   }
 
   const copy = async () => {
-    await navigator.clipboard.writeText(issued.clientSecret);
-    setCopied(true);
+    try {
+      // Буфер обмена — только в безопасном контексте (https или localhost) и с разрешения браузера.
+      await navigator.clipboard.writeText(issued.clientSecret);
+      setCopied(true);
+    } catch (error) {
+      notifyError("скопировать секрет — выделите его и скопируйте вручную", error);
+    }
   };
 
   return (
     <Dialog
       open
+      dismissible={false}
       onOpenChange={(open) => {
         if (!open) {
           setCopied(false);

@@ -8,15 +8,34 @@ interface DialogProps {
   title: string;
   description?: string;
   children: ReactNode;
+  /** false — не закрывается кликом по фону и Esc: только своими кнопками (например, окно с одноразовым секретом). */
+  dismissible?: boolean;
 }
 
-/** Модальное окно (Radix Dialog): фокус внутри, Esc закрывает. */
-export function Dialog({ open, onOpenChange, title, description, children }: DialogProps) {
+/** Модальное окно (Radix Dialog): фокус внутри, Esc закрывает (если dismissible). */
+export function Dialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  children,
+  dismissible = true,
+}: DialogProps) {
+  const keepOpen = (event: Event) => {
+    if (!dismissible) {
+      event.preventDefault();
+    }
+  };
+
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 bg-black/50" />
-        <DialogPrimitive.Content className="fixed top-1/2 left-1/2 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-5 text-foreground shadow-lg">
+        <DialogPrimitive.Content
+          onInteractOutside={keepOpen}
+          onEscapeKeyDown={keepOpen}
+          className="fixed top-1/2 left-1/2 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-5 text-foreground shadow-lg"
+        >
           <DialogPrimitive.Title className="mb-1 text-base font-semibold">
             {title}
           </DialogPrimitive.Title>

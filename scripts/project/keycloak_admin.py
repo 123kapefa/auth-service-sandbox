@@ -7,7 +7,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-KC = os.environ.get("KC", f"http://localhost:{os.environ.get('KEYCLOAK_PORT', '8180')}")
+KC = os.environ.get("KC", f"http://localhost:{os.environ.get('KEYCLOAK_PORT') or os.environ.get('AUTH_KEYCLOAK_PORT') or '8180'}")
 
 
 def master_token():

@@ -70,6 +70,55 @@ public sealed class ServiceKeysTests : IClassFixture<AuthServiceWebFactory>
     }
 
     [Fact]
+    public async Task Issue_PermissionsNotGranted_ClientRemoved()
+    {
+        _factory.ServiceRegistry.SkipAccount = true; // учётки сервиса нет в Admin API — права не выдать
+
+        HttpResponseMessage response = await IssueAsync("orders", "Заказы", permissions: ["service.users.read"]);
+
+        Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.Empty(_factory.ServiceRegistry.ClientIds); // клиент не остался «ничьим»
+        Assert.Empty(_factory.ServiceKeys.Keys);
+    }
+
+    [Fact]
+    public async Task Issue_DatabaseFailed_ClientRemoved()
+    {
+        _factory.ServiceKeys.FailNextWrite = true;
+
+        await AssertErrorAsync(null, await IssueAsync("orders", "Заказы"), HttpStatusCode.InternalServerError, "services.not_saved");
+
+        Assert.Empty(_factory.ServiceRegistry.ClientIds);
+    }
+
+    [Fact]
+    public async Task Rotate_DatabaseFailed_SecretStillReturned()
+    {
+        await IssueAsync("orders", "Заказы");
+        _factory.ServiceKeys.FailNextWrite = true;
+
+        JsonElement rotated = await ResultAsync(await SendAsync(HttpMethod.Post, "/auth/admin/services/orders/rotate"));
+
+        // Keycloak уже сменил секрет — без ответа сервис остался бы без рабочего ключа.
+        Assert.Equal(_factory.ServiceRegistry.SecretOf("service-orders"), rotated.GetProperty("clientSecret").GetString());
+        Assert.True(_factory.Revocations.HasApp("service-orders", _factory.ServiceRegistry.ServiceAccountOf("service-orders")));
+    }
+
+    [Fact]
+    public async Task Revoke_ClientGoneOutside_RecordRemoved_TokensRevoked()
+    {
+        await IssueAsync("orders", "Заказы");
+        Guid serviceAccount = _factory.ServiceRegistry.ServiceAccountOf("service-orders");
+        _factory.ServiceRegistry.Forget("service-orders"); // удалён в консоли Keycloak — токен управления не принят
+
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(HttpMethod.Delete, "/auth/admin/services/orders")).StatusCode);
+
+        Assert.Empty(_factory.ServiceKeys.Keys);
+        Assert.True(_factory.Revocations.HasApp("service-orders", serviceAccount));
+        Assert.Contains("\"clientDeletionUnconfirmed\":true", _factory.AuditLog.Entries[^1].Changes, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Issue_RegistrationTokenStoredEncrypted()
     {
         await IssueAsync("orders", "Заказы");

@@ -93,6 +93,30 @@ public sealed class ServiceUsersTests : IClassFixture<AuthServiceWebFactory>
         Assert.Equal("app.access_denied", result.GetProperty("reason").GetString());
     }
 
+    [Fact]
+    public async Task AccessCheck_NestedRole_LikeToken()
+    {
+        // Роль режима «supervisor» включает роль «manager» — права manager есть и в токене (маппер обходит вложенные).
+        _keycloak.AddAppRole("sandbox-api", "supervisor", "manager");
+        TestUser supervisor = new("руководитель", Guid.NewGuid(), "+79990000077", ["customer", "supervisor"], "supervisor");
+        _keycloak.Add(supervisor, ["customer", "supervisor"]);
+
+        JsonElement result = await CheckAsync(supervisor, "users.view");
+
+        Assert.True(result.GetProperty("allowed").GetBoolean());
+        Assert.Contains("users.block", result.GetProperty("permissions").EnumerateArray().Select(p => p.GetString()));
+    }
+
+    [Fact]
+    public async Task Service_EvenWithAdminPermission_NotInKeyManagement()
+    {
+        // Защита в глубину: даже если сервису вручную выдали services.manage — ключами управляет только человек.
+        using HttpClient client = _factory.CreateClientWithToken(
+            _factory.CreateServiceToken(ORDERS, _orders, AuthServicePermissions.ProjectServices.MANAGE));
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(new Uri("/auth/admin/services", UriKind.Relative))).StatusCode);
+    }
+
     [Theory]
     [InlineData("/auth/services/users/{0}")]
     [InlineData("/auth/services/users/{0}/access?permission=profile.view")]
@@ -135,8 +159,9 @@ public sealed class ServiceUsersTests : IClassFixture<AuthServiceWebFactory>
     [Fact]
     public async Task Service_RevokedKey_Unauthorized()
     {
+        // Как при отзыве и перевыпуске ключа: отметка «по приложению» (клиент сервиса + его учётка), включая ту же секунду.
         string token = _factory.CreateServiceToken(ORDERS, _orders, AuthServicePermissions.ServiceAccess.USERS_READ);
-        await _factory.Revocations.RevokeUserAsync(_orders.ToString(), DateTimeOffset.UtcNow.AddSeconds(5), default);
+        await _factory.Revocations.RevokeAppAsync(ORDERS, _orders.ToString(), DateTimeOffset.UtcNow, default);
 
         using HttpClient client = _factory.CreateClientWithToken(token);
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(new Uri($"/auth/services/users/{TestUser.Customer.Id}", UriKind.Relative))).StatusCode);

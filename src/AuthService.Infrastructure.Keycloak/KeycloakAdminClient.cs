@@ -376,8 +376,9 @@ internal sealed partial class KeycloakAdminClient(
             return IdentityProviderErrors.AppNotFound();
         }
 
+        // Только роли этого же клиента: одноимённая роль другого приложения в составе — не право этого приложения.
         Result<RoleRepresentation[], Error> composites = await GetJsonAsync<RoleRepresentation[]>(
-            $"clients/{client.Value}/roles/{Uri.EscapeDataString(roleName)}/composites", cancellationToken);
+            $"clients/{client.Value}/roles/{Uri.EscapeDataString(roleName)}/composites/clients/{client.Value}", cancellationToken);
         return composites.IsFailure
             ? composites.Error
             : Result.Success<IReadOnlyList<string>, Error>([.. composites.Value.Select(role => role.Name).Order(StringComparer.Ordinal)]);

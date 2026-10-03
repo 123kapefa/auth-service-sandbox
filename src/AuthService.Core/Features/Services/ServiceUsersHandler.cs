@@ -87,17 +87,51 @@ public sealed class ServiceUsersHandler(
             return Denied(NO_MODE, mode);
         }
 
-        Result<IReadOnlyList<string>, Error> composites = await identityAdmin.GetRoleCompositesAsync(clientId, mode, cancellationToken);
-        if (composites.IsFailure)
+        Result<IReadOnlyList<string>, Error> collected = await PermissionsOfModeAsync(clientId, mode, roles.Value.Catalog, cancellationToken);
+        if (collected.IsFailure)
         {
-            return composites.Error;
+            return collected.Error;
         }
 
-        // В составе роли режима — права (и, возможно, вложенные роли): права — всё, что не роль приложения.
-        HashSet<string> appRoles = [.. roles.Value.Catalog.Where(role => !AppCatalog.IsPermission(role)).Select(role => role.Name)];
-        string[] permissions = [.. composites.Value.Where(name => !appRoles.Contains(name)).Order(StringComparer.Ordinal)];
+        IReadOnlyList<string> permissions = collected.Value;
         bool allowed = permissions.Contains(permission.Trim(), StringComparer.Ordinal);
         return new AccessCheckResponse(allowed, allowed ? null : PERMISSION_MISSING, mode, permissions);
+    }
+
+    // Права режима — как у маппера токена: состав роли с вложенными ролями этого приложения (обход без повторов).
+    // Право — всё, что в составе не роль приложения.
+    private async Task<Result<IReadOnlyList<string>, Error>> PermissionsOfModeAsync(
+        string clientId,
+        string mode,
+        IReadOnlyList<AppRole> catalog,
+        CancellationToken cancellationToken)
+    {
+        HashSet<string> appRoles = [.. catalog.Where(role => !AppCatalog.IsPermission(role)).Select(role => role.Name)];
+        HashSet<string> visited = new(StringComparer.Ordinal) { mode };
+        SortedSet<string> permissions = new(StringComparer.Ordinal);
+        Queue<string> pending = new([mode]);
+        while (pending.TryDequeue(out string? role))
+        {
+            Result<IReadOnlyList<string>, Error> composites = await identityAdmin.GetRoleCompositesAsync(clientId, role, cancellationToken);
+            if (composites.IsFailure)
+            {
+                return composites.Error;
+            }
+
+            foreach (string name in composites.Value)
+            {
+                if (!appRoles.Contains(name))
+                {
+                    permissions.Add(name);
+                }
+                else if (visited.Add(name))
+                {
+                    pending.Enqueue(name);
+                }
+            }
+        }
+
+        return Result.Success<IReadOnlyList<string>, Error>([.. permissions]);
     }
 
     private static AccessCheckResponse Denied(string reason, string? mode) => new(false, reason, mode, []);

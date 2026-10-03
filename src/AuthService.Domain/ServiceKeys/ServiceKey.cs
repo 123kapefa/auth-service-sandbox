@@ -67,7 +67,4 @@ public sealed class ServiceKey
         ProtectedRegistrationToken = protectedRegistrationToken;
         RotatedAt = rotatedAt;
     }
-
-    /// <summary>Токен управления сменился без перевыпуска ключа (Keycloak выдаёт новый на каждое обращение).</summary>
-    public void RegistrationTokenChanged(string protectedRegistrationToken) => ProtectedRegistrationToken = protectedRegistrationToken;
 }

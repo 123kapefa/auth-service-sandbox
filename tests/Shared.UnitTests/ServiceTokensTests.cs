@@ -46,6 +46,28 @@ public sealed class ServiceTokensTests
     }
 
     [Fact]
+    public async Task Retry_IsInNextSecond_AndResendsBody()
+    {
+        int issued = 0;
+        StubHandler keycloak = new(_ => Token($"t{++issued}"));
+        List<(long Second, string Body)> seen = [];
+        StubHandler api = new(request =>
+        {
+            seen.Add((DateTimeOffset.UtcNow.ToUnixTimeSeconds(), request.Content!.ReadAsStringAsync().GetAwaiter().GetResult()));
+            return new HttpResponseMessage(seen.Count == 1 ? HttpStatusCode.Unauthorized : HttpStatusCode.OK);
+        });
+        using ServiceProvider services = Services(keycloak);
+        using HttpClient client = Client(services, api);
+
+        using StringContent body = new("""{"text":"заказ оформлен"}""", Encoding.UTF8, "application/json");
+        HttpResponseMessage response = await client.PostAsync(new Uri("http://notifications/send"), body);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(seen[1].Second > seen[0].Second, "повтор — в следующей секунде");
+        Assert.Equal(seen[0].Body, seen[1].Body);
+    }
+
+    [Fact]
     public async Task UnauthorizedTwice_ReturnsUnauthorized_NoLoop()
     {
         StubHandler keycloak = new(_ => Token("t"));
@@ -87,7 +109,7 @@ public sealed class ServiceTokensTests
     }
 
     private static HttpClient Client(ServiceProvider services, StubHandler api) =>
-        new(new ServiceTokenHandler(services.GetRequiredService<IServiceTokenProvider>()) { InnerHandler = api });
+        new(new ServiceTokenHandler(services.GetRequiredService<IServiceTokenProvider>(), TimeProvider.System) { InnerHandler = api });
 
     private static HttpResponseMessage Token(string value) =>
         new(HttpStatusCode.OK)

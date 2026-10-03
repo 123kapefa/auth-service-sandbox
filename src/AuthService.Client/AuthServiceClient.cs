@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using AuthService.Contracts.Services;
 using CSharpFunctionalExtensions;
+using PlatformAuth.ServiceTokens;
 using SharedKernel;
 
 namespace AuthService.Client;
@@ -58,6 +59,16 @@ public sealed class AuthServiceClient(HttpClient http) : IAuthServiceClient
         catch (HttpRequestException exception)
         {
             return Error.Failure("auth_service.unavailable", $"Сервис входа недоступен: {exception.Message}").AsTransient();
+        }
+        catch (ServiceTokenException exception)
+        {
+            // Ключ сервиса отозван или в настройках старый секрет — без токена в сервис входа не пройти.
+            return Error.Authentication("auth_service.service_key_rejected", exception.Message);
+        }
+        catch (JsonException)
+        {
+            // Ответ не JSON (например, страница ошибки прокси).
+            return Error.Failure("auth_service.bad_response", "Сервис входа ответил не в формате API").AsTransient();
         }
     }
 

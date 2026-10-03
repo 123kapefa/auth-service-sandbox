@@ -22,6 +22,9 @@ describe("код сервиса — как на сервере", () => {
     expect(valid("1orders")).toBe(false);
     expect(valid("orders-")).toBe(false);
     expect(valid("заказы")).toBe(false);
+    expect(valid("a")).toBe(false); // как на сервере: минимум две буквы (начало и конец)
+    expect(valid("a".repeat(40))).toBe(true);
+    expect(valid("a".repeat(41))).toBe(false);
   });
 });
 

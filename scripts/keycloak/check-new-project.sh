@@ -31,13 +31,26 @@ echo "0. Проект с нуля: realm, первый админ, прилож�
 MASTER=$(master_token)
 curl -s -o /dev/null -X DELETE -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM"
 check "проект создан" \
-  "$(AUTH_BFF_CLIENT_SECRET=demo-shop-bff-secret "$ROOT/scripts/project/create-project.sh" "$REALM" "Демо-магазин" "$API" http://auth-service-demo-shop:8080 2>/dev/null | head -1)" \
+  "$(DEV=1 AUTH_BFF_CLIENT_SECRET=demo-shop-bff-secret "$ROOT/scripts/project/create-project.sh" "$REALM" "Демо-магазин" "$API" http://auth-service-demo-shop:8080 2>/dev/null | head -1)" \
   "Проект «Демо-магазин» создан: realm $REALM, клиенты auth-api и auth-bff."
 check "первый админ" "$("$ROOT/scripts/project/add-admin.py" "$REALM" "$ADMIN_PHONE" --email admin@demo-shop.test --password "$PASSWORD" | cut -d' ' -f1-4)" \
   "Админ проекта $REALM: +$ADMIN_PHONE"
 check "приложение «Заказы»" \
   "$("$ROOT/scripts/project/add-app.py" "$REALM" orders "Заказы" --default-role customer --web http://localhost:5300 | cut -d: -f1)" \
   "Приложение «Заказы» подключено к $REALM"
+# Повторный запуск после сбоя: шаги уже сделаны — пропускаются, атрибуты админа (режим в «Заказах») не теряются.
+ADMIN_ID=$(curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/users?username=$ADMIN_PHONE&exact=true" | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["id"])')
+curl -s -o /dev/null -X PUT -H "Authorization: Bearer $MASTER" -H 'Content-Type: application/json' \
+  -d '{"attributes":{"phone":["+'"$ADMIN_PHONE"'"],"active_mode":["admin"],"active_mode.orders":["customer"]}}' "$KC/admin/realms/$REALM/users/$ADMIN_ID"
+check "повторный запуск add-app.py и add-admin.py — без ошибок" \
+  "$("$ROOT/scripts/project/add-app.py" "$REALM" orders "Заказы" --default-role customer --web http://localhost:5300 2>&1 | cut -d: -f1) / $("$ROOT/scripts/project/add-admin.py" "$REALM" "$ADMIN_PHONE" --email admin@demo-shop.test --password "$PASSWORD" 2>&1 | cut -d' ' -f1-4)" \
+  "Приложение «Заказы» подключено к $REALM / Админ проекта $REALM: +$ADMIN_PHONE"
+check "повторный запуск с другим --web: адрес входа «Заказов» обновлён" \
+  "$("$ROOT/scripts/project/add-app.py" "$REALM" orders "Заказы" --web http://localhost:5301 > /dev/null 2>&1; curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/clients?clientId=orders-web" | python3 -c 'import json,sys; c=json.load(sys.stdin)[0]; print(c["redirectUris"][0], c["webOrigins"][0], c["attributes"]["post.logout.redirect.uris"])'; "$ROOT/scripts/project/add-app.py" "$REALM" orders "Заказы" --web http://localhost:5300 > /dev/null 2>&1)" \
+  "http://localhost:5301/* http://localhost:5301 http://localhost:5301/*"
+check "повторный запуск: атрибуты админа сохранены (режим в «Заказах»)" \
+  "$(curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/users/$ADMIN_ID" | python3 -c 'import json,sys; print(json.load(sys.stdin)["attributes"].get("active_mode.orders"))')" \
+  "['customer']"
 # Своя база сервиса проекта переживает пересоздание realm — ключи сервисов прошлого прогона в ней устарели.
 "${COMPOSE[@]}" exec -T postgres sh -c 'psql -q -U "$POSTGRES_USER" -d auth_demo_shop -c "DELETE FROM auth.service_keys"' > /dev/null 2>&1
 REGISTRATION=$(REALM=$REALM "$ROOT/scripts/keycloak/registration-token.sh")

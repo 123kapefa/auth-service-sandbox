@@ -8,10 +8,15 @@ namespace PlatformAuth.Redis;
 /// <summary>
 /// Отметки в Redis. Отзыв (неймспейс auth:revoked): user:{sub} = T, session:{sid} = 1, app:{приложение}:{sub} = T —
 /// приложение — клиент входа (azp) или клиент ролей (audience сервиса: у «Менеджера 1С» входит другой клиент) —
-/// T в секундах Unix. Доступ изменился (неймспейс auth:changed): user:{sub} = версия, mode:{клиент}:{роль} = версия.
-/// Все живут TokenLifetime: дольше старые токены не живут сами. Чтение — одним MGET.
+/// T в секундах Unix. Доступ изменился (неймспейс auth:changed): user:{sub} = версия, mode:{realm}:{клиент}:{роль} =
+/// версия. Все живут TokenLifetime: дольше старые токены не живут сами. Чтение — одним MGET.
+/// Redis может быть общим у нескольких проектов (realm): ключи с sub и так уникальны, ключ роли — с realm проекта
+/// (клиенты в проектах называются одинаково — auth-api).
 /// </summary>
-internal sealed class RedisTokenRevocationStore(IConnectionMultiplexer redis, IOptions<TokenRevocationOptions> options)
+internal sealed class RedisTokenRevocationStore(
+    IConnectionMultiplexer redis,
+    IOptions<TokenRevocationOptions> options,
+    IOptions<JwtAuthenticationOptions> authentication)
     : ITokenRevocationStore
 {
     private const string PREFIX = "auth:revoked:";
@@ -61,7 +66,10 @@ internal sealed class RedisTokenRevocationStore(IConnectionMultiplexer redis, IO
 
     private static RedisKey AccessKey(string subject) => CHANGED + "user:" + subject;
 
-    private static RedisKey ModeKey(string rolesClient, string role) => CHANGED + "mode:" + rolesClient + ":" + role;
+    private RedisKey ModeKey(string rolesClient, string role) => CHANGED + "mode:" + Realm + ":" + rolesClient + ":" + role;
+
+    // Realm проекта — последний сегмент издателя токенов (…/realms/shop → shop).
+    private string Realm => authentication.Value.ResolveIssuer().TrimEnd('/').Split('/')[^1];
 
     private static long? Latest(long? first, long? second) =>
         first is null ? second : second is null ? first : Math.Max(first.Value, second.Value);

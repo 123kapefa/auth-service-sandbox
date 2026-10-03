@@ -6,14 +6,14 @@ namespace AuthService.Contracts.Admin;
 /// <param name="Name">Название: «Заказы».</param>
 /// <param name="IssuedAt">Когда выдан ключ.</param>
 /// <param name="RotatedAt">Когда перевыпущен последний раз.</param>
-/// <param name="Permissions">Что сервису можно в сервисе входа: service.users.read, service.access.check.</param>
+/// <param name="Permissions">Что сервису можно в сервисе входа: service.users.read, service.access.check; null — не удалось прочитать.</param>
 public sealed record ServiceKeyResponse(
     string Code,
     string ClientId,
     string Name,
     DateTimeOffset IssuedAt,
     DateTimeOffset? RotatedAt,
-    IReadOnlyList<string> Permissions);
+    IReadOnlyList<string>? Permissions);
 
 /// <summary>Ключ выдан или перевыпущен: секрет показывается один раз — сохраните его в настройки сервиса.</summary>
 /// <param name="Service">Сервис.</param>

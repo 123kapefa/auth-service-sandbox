@@ -16,7 +16,7 @@ import {
 export function ServiceKeyActions({ service }: { service: ServiceKey }) {
   const [dialog, setDialog] = useState<"permissions" | "rotate" | "revoke" | null>(null);
   const [issued, setIssued] = useState<IssuedServiceKey | null>(null);
-  const [permissions, setPermissions] = useState<string[]>(service.permissions);
+  const [permissions, setPermissions] = useState<string[]>(service.permissions ?? []);
   const rotate = useRotateServiceKey();
   const revoke = useRevokeServiceKey();
   const setServicePermissions = useSetServicePermissions();
@@ -31,8 +31,9 @@ export function ServiceKeyActions({ service }: { service: ServiceKey }) {
       <Button
         size="sm"
         variant="ghost"
+        disabled={service.permissions === null}
         onClick={() => {
-          setPermissions(service.permissions);
+          setPermissions(service.permissions ?? []);
           setDialog("permissions");
         }}
       >
@@ -51,7 +52,8 @@ export function ServiceKeyActions({ service }: { service: ServiceKey }) {
         title={`Права сервиса «${service.name}»`}
         description="Права сузили — выданные сервису токены сразу перестанут действовать, он возьмёт новый."
       >
-        <div className="grid gap-2">
+        <fieldset className="grid gap-2">
+          <legend className="sr-only">Что можно в сервисе входа</legend>
           {SERVICE_PERMISSIONS.map((permission) => (
             <label key={permission.name} className="flex items-start gap-2 text-sm">
               <input
@@ -66,7 +68,7 @@ export function ServiceKeyActions({ service }: { service: ServiceKey }) {
               </span>
             </label>
           ))}
-        </div>
+        </fieldset>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="outline" onClick={() => setDialog(null)}>
             Отмена
@@ -98,6 +100,7 @@ export function ServiceKeyActions({ service }: { service: ServiceKey }) {
             onSuccess: (result) => {
               setDialog(null);
               setIssued(result);
+              rotate.reset(); // секрет — только в окне, не в состоянии мутации
             },
           })
         }

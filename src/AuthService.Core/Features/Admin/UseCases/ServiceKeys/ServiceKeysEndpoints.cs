@@ -21,7 +21,9 @@ public sealed class ServiceKeysEndpoints : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
+        // Только человек (защита в глубину: даже если сервису вручную дадут services.manage, ключами он не управляет).
         RouteGroupBuilder services = app.MapGroup("/auth/admin/services")
+            .RequireUser()
             .RequirePermissions(AuthServicePermissions.ProjectServices.MANAGE);
         services.MapGet(string.Empty, ListAsync);
         services.MapPost(string.Empty, IssueAsync);

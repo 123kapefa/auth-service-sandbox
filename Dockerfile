@@ -38,4 +38,6 @@ COPY --from=build /out/api .
 COPY --from=admin /admin/dist ./wwwroot/admin
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
+# Не root: встроенный пользователь образа aspnet (app, uid 1654). Сертификат DataProtection должен быть ему доступен.
+USER $APP_UID
 ENTRYPOINT ["dotnet", "AuthService.Api.dll"]

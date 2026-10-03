@@ -48,6 +48,17 @@ public sealed class AuthServiceClientTests
         Assert.Equal("users.not_found", user.Error.Messages[0].Code);
     }
 
+    [Fact]
+    public async Task NotJson_TransientFailure_NotException()
+    {
+        Stub api = new(HttpStatusCode.BadGateway, "<html>502 Bad Gateway</html>");
+
+        Result<ServiceUserResponse, Error> user = await Client(api).GetUserAsync(_user, default);
+
+        Assert.True(user.IsFailure);
+        Assert.Equal("auth_service.bad_response", user.Error.Messages[0].Code);
+    }
+
     private static AuthServiceClient Client(Stub api) => new(new HttpClient(api) { BaseAddress = new Uri("http://auth/") });
 
     private sealed class Stub(HttpStatusCode status, string body) : HttpMessageHandler

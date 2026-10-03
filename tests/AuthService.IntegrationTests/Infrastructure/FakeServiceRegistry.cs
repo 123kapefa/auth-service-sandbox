@@ -22,6 +22,12 @@ public sealed class FakeServiceRegistry : IServiceRegistry
     /// <summary>Учётка зарегистрированного клиента — в подставной Admin API (как service-account-… в Keycloak).</summary>
     public Action<Guid, string>? OnRegistered { get; set; }
 
+    /// <summary>Учётка сервиса «не нашлась» в Admin API (выдача прав упадёт) — проверка отката регистрации.</summary>
+    public bool SkipAccount { get; set; }
+
+    /// <summary>Клиент удалён вне сервиса входа (в консоли): токен управления больше не принимается.</summary>
+    public void Forget(string clientId) => _clients.TryRemove(clientId, out _);
+
     public IReadOnlyCollection<string> ClientIds => [.. _clients.Keys];
 
     public string? SecretOf(string clientId) => _clients.TryGetValue(clientId, out Client? client) ? client.Secret : null;
@@ -32,6 +38,7 @@ public sealed class FakeServiceRegistry : IServiceRegistry
     {
         _clients.Clear();
         Configured = true;
+        SkipAccount = false;
     }
 
     public Task<Result<RegisteredService, Error>> RegisterAsync(string clientId, string name, CancellationToken cancellationToken)
@@ -43,27 +50,31 @@ public sealed class FakeServiceRegistry : IServiceRegistry
 
         Client client = new(Next("secret"), Next("rat"), Guid.NewGuid());
         _clients[clientId] = client;
-        OnRegistered?.Invoke(client.ServiceAccountId, clientId);
+        if (!SkipAccount)
+        {
+            OnRegistered?.Invoke(client.ServiceAccountId, clientId);
+        }
+
         return Task.FromResult(Result.Success<RegisteredService, Error>(new RegisteredService(client.Secret, client.RegistrationToken, client.ServiceAccountId)));
     }
 
-    public Task<Result<RegisteredService, Error>> RotateSecretAsync(string clientId, string registrationToken, CancellationToken cancellationToken)
+    public Task<Result<RotatedSecret, Error>> RotateSecretAsync(string clientId, string registrationToken, CancellationToken cancellationToken)
     {
         if (!_clients.TryGetValue(clientId, out Client? client) || client.RegistrationToken != registrationToken)
         {
-            return Task.FromResult(Result.Failure<RegisteredService, Error>(ServiceRegistryErrors.RegistrationRejected()));
+            return Task.FromResult(Result.Failure<RotatedSecret, Error>(ServiceRegistryErrors.ManagementTokenRejected(clientId)));
         }
 
         Client rotated = client with { Secret = Next("secret"), RegistrationToken = Next("rat") };
         _clients[clientId] = rotated;
-        return Task.FromResult(Result.Success<RegisteredService, Error>(new RegisteredService(rotated.Secret, rotated.RegistrationToken, rotated.ServiceAccountId)));
+        return Task.FromResult(Result.Success<RotatedSecret, Error>(new RotatedSecret(rotated.Secret, rotated.RegistrationToken)));
     }
 
     public Task<UnitResult<Error>> DeleteAsync(string clientId, string registrationToken, CancellationToken cancellationToken)
     {
         if (!_clients.TryGetValue(clientId, out Client? client) || client.RegistrationToken != registrationToken)
         {
-            return Task.FromResult(UnitResult.Failure<Error>(ServiceRegistryErrors.RegistrationRejected()));
+            return Task.FromResult(UnitResult.Failure<Error>(ServiceRegistryErrors.ManagementTokenRejected(clientId)));
         }
 
         _clients.TryRemove(clientId, out _);
@@ -82,7 +93,23 @@ public sealed class InMemoryServiceKeyStore : IServiceKeyStore
 
     public IReadOnlyCollection<ServiceKey> Keys => [.. _keys.Values];
 
-    public void Reset() => _keys.Clear();
+    /// <summary>База «упала» на следующей записи (добавление или сохранение).</summary>
+    public bool FailNextWrite { get; set; }
+
+    public void Reset()
+    {
+        _keys.Clear();
+        FailNextWrite = false;
+    }
+
+    private void ThrowIfFailing()
+    {
+        if (FailNextWrite)
+        {
+            FailNextWrite = false;
+            throw new InvalidOperationException("База недоступна.");
+        }
+    }
 
     public Task<IReadOnlyList<ServiceKey>> ListAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<ServiceKey>>([.. _keys.Values.OrderBy(key => key.Code, StringComparer.Ordinal)]);
@@ -93,11 +120,16 @@ public sealed class InMemoryServiceKeyStore : IServiceKeyStore
     public Task AddAsync(ServiceKey key, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(key);
+        ThrowIfFailing();
         _keys[key.Code] = key;
         return Task.CompletedTask;
     }
 
-    public Task SaveAsync(ServiceKey key, CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task SaveAsync(ServiceKey key, CancellationToken cancellationToken)
+    {
+        ThrowIfFailing();
+        return Task.CompletedTask;
+    }
 
     public Task RemoveAsync(ServiceKey key, CancellationToken cancellationToken)
     {

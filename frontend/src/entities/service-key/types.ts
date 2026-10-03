@@ -5,8 +5,8 @@ export interface ServiceKey {
   name: string;
   issuedAt: string;
   rotatedAt: string | null;
-  /** Что сервису можно в сервисе входа: service.users.read, service.access.check. */
-  permissions: string[];
+  /** Что сервису можно в сервисе входа: service.users.read, service.access.check; null — не удалось прочитать. */
+  permissions: string[] | null;
 }
 
 /** Ответ на выдачу и перевыпуск: секрет показывается один раз. */

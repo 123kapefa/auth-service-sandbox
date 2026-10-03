@@ -31,8 +31,16 @@ def main():
     if args.password:
         user["credentials"] = [{"type": "password", "value": args.password, "temporary": False}]
     admin.call("POST", "/users", user, ok=(409,))
-    user_id = admin.call("GET", f"/users?username={digits}&exact=true")[0]["id"]
-    admin.call("PUT", f"/users/{user_id}", {"attributes": user["attributes"], **({"email": args.email, "emailVerified": True} if args.email else {})})
+    found = admin.call("GET", f"/users?username={digits}&exact=true")
+    if not found:
+        # 409 не из-за телефона — почта уже у другого пользователя.
+        raise SystemExit(f"Пользователь +{digits} не создан: почта {args.email} уже занята другим пользователем?")
+    existing = found[0]
+    user_id = existing["id"]
+    # Уже был — атрибуты дописываем к его собственным (режимы в других приложениях и т. п. не теряются).
+    attributes = {**(existing.get("attributes") or {}), **user["attributes"]}
+    admin.call("PUT", f"/users/{user_id}", {**existing, "attributes": attributes,
+                                            **({"email": args.email, "emailVerified": True} if args.email else {})})
 
     api = admin.client("auth-api")
     admin.call("POST", f"/users/{user_id}/role-mappings/clients/{api['id']}", [admin.role(api["id"], "admin")])

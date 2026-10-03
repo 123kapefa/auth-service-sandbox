@@ -21,3 +21,4 @@ __pycache__/
 
 # Поставка: пакеты и образы (scripts/package)
 artifacts/
+.check-deploy/
