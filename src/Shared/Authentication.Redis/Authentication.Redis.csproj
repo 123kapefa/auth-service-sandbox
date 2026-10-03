@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Platform.Authentication.Redis</PackageId>
+    <Description>Мгновенный отзыв токенов и «доступ изменился» — отметки сервиса входа в Redis.</Description>
+  </PropertyGroup>
+  <PropertyGroup>
     <RootNamespace>PlatformAuth.Redis</RootNamespace>
   </PropertyGroup>
   <ItemGroup>

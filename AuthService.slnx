@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/AuthService.Api/AuthService.Api.csproj" />
+    <Project Path="src/AuthService.Client/AuthService.Client.csproj" />
     <Project Path="src/AuthService.Contracts/AuthService.Contracts.csproj" />
     <Project Path="src/AuthService.Core/AuthService.Core.csproj" />
     <Project Path="src/AuthService.Domain/AuthService.Domain.csproj" />

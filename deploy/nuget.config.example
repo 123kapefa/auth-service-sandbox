@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Пакеты сервиса входа для сервисов проекта: локальный фид (scripts/package/pack.sh → artifacts/nuget) или внутренний
+  NuGet-сервер компании. Скопировать как nuget.config в корень решения сервиса и поправить путь.
+-->
+<configuration>
+  <packageSources>
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+    <add key="platform-auth" value="../auth_service/artifacts/nuget" />
+  </packageSources>
+  <packageSourceMapping>
+    <packageSource key="platform-auth">
+      <package pattern="Platform.*" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
+</configuration>

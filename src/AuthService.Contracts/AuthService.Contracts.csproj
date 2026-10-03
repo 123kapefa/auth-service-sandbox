@@ -1,1 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk" />
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Platform.AuthService.Contracts</PackageId>
+    <Description>Контракты API сервиса входа: админка и API для сервисов проекта.</Description>
+  </PropertyGroup>
+</Project>

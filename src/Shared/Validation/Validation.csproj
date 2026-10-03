@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Platform.Validation</PackageId>
+    <Description>FluentValidation → Error платформы (WithError, ToError).</Description>
+  </PropertyGroup>
+  <PropertyGroup>
     <RootNamespace>Validation</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
