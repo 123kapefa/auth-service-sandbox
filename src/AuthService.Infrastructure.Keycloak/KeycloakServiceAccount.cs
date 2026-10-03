@@ -67,11 +67,11 @@ internal sealed partial class KeycloakServiceAccount(
 
     public void Dispose() => _lock.Dispose();
 
-    // …/realms/sandbox/protocol/openid-connect/token → …/realms/sandbox/
+    // …/realms/{realm}/protocol/openid-connect/token → …/realms/{realm}/
     private static Uri RealmBase(string tokenEndpoint) =>
         new(tokenEndpoint[..(tokenEndpoint.IndexOf("/protocol/", StringComparison.Ordinal) + 1)]);
 
-    // …/realms/sandbox/protocol/openid-connect/token → …/admin/realms/sandbox/
+    // …/realms/{realm}/protocol/openid-connect/token → …/admin/realms/{realm}/
     private static Uri AdminBase(string tokenEndpoint)
     {
         const string realms = "/realms/";

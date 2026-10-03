@@ -5,7 +5,7 @@ public sealed class JwtAuthenticationOptions
 {
     public const string SECTION_NAME = "Authentication";
 
-    /// <summary>Адрес realm сервера входа, например http://localhost:8180/realms/sandbox.</summary>
+    /// <summary>Адрес realm сервера входа, например http://localhost:8180/realms/shop.</summary>
     public string Authority { get; init; } = string.Empty;
 
     /// <summary>

@@ -1,0 +1,47 @@
+# Второй проект на том же Keycloak: «Демо-магазин» (realm demo-shop) — свой экземпляр сервиса входа из того же образа.
+# Образец «как встроить»: отличаются только настройки (realm, секрет, база, адреса). Создать проект и запустить:
+#   AUTH_BFF_CLIENT_SECRET=demo-shop-bff-secret scripts/project/create-project.sh demo-shop "Демо-магазин" \
+#       http://localhost:8082 http://auth-service-demo-shop:8080
+#   docker compose -f compose.yaml -f infra/projects/demo-shop/compose.yaml up -d --wait auth-service-demo-shop
+# В браузере оба сервиса на localhost делят cookie (порт cookie не различает) — проверять по очереди или скриптом;
+# в бою у проектов разные домены.
+services:
+  auth-migrator-demo-shop:
+    image: auth_service-api:local
+    entrypoint: ["./efbundle", "--connection", "Host=postgres;Port=5432;Database=auth_demo_shop;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"]
+    depends_on:
+      demo-shop-db:
+        condition: service_completed_successfully
+
+  # База сервиса проекта — своя (в общем Postgres песочницы — отдельная база).
+  demo-shop-db:
+    image: postgres:17-alpine
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    entrypoint: ["sh", "-c", "psql -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB} -tAc \"SELECT 1 FROM pg_database WHERE datname = 'auth_demo_shop'\" | grep -q 1 || psql -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c 'CREATE DATABASE auth_demo_shop'"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  auth-service-demo-shop:
+    image: auth_service-api:local
+    init: true
+    ports:
+      - "8082:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__AuthDb: Host=postgres;Port=5432;Database=auth_demo_shop;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      ConnectionStrings__Redis: redis:6379
+      # Проект: realm и клиенты компонента (auth-api, auth-bff) — одинаковые во всех проектах.
+      Authentication__Authority: http://localhost:8180/realms/demo-shop
+      Authentication__MetadataAddress: http://keycloak:8180/realms/demo-shop/.well-known/openid-configuration
+      Authentication__Audience: auth-api
+      Keycloak__ClientId: auth-bff
+      Keycloak__ClientSecret: ${DEMO_SHOP_BFF_CLIENT_SECRET:-demo-shop-bff-secret}
+      Keycloak__RegistrationToken: ${DEMO_SHOP_REGISTRATION_TOKEN:-}
+      ReturnUrls__AllowedOrigins__0: http://localhost:8082
+    depends_on:
+      redis:
+        condition: service_healthy
+      auth-migrator-demo-shop:
+        condition: service_completed_successfully

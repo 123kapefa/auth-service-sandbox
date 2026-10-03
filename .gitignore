@@ -15,3 +15,6 @@ src/AuthService.Api/wwwroot/admin/
 login-theme/node_modules/
 login-theme/dist/
 login-theme/dist_keycloak/
+
+# Python-скрипты (scripts/project)
+__pycache__/

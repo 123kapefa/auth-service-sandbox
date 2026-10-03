@@ -9,7 +9,7 @@ using SharedKernel;
 namespace AuthService.Core.Features.Auth.UseCases.BackchannelLogout;
 
 /// <summary>
-/// POST /auth/backchannel-logout (form: logout_token) — вызывает Keycloak, адрес — в настройках клиента sandbox-bff
+/// POST /auth/backchannel-logout (form: logout_token) — вызывает Keycloak, адрес — в настройках клиента входа (auth-bff)
 /// (backchannel.logout.url). Без входа: подлинность — подпись logout_token.
 /// </summary>
 public sealed class BackchannelLogoutEndpoint : IEndpoint
