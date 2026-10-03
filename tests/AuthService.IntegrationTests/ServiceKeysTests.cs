@@ -16,6 +16,8 @@ public sealed class ServiceKeysTests : IClassFixture<AuthServiceWebFactory>
     {
         _factory = factory;
         factory.ServiceRegistry.Reset();
+        factory.IdentityAdmin.Reset();
+        factory.IdentityAdmin.SeedAppRoles();
         factory.ServiceKeys.Reset();
         factory.Revocations.Reset();
         factory.AuditLog.Reset();
@@ -34,6 +36,37 @@ public sealed class ServiceKeysTests : IClassFixture<AuthServiceWebFactory>
         JsonElement service = Assert.Single(list.EnumerateArray());
         Assert.Equal("Заказы", service.GetProperty("name").GetString());
         Assert.False(service.TryGetProperty("clientSecret", out _)); // в списке секрета нет
+    }
+
+    [Fact]
+    public async Task Issue_WithPermissions_GrantedToServiceAccount()
+    {
+        JsonElement issued = await ResultAsync(await IssueAsync("orders", "Заказы", permissions: ["service.users.read"]));
+
+        Assert.Equal(["service.users.read"], issued.GetProperty("service").GetProperty("permissions").EnumerateArray().Select(p => p.GetString()));
+        (Guid account, string[] grant, string[] _) = Assert.Single(_factory.IdentityAdmin.RoleChanges);
+        Assert.Equal((_factory.ServiceRegistry.ServiceAccountOf("service-orders"), "service.users.read"), (account, Assert.Single(grant)));
+    }
+
+    [Fact]
+    public async Task Issue_UserPermission_BadRequest()
+    {
+        Assert.Equal(HttpStatusCode.BadRequest, (await IssueAsync("orders", "Заказы", permissions: ["users.block"])).StatusCode);
+        Assert.Empty(_factory.ServiceRegistry.ClientIds);
+    }
+
+    [Fact]
+    public async Task SetPermissions_Narrowed_TokensRevoked()
+    {
+        await IssueAsync("orders", "Заказы", permissions: ["service.users.read", "service.access.check"]);
+
+        using HttpClient client = _factory.CreateClientFor(TestUser.AdminInAdminMode);
+        HttpResponseMessage response = await client.PutAsJsonAsync(
+            new Uri("/auth/admin/services/orders/permissions", UriKind.Relative), new { permissions = new[] { "service.access.check" } });
+
+        Assert.Equal(["service.access.check"], (await ResultAsync(response)).GetProperty("permissions").EnumerateArray().Select(p => p.GetString()));
+        Assert.True(_factory.Revocations.HasApp("service-orders", _factory.ServiceRegistry.ServiceAccountOf("service-orders")));
+        Assert.Equal(AuditActions.SERVICE_KEY_PERMISSIONS_CHANGED, _factory.AuditLog.Entries[^1].Action);
     }
 
     [Fact]
@@ -82,7 +115,7 @@ public sealed class ServiceKeysTests : IClassFixture<AuthServiceWebFactory>
         string second = rotated.GetProperty("clientSecret").GetString()!;
         Assert.NotEqual(first, second);
         Assert.Equal(_factory.ServiceRegistry.SecretOf("service-orders"), second);
-        Assert.True(_factory.Revocations.HasUser(_factory.ServiceRegistry.ServiceAccountOf("service-orders")));
+        Assert.True(_factory.Revocations.HasApp("service-orders", _factory.ServiceRegistry.ServiceAccountOf("service-orders")));
         Assert.Equal(AuditActions.SERVICE_KEY_ROTATED, _factory.AuditLog.Entries[^1].Action);
 
         // Токен управления сменился при перевыпуске — следующий перевыпуск идёт уже новым.
@@ -99,7 +132,7 @@ public sealed class ServiceKeysTests : IClassFixture<AuthServiceWebFactory>
 
         Assert.Empty(_factory.ServiceRegistry.ClientIds);
         Assert.Empty(_factory.ServiceKeys.Keys);
-        Assert.True(_factory.Revocations.HasUser(serviceAccount));
+        Assert.True(_factory.Revocations.HasApp("service-orders", serviceAccount));
         Assert.Equal(AuditActions.SERVICE_KEY_REVOKED, _factory.AuditLog.Entries[^1].Action);
     }
 
@@ -134,10 +167,10 @@ public sealed class ServiceKeysTests : IClassFixture<AuthServiceWebFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(new Uri("/auth/admin/services", UriKind.Relative))).StatusCode);
     }
 
-    private async Task<HttpResponseMessage> IssueAsync(string code, string name, TestUser? caller = null)
+    private async Task<HttpResponseMessage> IssueAsync(string code, string name, TestUser? caller = null, string[]? permissions = null)
     {
         using HttpClient client = _factory.CreateClientFor(caller ?? TestUser.AdminInAdminMode);
-        return await client.PostAsJsonAsync(new Uri("/auth/admin/services", UriKind.Relative), new { code, name });
+        return await client.PostAsJsonAsync(new Uri("/auth/admin/services", UriKind.Relative), new { code, name, permissions });
     }
 
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, TestUser? caller = null)

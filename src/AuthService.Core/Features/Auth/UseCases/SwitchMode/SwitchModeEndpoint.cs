@@ -18,7 +18,7 @@ namespace AuthService.Core.Features.Auth.UseCases.SwitchMode;
 public sealed class SwitchModeEndpoint : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app) =>
-        app.MapPost("/auth/mode", Handle).RequireAuthorization();
+        app.MapPost("/auth/mode", Handle).RequireUser();
 
     private static async Task<EndpointResult<SwitchModeResponse>> Handle(
         [FromBody] SwitchModeRequest request,

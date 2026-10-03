@@ -14,7 +14,7 @@ namespace AuthService.Core.Features.Me;
 public sealed class GetMeEndpoint : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app) =>
-        app.MapGet("/me/", Handle).RequireAuthorization();
+        app.MapGet("/me/", Handle).RequireUser();
 
     private static EndpointResult<MeResponse> Handle([FromServices] CurrentUser user) =>
         Result.Success<MeResponse, Error>(new MeResponse(

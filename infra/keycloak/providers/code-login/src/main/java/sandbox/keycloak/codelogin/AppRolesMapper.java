@@ -23,6 +23,9 @@ import org.keycloak.representations.IDToken;
  * админ в режиме покупателя получает права покупателя. Сервисы читают права из токена — карта в их коде не нужна.
  * access_version и mode_version — версии доступа пользователя и роли активного режима: по ним сервисы узнают, что
  * доступ изменился, и просят клиента обновить токен (умный рефреш).
+ * Токен служебной учётки (сервис проекта по ключу) — без ролей пользователя (у сервиса нет режимов, роли по умолчанию
+ * realm ему не нужны), permissions — выданные сервису права, client_id — какой сервис: по нему сервисы отличают
+ * сервис от человека.
  */
 public final class AppRolesMapper extends AbstractOIDCProtocolMapper
     implements OIDCAccessTokenMapper, UserInfoTokenMapper, TokenIntrospectionTokenMapper {
@@ -33,6 +36,7 @@ public final class AppRolesMapper extends AbstractOIDCProtocolMapper
     private static final String DEFAULT_MODE_ATTRIBUTE = "active_mode";
     static final String ACCESS_VERSION = "access_version";
     static final String MODE_VERSION = "mode_version";
+    static final String SERVICE_CLIENT = "client_id";
 
     private static final List<ProviderConfigProperty> CONFIG = new ArrayList<>();
 
@@ -87,6 +91,15 @@ public final class AppRolesMapper extends AbstractOIDCProtocolMapper
         }
 
         UserModel user = userSession.getUser();
+        if (user.getServiceAccountClientLink() != null) {
+            ClientModel service = session.getContext().getRealm().getClientById(user.getServiceAccountClientLink());
+            token.getOtherClaims().put("role", List.of());
+            token.getOtherClaims().put("available_roles", List.of());
+            token.getOtherClaims().put("permissions", AppRoles.servicePermissionsOf(client, user));
+            token.getOtherClaims().put(SERVICE_CLIENT, service == null ? user.getServiceAccountClientLink() : service.getClientId());
+            return;
+        }
+
         List<String> roles = AppRoles.rolesOf(client, user);
         String modeAttribute = mapping.getConfig().getOrDefault(MODE_ATTRIBUTE, DEFAULT_MODE_ATTRIBUTE);
         token.getOtherClaims().put("role", roles);

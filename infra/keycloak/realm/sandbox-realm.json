@@ -445,6 +445,34 @@
               "code"
             ]
           }
+        },
+        {
+          "name": "service.users.read",
+          "description": "Сервис: читать пользователя",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "service.access.check",
+          "description": "Сервис: проверить доступ пользователя",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
         }
       ],
       "account": [

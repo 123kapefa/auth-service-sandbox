@@ -44,6 +44,18 @@ final class AppRoles {
             .toList();
     }
 
+    /**
+     * Права служебной учётки (сервис проекта с ключом доступа): у сервиса нет режимов — права только выданные ему прямо.
+     * Роли по умолчанию realm (customer и её права) учётка получает при создании — сервису они не нужны и не считаются.
+     */
+    static List<String> servicePermissionsOf(ClientModel client, UserModel serviceAccount) {
+        return serviceAccount.getClientRoleMappingsStream(client)
+            .filter(AppRoles::isPermission)
+            .map(RoleModel::getName)
+            .sorted()
+            .toList();
+    }
+
     /** Версия роли активного режима (атрибут version), если режим — роль пользователя; иначе null. */
     static String versionOf(ClientModel client, UserModel user, String activeMode) {
         RoleModel mode = activeMode == null ? null : client.getRole(activeMode);

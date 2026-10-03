@@ -74,7 +74,7 @@ login "$MANAGER" /me/ 0987654321 > /dev/null   # после очистки: со
 echo "1. Каталог прав: системные из кода и свои из админки"
 check "системные права приложения (из кода, source=code)" \
   "$(call "$ADMIN" GET "$PERMS" '' '",".join(sorted(p["name"] for p in r if p["source"] == "code"))')" \
-  "200 audit.view,profile.view,roles.manage,services.manage,users.block,users.credentials.manage,users.roles.manage,users.sessions.manage,users.view"
+  "200 audit.view,profile.view,roles.manage,service.access.check,service.users.read,services.manage,users.block,users.credentials.manage,users.roles.manage,users.sessions.manage,users.view"
 check "у права есть описание" "$(call "$ADMIN" GET "$PERMS" '' '[p["description"] for p in r if p["name"] == "users.view"][0]')" "200 Пользователи: список и карточка"
 check "своё право создаётся (source=admin)" \
   "$(call "$ADMIN" POST "$PERMS" '{"name":"reports.export","description":"Выгрузка отчётов"}' '[p["source"] for p in r if p["name"] == "reports.export"][0]')" "200 admin"

@@ -18,7 +18,7 @@ namespace AuthService.Core.Features.Admin.UseCases.AdminMe;
 public sealed class AdminMeEndpoint : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app) =>
-        app.MapGet("/auth/admin/me", Handle).RequireAuthorization();
+        app.MapGet("/auth/admin/me", Handle).RequireUser();
 
     private static async Task<EndpointResult<AdminMeResponse>> Handle(
         [FromServices] CurrentUser caller,

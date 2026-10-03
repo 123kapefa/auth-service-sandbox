@@ -20,6 +20,7 @@ public static class AuditActions
     public const string SERVICE_KEY_ISSUED = "ServiceKeyIssued";
     public const string SERVICE_KEY_ROTATED = "ServiceKeyRotated";
     public const string SERVICE_KEY_REVOKED = "ServiceKeyRevoked";
+    public const string SERVICE_KEY_PERMISSIONS_CHANGED = "ServiceKeyPermissionsChanged";
 
     public const string USER_OBJECT = "user";
     public const string ROLE_OBJECT = "role";

@@ -19,6 +19,9 @@ public sealed class FakeServiceRegistry : IServiceRegistry
 
     public bool IsConfigured => Configured;
 
+    /// <summary>Учётка зарегистрированного клиента — в подставной Admin API (как service-account-… в Keycloak).</summary>
+    public Action<Guid, string>? OnRegistered { get; set; }
+
     public IReadOnlyCollection<string> ClientIds => [.. _clients.Keys];
 
     public string? SecretOf(string clientId) => _clients.TryGetValue(clientId, out Client? client) ? client.Secret : null;
@@ -40,6 +43,7 @@ public sealed class FakeServiceRegistry : IServiceRegistry
 
         Client client = new(Next("secret"), Next("rat"), Guid.NewGuid());
         _clients[clientId] = client;
+        OnRegistered?.Invoke(client.ServiceAccountId, clientId);
         return Task.FromResult(Result.Success<RegisteredService, Error>(new RegisteredService(client.Secret, client.RegistrationToken, client.ServiceAccountId)));
     }
 

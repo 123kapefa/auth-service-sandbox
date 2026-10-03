@@ -120,7 +120,7 @@ check "manager = просмотр и блокировка пользовател
 check "admin = все права" "$(composites admin)" audit.view,profile.view,roles.manage,services.manage,users.block,users.credentials.manage,users.roles.manage,users.sessions.manage,users.view
 check "права помечены kind=permission" "$(curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/clients/$API_ID/roles?briefRepresentation=false" \
   | python3 -c 'import json,sys; r=json.load(sys.stdin); print(",".join(sorted(x["name"] for x in r if x.get("attributes",{}).get("kind")==["permission"])))')" \
-  audit.view,profile.view,roles.manage,services.manage,users.block,users.credentials.manage,users.roles.manage,users.sessions.manage,users.view
+  audit.view,profile.view,roles.manage,service.access.check,service.users.read,services.manage,users.block,users.credentials.manage,users.roles.manage,users.sessions.manage,users.view
 check "в role токена — только роли, без прав" "$(token 71234567890 | claim role)" admin,customer
 check "permissions — права активного режима: админ в режиме admin" "$(token 71234567890 | claim permissions)" \
   audit.view,profile.view,roles.manage,services.manage,users.block,users.credentials.manage,users.roles.manage,users.sessions.manage,users.view

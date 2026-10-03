@@ -24,7 +24,7 @@ public static class AppPermissionFilter
     public static TBuilder RequireAppPermission<TBuilder>(this TBuilder builder, string permission)
         where TBuilder : IEndpointConventionBuilder
     {
-        builder.RequireAuthorization();
+        builder.RequireUser();
         builder.AddEndpointFilter(async (context, next) =>
             await AllowedAsync(context.HttpContext, permission)
                 ? await next(context)

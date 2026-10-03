@@ -33,7 +33,11 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
     private readonly RSA _rsa = RSA.Create(2048);
     private readonly RsaSecurityKey _signingKey;
 
-    public AuthServiceWebFactory() => _signingKey = new RsaSecurityKey(_rsa) { KeyId = "test-key" };
+    public AuthServiceWebFactory()
+    {
+        _signingKey = new RsaSecurityKey(_rsa) { KeyId = "test-key" };
+        ServiceRegistry.OnRegistered = IdentityAdmin.AddServiceAccount;
+    }
 
     /// <summary>Подставной сервер входа вместо Keycloak.</summary>
     public FakeIdentityProvider IdentityProvider { get; } = new();
@@ -115,6 +119,33 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
             Expires = now.AddMinutes(15), // как access-токен Keycloak
             SigningCredentials = new SigningCredentials(_signingKey, SecurityAlgorithms.RsaSha256),
             Claims = claims,
+        });
+    }
+
+    /// <summary>
+    /// Токен сервиса проекта по ключу доступа — как его выпускает Keycloak с маппером плагина: без ролей пользователя,
+    /// права — выданные сервису, client_id — какой сервис.
+    /// </summary>
+    public string CreateServiceToken(string clientId, Guid serviceAccountId, params string[] permissions)
+    {
+        DateTime now = DateTime.UtcNow;
+        return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = ISSUER,
+            Audience = AUDIENCE,
+            IssuedAt = now,
+            NotBefore = now,
+            Expires = now.AddMinutes(15),
+            SigningCredentials = new SigningCredentials(_signingKey, SecurityAlgorithms.RsaSha256),
+            Claims = new Dictionary<string, object>(StringComparer.Ordinal)
+            {
+                [AuthClaims.SUBJECT] = serviceAccountId.ToString(),
+                [AuthClaims.ROLE] = Array.Empty<string>(),
+                [AuthClaims.AVAILABLE_ROLES] = Array.Empty<string>(),
+                [AuthClaims.PERMISSIONS] = permissions,
+                [AuthClaims.AUTHORIZED_PARTY] = clientId,
+                [AuthClaims.CLIENT_ID] = clientId,
+            },
         });
     }
 

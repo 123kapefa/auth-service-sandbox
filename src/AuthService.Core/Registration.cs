@@ -21,6 +21,7 @@ using AuthService.Core.Features.Auth.UseCases.Logout;
 using AuthService.Core.Features.Auth.UseCases.Refresh;
 using AuthService.Core.Features.Auth.UseCases.SwitchMode;
 using AuthService.Core.Features.Security;
+using AuthService.Core.Features.Services;
 using FluentValidation;
 using Framework.Endpoints;
 using Microsoft.Extensions.Configuration;
@@ -71,6 +72,7 @@ public static class Registration
         services.AddHostedService<PermissionCatalogSync>();
         services.AddScoped<SessionsHandler>();
         services.AddScoped<ServiceKeysHandler>();
+        services.AddScoped<ServiceUsersHandler>();
 
         return services;
     }

@@ -65,6 +65,14 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
             []);
     }
 
+    /// <summary>Учётка сервиса проекта (клиент с ключом доступа) — как service-account-… в Keycloak.</summary>
+    public void AddServiceAccount(Guid id, string clientId) =>
+        _accounts[id] = new Account(
+            new IdentityUser(id, "service-account-" + clientId, null, null, null, true, DateTimeOffset.UtcNow),
+            [],
+            false,
+            []);
+
     /// <summary>Роли пользователя в другом приложении (например, «Менеджер 1С»).</summary>
     public void SetAppRoles(TestUser user, string clientId, params string[] roles)
     {

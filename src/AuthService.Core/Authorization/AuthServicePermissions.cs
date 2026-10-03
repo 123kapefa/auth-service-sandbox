@@ -37,6 +37,21 @@ public static class AuthServicePermissions
         public const string MANAGE = "services.manage";
     }
 
+    /// <summary>
+    /// Права сервисов проекта (по ключу доступа) в сервисе входа. Выдаются ключу при выдаче или позже; людям — не нужны:
+    /// эндпоинты с ними пускают только сервисы (RequireService).
+    /// </summary>
+    public static class ServiceAccess
+    {
+        /// <summary>Читать пользователя по Id или логину: телефон, почта, заблокирован ли.</summary>
+        public const string USERS_READ = "service.users.read";
+
+        /// <summary>Проверить, есть ли у пользователя право в приложении (фоновые задачи без токена пользователя).</summary>
+        public const string ACCESS_CHECK = "service.access.check";
+
+        public static IReadOnlyList<string> All { get; } = [USERS_READ, ACCESS_CHECK];
+    }
+
     public static class Roles
     {
         /// <summary>Роли и права приложения: создавать, менять состав, удалять.</summary>
@@ -54,5 +69,7 @@ public static class AuthServicePermissions
         new(Audit.VIEW, "Журнал действий и входов"),
         new(Roles.MANAGE, "Роли и права приложения"),
         new(ProjectServices.MANAGE, "Сервисы проекта и их ключи доступа"),
+        new(ServiceAccess.USERS_READ, "Сервис: читать пользователя"),
+        new(ServiceAccess.ACCESS_CHECK, "Сервис: проверить доступ пользователя"),
     ];
 }

@@ -38,5 +38,11 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor, IPermi
 
     public bool HasPermission(string permission) => Permissions.Contains(permission);
 
+    /// <summary>Вызывает сервис проекта по ключу доступа (не человек).</summary>
+    public bool IsService => ServiceClientId is not null;
+
+    /// <summary>client_id сервиса, вызвавшего по ключу; у человека — null.</summary>
+    public string? ServiceClientId => Principal.FindFirstValue(AuthClaims.CLIENT_ID);
+
     private ClaimsPrincipal Principal => httpContextAccessor.HttpContext?.User ?? new ClaimsPrincipal(new ClaimsIdentity());
 }

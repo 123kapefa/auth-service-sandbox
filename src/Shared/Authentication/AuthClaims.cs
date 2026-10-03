@@ -36,4 +36,10 @@ public static class AuthClaims
 
     /// <summary>Когда пользователь вошёл (секунды Unix): для действий, требующих недавнего входа.</summary>
     public const string AUTH_TIME = "auth_time";
+
+    /// <summary>
+    /// Сервис проекта, получивший токен своим ключом доступа (client_credentials): его client_id. Есть только у токенов
+    /// сервисов — по нему сервис отличается от человека.
+    /// </summary>
+    public const string CLIENT_ID = "client_id";
 }

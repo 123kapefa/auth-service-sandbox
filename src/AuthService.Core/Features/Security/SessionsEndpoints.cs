@@ -19,7 +19,7 @@ public sealed class SessionsEndpoints : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        RouteGroupBuilder security = app.MapGroup("/security/sessions").RequireAuthorization();
+        RouteGroupBuilder security = app.MapGroup("/security/sessions").RequireUser();
         security.MapGet(string.Empty, ListAsync);
         security.MapPost("/{sessionId}/terminate", TerminateAsync);
         security.MapPost("/terminate-all-others", TerminateOthersAsync);
