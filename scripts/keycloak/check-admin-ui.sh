@@ -53,6 +53,10 @@ check "«кто я»: права проекта и все приложения" 
 check "названия приложений — без ключей Keycloak \${…}" \
   "$(json "$ADMIN" "/auth/admin/users/$(json "$ADMIN" '/auth/admin/users?search=79990000001' 'r["items"][0]["id"]' | cut -d' ' -f2)/apps" 'str(any(a["name"] and a["name"].startswith("${") for a in r))')" \
   "200 False"
+check "раздел «Сервисы» — та же страница (SPA)" \
+  "$(curl -s -o "$WORK/services.html" -w '%{http_code}' "$API/admin/services") $(cmp -s "$WORK/index.html" "$WORK/services.html" && echo same)" "200 same"
+check "«кто я»: у админа проекта — право на сервисы и ключи" "$(json "$ADMIN" /auth/admin/me 'str("services.manage" in r["permissions"])')" "200 True"
+check "список сервисов для раздела" "$(json "$ADMIN" /auth/admin/services 'type(r).__name__')" "200 list"
 check "журнал по приложению" "$(json "$ADMIN" '/auth/admin/audit?app=manager-1c&pageSize=5' 'str(all(i["app"] == "manager-1c" for i in r["items"]))')" "200 True"
 check "роли пользователя: что можно выдать" \
   "$(json "$ADMIN" "/auth/admin/apps/manager-1c/users/$(json "$ADMIN" '/auth/admin/users?search=79990000008' 'r["items"][0]["id"]' | cut -d' ' -f2)/roles" '",".join(x["name"] for x in r["assignableRoles"])')" \

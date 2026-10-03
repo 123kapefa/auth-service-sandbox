@@ -19,6 +19,10 @@ export function navItems(access: AdminAccess): NavItem[] {
     items.push({ to: "/journal", label: "Журнал" });
   }
 
+  if (access.projectServices) {
+    items.push({ to: "/services", label: "Сервисы" });
+  }
+
   // Приложение — в меню, если в его разделе есть хоть одна вкладка (выдача ролей, роли и права, журнал).
   for (const app of access.apps) {
     if (appTabs(app).length > 0) {

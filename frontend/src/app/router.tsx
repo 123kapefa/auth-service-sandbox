@@ -6,6 +6,7 @@ import { AppUsersPage } from "@/pages/app-users";
 import { JournalPage } from "@/pages/journal";
 import { NotFoundPage } from "@/pages/not-found";
 import { OverviewPage } from "@/pages/overview";
+import { ServicesPage } from "@/pages/services";
 import { UserPage } from "@/pages/user";
 import { UsersPage } from "@/pages/users";
 import { ADMIN_BASE } from "@/shared/config/routes";
@@ -21,6 +22,7 @@ export const router = createBrowserRouter(
         { path: "users", element: <UsersPage /> },
         { path: "users/:userId", element: <UserPage /> },
         { path: "journal", element: <JournalPage /> },
+        { path: "services", element: <ServicesPage /> },
         {
           path: "apps/:clientId",
           element: <AppSection />,
