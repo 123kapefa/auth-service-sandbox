@@ -71,6 +71,9 @@ public static class Registration
         services.AddScoped<CredentialsHandler>();
         services.AddHostedService<PermissionCatalogSync>();
         services.AddScoped<SessionsHandler>();
+        services.AddScoped<LoginDevices>();
+        services.AddScoped<LoginDeviceRecorder>();
+        services.AddScoped<LoginHistoryHandler>();
         services.AddScoped<ServiceKeysHandler>();
         services.AddScoped<ServiceUsersHandler>();
 

@@ -30,6 +30,7 @@
 | `GET /security/sessions` | вошёл | свои сессии, текущая — `isCurrent` |
 | `POST /security/sessions/{id}/terminate` | вошёл | завершить свою сессию (чужая — 404) |
 | `POST /security/sessions/terminate-all-others` | вошёл | завершить все, кроме текущей |
+| `GET /security/logins` | вошёл | свои входы и ошибки входа за 30 дней: IP, устройство (6б.3) |
 | `GET /auth/admin/audit?objectId&actorId&action&from&to&page&pageSize` | `audit.view` | журнал действий сотрудников |
 | `GET /auth/admin/login-events?userId&page&pageSize` | `audit.view` | входы, ошибки входа, выходы (события Keycloak) |
 | `GET /auth/login?reauth=true` | — | войти заново (`prompt=login`): пароль и 2FA, если включена |

@@ -108,6 +108,12 @@
   }
 }
 
+/* Страница не оттягивается за край (Safari, тачпад): видны были бы верх и низ каркаса. */
+html,
+body {
+  overscroll-behavior: none;
+}
+
 body {
   margin: 0;
   background: var(--color-background);

@@ -1,6 +1,7 @@
 using AuthService.Core.Abstractions;
 using AuthService.Infrastructure.Postgres.AuditLog;
 using AuthService.Infrastructure.Postgres.ServiceKeys;
+using AuthService.Infrastructure.Postgres.Sessions;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,7 @@ public static class DependencyInjectionExtensions
         });
         services.AddScoped<IAuditLog, EfAuditLog>();
         services.AddScoped<IServiceKeyStore, EfServiceKeyStore>();
+        services.AddScoped<ILoginDeviceStore, EfLoginDeviceStore>();
         IDataProtectionBuilder dataProtection = services.AddDataProtection()
             .SetApplicationName("auth-service")
             .PersistKeysToDbContext<AuthDbContext>();

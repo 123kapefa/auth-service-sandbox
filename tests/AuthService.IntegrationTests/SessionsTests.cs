@@ -1,18 +1,25 @@
 using System.Net;
 using System.Text.Json;
+using AuthService.Core.Abstractions;
 using AuthService.IntegrationTests.Infrastructure;
 using PlatformAuth;
 using Xunit;
 
 namespace AuthService.IntegrationTests;
 
-/// <summary>Свои сессии (/security/sessions) и сессии пользователя в админке — с подставным Admin API.</summary>
+/// <summary>
+/// Свои сессии (/security/sessions), история входов (/security/logins) и сессии пользователя в админке — с подставным
+/// Admin API и устройствами сессий в памяти.
+/// </summary>
 public sealed class SessionsTests : IClassFixture<AuthServiceWebFactory>
 {
     private const string CURRENT = "s-current";
+    private const string MAC_CHROME = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
+    private const string IPHONE_SAFARI = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1";
 
     private readonly AuthServiceWebFactory _factory;
     private readonly FakeIdentityAdmin _keycloak;
+    private readonly InMemoryLoginDevices _devices;
 
     public SessionsTests(AuthServiceWebFactory factory)
     {
@@ -20,6 +27,8 @@ public sealed class SessionsTests : IClassFixture<AuthServiceWebFactory>
         _keycloak = factory.IdentityAdmin;
         _keycloak.Reset();
         factory.Revocations.Reset();
+        _devices = factory.LoginDevices;
+        _devices.Reset();
         _keycloak.Add(TestUser.Customer, []);
         _keycloak.Add(TestUser.AdminInAdminMode, [AuthModes.ADMIN]);
         _keycloak.Add(TestUser.ManagerInManagerMode, [AuthModes.MANAGER]);
@@ -39,6 +48,66 @@ public sealed class SessionsTests : IClassFixture<AuthServiceWebFactory>
             Items(result).Select(item => $"{item.GetProperty("id").GetString()}:{item.GetProperty("isCurrent").GetBoolean()}"));
         Assert.Equal(["account-console", "sandbox-bff"], Items(result).Single(item => item.GetProperty("id").GetString() == "s-phone")
             .GetProperty("apps").EnumerateArray().Select(app => app.GetString()));
+    }
+
+    [Fact]
+    public async Task List_DeviceFromLogin_UnknownWithoutRecord()
+    {
+        _devices.Add(TestUser.Customer, CURRENT, MAC_CHROME);
+        _devices.Add(TestUser.Customer, "s-phone", IPHONE_SAFARI);
+
+        JsonElement result = await ResultAsync(await SendAsync(TestUser.Customer, HttpMethod.Get, "/security/sessions"));
+
+        Assert.Equal(
+            ["s-current:Chrome · macOS", "s-laptop:", "s-phone:Safari · iPhone"],
+            Items(result).Select(item => $"{item.GetProperty("id").GetString()}:{item.GetProperty("deviceLabel").GetString()}"));
+        Assert.Equal(MAC_CHROME, Items(result).First().GetProperty("userAgent").GetString());
+    }
+
+    [Fact]
+    public async Task List_DevicesUnavailable_SessionsStillShown()
+    {
+        _devices.Broken = true;
+
+        JsonElement result = await ResultAsync(await SendAsync(TestUser.Customer, HttpMethod.Get, "/security/sessions"));
+
+        Assert.Equal(3, Items(result).Count());
+        Assert.All(Items(result), item => Assert.Equal(JsonValueKind.Null, item.GetProperty("deviceLabel").ValueKind));
+    }
+
+    [Fact]
+    public async Task Logins_Own_WithDeviceAndReason_NewestFirst()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        _devices.Add(TestUser.Customer, "s-phone", IPHONE_SAFARI);
+        _devices.Add(TestUser.AdminInAdminMode, "s-admin", MAC_CHROME);
+        _keycloak.LoginEvents.Add(new LoginEvent(
+            now, LoginEventTypes.LOGIN, TestUser.Customer.Id, "10.0.0.1", "sandbox-bff", null, "79990000001", "s-phone"));
+        _keycloak.LoginEvents.Add(new LoginEvent(
+            now.AddMinutes(-1), LoginEventTypes.LOGIN_ERROR, TestUser.Customer.Id, "10.0.0.2", "sandbox-bff", "invalid_user_credentials", "79990000001"));
+        _keycloak.LoginEvents.Add(new LoginEvent(
+            now.AddMinutes(-2), LoginEventTypes.LOGOUT, TestUser.Customer.Id, "10.0.0.1", "sandbox-bff", null, "79990000001", "s-old"));
+        _keycloak.LoginEvents.Add(new LoginEvent(
+            now.AddMinutes(-3), LoginEventTypes.LOGIN, TestUser.AdminInAdminMode.Id, "10.0.0.9", "sandbox-bff", null, "71234567890", "s-admin"));
+
+        JsonElement result = await ResultAsync(await SendAsync(TestUser.Customer, HttpMethod.Get, "/security/logins"));
+
+        JsonElement[] items = [.. Items(result)];
+        Assert.Equal(2, items.Length); // выход и чужой вход не показываются
+        Assert.True(items[0].GetProperty("success").GetBoolean());
+        Assert.Equal("Safari · iPhone", items[0].GetProperty("deviceLabel").GetString());
+        Assert.Equal("10.0.0.1", items[0].GetProperty("ipAddress").GetString());
+        Assert.False(items[1].GetProperty("success").GetBoolean());
+        Assert.Equal("invalid_user_credentials", items[1].GetProperty("error").GetString());
+        Assert.Equal(JsonValueKind.Null, items[1].GetProperty("deviceLabel").ValueKind);
+    }
+
+    [Fact]
+    public async Task Logins_Anonymous_Unauthorized()
+    {
+        using HttpClient client = _factory.CreateClientFor(null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(new Uri("/security/logins", UriKind.Relative))).StatusCode);
     }
 
     [Fact]

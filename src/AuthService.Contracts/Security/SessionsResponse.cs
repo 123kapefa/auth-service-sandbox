@@ -5,9 +5,9 @@ public sealed record SessionsResponse(IReadOnlyList<SessionResponse> Items);
 
 /// <summary>Одна сессия (вход на устройстве). Поля — как у боевого сервиса, плюс приложения сессии.</summary>
 /// <param name="Id">Id сессии.</param>
-/// <param name="UserAgent">Браузер: Keycloak в Admin API его не отдаёт — пока null.</param>
+/// <param name="UserAgent">User-Agent браузера, записанный сервисом при входе (Keycloak его не отдаёт); null — вход мимо сервиса.</param>
 /// <param name="IpAddress">IP, с которого вошли.</param>
-/// <param name="DeviceLabel">Устройство: так же — пока null.</param>
+/// <param name="DeviceLabel">Устройство по User-Agent: «Chrome · macOS»; null — не узнали.</param>
 /// <param name="CreatedAt">Когда вошли.</param>
 /// <param name="LastSeenAt">Последняя активность (вход или обновление токена).</param>
 /// <param name="IsCurrent">Это та сессия, из которой сделан запрос.</param>

@@ -44,6 +44,17 @@ public sealed class DemoPageTests(AuthServiceWebFactory factory) : IClassFixture
     }
 
     [Fact]
+    public async Task AccountDevices_RedirectsToOwnDevicesSection()
+    {
+        using HttpClient browser = factory.CreateBrowserClient();
+
+        HttpResponseMessage response = await browser.GetAsync(new Uri("/auth/account/devices", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(new Uri("/account/devices", UriKind.Relative), response.Headers.Location);
+    }
+
+    [Fact]
     public async Task AccountSettings_RedirectsToOwnAccount()
     {
         using HttpClient browser = factory.CreateBrowserClient();

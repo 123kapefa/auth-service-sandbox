@@ -302,7 +302,8 @@ internal sealed partial class KeycloakAdminClient(
                     found.IpAddress,
                     found.ClientId,
                     found.Error,
-                    found.Details?.GetValueOrDefault("username"))),
+                    found.Details?.GetValueOrDefault("username"),
+                    found.SessionId)),
             ]);
     }
 
@@ -760,7 +761,8 @@ internal sealed partial class KeycloakAdminClient(
         [property: JsonPropertyName("ipAddress")] string? IpAddress,
         [property: JsonPropertyName("clientId")] string? ClientId,
         [property: JsonPropertyName("error")] string? Error,
-        [property: JsonPropertyName("details")] Dictionary<string, string>? Details);
+        [property: JsonPropertyName("details")] Dictionary<string, string>? Details,
+        [property: JsonPropertyName("sessionId")] string? SessionId = null);
 
     private sealed record Credential(
         [property: JsonPropertyName("type")] string Type,

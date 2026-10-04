@@ -9,16 +9,22 @@ namespace AuthService.Core.Features.Security;
 /// <summary>
 /// Сессии пользователя на сервере входа (Keycloak): список, завершить одну, завершить все остальные.
 /// Текущая сессия — по claim sid токена. Завершённая сессия больше не обновляет токены, а её уже выданные
-/// access-токены отзываются сразу (отметка по sid).
+/// access-токены отзываются сразу (отметка по sid). Устройство сессии — из записи сервиса при входе (LoginDevices).
 /// </summary>
-public sealed class SessionsHandler(IIdentityAdmin identityAdmin, ITokenRevocationStore revocations)
+public sealed class SessionsHandler(IIdentityAdmin identityAdmin, ITokenRevocationStore revocations, LoginDevices devices)
 {
     public async Task<Result<SessionsResponse, Error>> ListAsync(Guid userId, string? currentSessionId, CancellationToken cancellationToken)
     {
         Result<IReadOnlyList<IdentitySession>, Error> sessions = await identityAdmin.GetSessionsAsync(userId, cancellationToken);
-        return sessions.IsFailure
-            ? sessions.Error
-            : new SessionsResponse([.. sessions.Value.Select(session => ToResponse(session, currentSessionId))]);
+        if (sessions.IsFailure)
+        {
+            return sessions.Error;
+        }
+
+        IReadOnlyDictionary<string, string?> userAgents =
+            await devices.GetUserAgentsAsync(userId, [.. sessions.Value.Select(session => session.Id)], cancellationToken);
+        return new SessionsResponse(
+            [.. sessions.Value.Select(session => ToResponse(session, userAgents.GetValueOrDefault(session.Id), currentSessionId))]);
     }
 
     public async Task<Result<SessionsResponse, Error>> TerminateAsync(
@@ -76,12 +82,12 @@ public sealed class SessionsHandler(IIdentityAdmin identityAdmin, ITokenRevocati
         return new TerminatedResponse(terminated);
     }
 
-    private static SessionResponse ToResponse(IdentitySession session, string? currentSessionId) =>
+    private static SessionResponse ToResponse(IdentitySession session, string? userAgent, string? currentSessionId) =>
         new(
             session.Id,
-            null,
+            userAgent,
             session.IpAddress,
-            null,
+            DeviceLabels.FromUserAgent(userAgent),
             session.StartedAt,
             session.LastAccessAt,
             string.Equals(session.Id, currentSessionId, StringComparison.Ordinal),

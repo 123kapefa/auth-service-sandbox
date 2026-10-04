@@ -94,6 +94,21 @@ public sealed class KeycloakAdminClientTests : IDisposable
         Assert.Equal((null, null), (credentials[3].Remaining, credentials[3].Total));
     }
 
+    [Fact]
+    public async Task LoginEvents_OfUser_WithSession()
+    {
+        IReadOnlyList<LoginEvent> events = (await CreateClient().GetLoginEventsAsync(
+            _userId, [LoginEventTypes.LOGIN, LoginEventTypes.LOGIN_ERROR], 0, 50, default)).Value;
+
+        Assert.Equal(
+            $"{ADMIN}/events?type=LOGIN&type=LOGIN_ERROR&first=0&max=50&user={_userId}",
+            _keycloak.AdminRequests.Single().Url);
+        Assert.Equal(("LOGIN", "s-1", null), (events[0].Type, events[0].SessionId, events[0].Error));
+        Assert.Equal(("LOGIN_ERROR", null, "invalid_user_credentials"), (events[1].Type, events[1].SessionId, events[1].Error));
+        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1790000400000), events[0].Time);
+        Assert.Equal("79990000001", events[1].Username);
+    }
+
     public void Dispose() => _keycloak.Dispose();
 
     private IIdentityAdmin CreateClient()
@@ -149,6 +164,14 @@ public sealed class KeycloakAdminClientTests : IDisposable
             ]
             """;
 
+        // События входа: у LOGIN — Id начатой сессии, у ошибки — причина.
+        private const string EVENTS = """
+            [
+              { "time": 1790000400000, "type": "LOGIN", "userId": "a2b3805f-2d09-4c35-ab2e-adc8ae75b01c", "sessionId": "s-1", "ipAddress": "10.0.0.1", "clientId": "sandbox-bff", "details": { "username": "79990000001" } },
+              { "time": 1790000300000, "type": "LOGIN_ERROR", "userId": "a2b3805f-2d09-4c35-ab2e-adc8ae75b01c", "ipAddress": "10.0.0.2", "clientId": "sandbox-bff", "error": "invalid_user_credentials", "details": { "username": "79990000001" } }
+            ]
+            """;
+
         public List<Request> TokenRequests { get; } = [];
 
         public List<(string Url, string? Bearer)> AdminRequests { get; } = [];
@@ -166,6 +189,11 @@ public sealed class KeycloakAdminClientTests : IDisposable
                 if (url.EndsWith("/credentials", StringComparison.Ordinal))
                 {
                     return Json(HttpStatusCode.OK, CREDENTIALS);
+                }
+
+                if (url.Contains("/events?", StringComparison.Ordinal))
+                {
+                    return Json(HttpStatusCode.OK, EVENTS);
                 }
 
                 return Json(UserStatus, UserStatus == HttpStatusCode.OK ? USER : """{"error":"User not found"}""");

@@ -187,6 +187,7 @@ public sealed record IdentitySession(
 /// <param name="ClientId">В какое приложение.</param>
 /// <param name="Error">Причина ошибки (invalid_user_credentials, user_disabled…).</param>
 /// <param name="Username">Логин, если Keycloak его записал.</param>
+/// <param name="SessionId">Сессия (у LOGIN — начатая этим входом; у ошибки входа — null).</param>
 public sealed record LoginEvent(
     DateTimeOffset Time,
     string Type,
@@ -194,7 +195,8 @@ public sealed record LoginEvent(
     string? IpAddress,
     string? ClientId,
     string? Error,
-    string? Username);
+    string? Username,
+    string? SessionId = null);
 
 /// <summary>Типы событий входа Keycloak, которые показывает журнал.</summary>
 public static class LoginEventTypes
