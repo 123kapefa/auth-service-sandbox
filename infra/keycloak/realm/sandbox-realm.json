@@ -373,6 +373,12 @@
             ]
           }
         }
+      },
+      {
+        "name": "manage-branding",
+        "description": "Служебная: менять оформление проекта (плагин platform-branding) — у учётки сервиса входа",
+        "composite": false,
+        "clientRole": false
       }
     ],
     "client": {
@@ -437,7 +443,8 @@
                 "users.credentials.manage",
                 "audit.view",
                 "roles.manage",
-                "services.manage"
+                "services.manage",
+                "branding.manage"
               ]
             }
           },
@@ -565,6 +572,20 @@
         {
           "name": "services.manage",
           "description": "Сервисы проекта и их ключи доступа",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "branding.manage",
+          "description": "Оформление проекта: название, логотип, цвет, тема",
           "composite": false,
           "clientRole": true,
           "attributes": {
@@ -1910,7 +1931,10 @@
           "view-events",
           "query-clients"
         ]
-      }
+      },
+      "realmRoles": [
+        "manage-branding"
+      ]
     },
     {
       "username": "service-account-legacy-import",

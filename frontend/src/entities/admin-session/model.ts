@@ -10,6 +10,7 @@ export const Permissions = {
   auditView: "audit.view",
   rolesManage: "roles.manage",
   servicesManage: "services.manage",
+  brandingManage: "branding.manage",
 } as const;
 
 /** Что вызвавшему видно в админке. Только для интерфейса — доступ проверяет сервер. */
@@ -22,6 +23,8 @@ export function accessOf(session: AdminSession) {
     projectAudit: project.has(Permissions.auditView),
     /** Сервисы проекта и их ключи доступа — только админ проекта. */
     projectServices: project.has(Permissions.servicesManage),
+    /** Оформление страниц входа — только админ проекта. */
+    projectBranding: project.has(Permissions.brandingManage),
     /** Приложения под управлением (у админа приложения — только своё). */
     apps: session.apps,
     /** Есть ли что делать в админке вообще. */
@@ -29,6 +32,7 @@ export function accessOf(session: AdminSession) {
       project.has(Permissions.usersView) ||
       project.has(Permissions.auditView) ||
       project.has(Permissions.servicesManage) ||
+      project.has(Permissions.brandingManage) ||
       session.apps.length > 0,
   };
 }

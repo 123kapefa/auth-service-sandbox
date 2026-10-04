@@ -12,7 +12,8 @@ src/main.tsx           — точка входа: в Keycloak — window.kcConte
 src/kc.gen.tsx         — создаёт Keycloakify при сборке (не править)
 src/login/KcContext.ts — свои страницы плагина и их атрибуты (platform-code-login.ftl: codeChannel, codeTarget…)
 src/login/KcPage.tsx   — страница по pageId: свои — pages/, остальные — стандартные Keycloakify в нашем каркасе
-src/login/Template.tsx — каркас: название, карточка, сообщение Keycloak, «другой способ», языки
+src/login/Template.tsx — каркас: логотип и название, карточка, сообщение Keycloak, «другой способ», языки
+src/login/branding.ts  — оформление проекта (плагин platform-branding): логотип, цвет, тема — читается до показа
 src/login/classes.ts   — классы Keycloak → Tailwind (так стандартные страницы выглядят как наши)
 src/login/i18n.ts      — свои тексты и тексты realm для страниц входа (только литералы: читаются при сборке)
 src/login/pages/       — Login (телефон или почта, «Войти по коду», ключ доступа), CodeLogin (экран кода)
@@ -29,6 +30,10 @@ src/email/            — тема писем (FreeMarker, без React): кар
 - **Письма** (`emailTheme: platform`): стили — в атрибутах (почтовые программы не читают `<style>`), к каждому HTML —
   текстовый вариант в `text/`. Остальные письма Keycloak — его шаблоны в нашем каркасе. Письмо с кодом рисует плагин
   (`EmailCodeSender`) этим же шаблоном: без темы писем код на почту не уйдёт. Посмотреть — Mailpit, `localhost:8025`.
+- **Оформление проекта** (админка, «Оформление»): название — `realm.displayName`, логотип, цвет и тема —
+  `GET …/realms/{realm}/platform-branding` в `main.tsx` до первого показа (не дождались за 1,5 с — серый стиль).
+  Тема — `data-theme` на `<html>`, цвет — токены `--color-primary`, `--color-ring`, `--color-primary-foreground`.
+  В `npm run dev` (макеты) плагина нет — страницы серые.
 - **Поля форм**: имена — как читает сервер (`username`, `password`, `code`, `codeLogin`, `resend`…).
 
 ## Команды

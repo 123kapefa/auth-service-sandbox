@@ -29,7 +29,7 @@ check "старый refresh-токен отклонён → 401" \
   "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Cookie: refreshToken=$OLD_REFRESH" "$API/auth/refresh")" 401
 
 echo "3. return_to"
-check "чужой return_to → возврат на /" "$(login "$JAR" https://evil.example/phish 0987654321)" /
+check "чужой return_to → возврат в кабинет (/account/)" "$(login "$JAR" https://evil.example/phish 0987654321)" /account/
 
 echo "4. Выход"
 LAST_REFRESH=$(cookie "$JAR" refreshToken)

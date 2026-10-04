@@ -3,6 +3,7 @@ import { AppJournalPage } from "@/pages/app-journal";
 import { AppRolesPage } from "@/pages/app-roles";
 import { AppUserPage } from "@/pages/app-user";
 import { AppUsersPage } from "@/pages/app-users";
+import { BrandingPage } from "@/pages/branding";
 import { JournalPage } from "@/pages/journal";
 import { NotFoundPage } from "@/pages/not-found";
 import { OverviewPage } from "@/pages/overview";
@@ -23,6 +24,7 @@ export const router = createBrowserRouter(
         { path: "users/:userId", element: <UserPage /> },
         { path: "journal", element: <JournalPage /> },
         { path: "services", element: <ServicesPage /> },
+        { path: "branding", element: <BrandingPage /> },
         {
           path: "apps/:clientId",
           element: <AppSection />,
