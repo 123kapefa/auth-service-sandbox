@@ -40,9 +40,13 @@ public static class FrontendExtensions
         return app;
     }
 
-    /// <summary>Маршруты интерфейсов без файла — их index.html (если интерфейс собран).</summary>
+    /// <summary>
+    /// Маршруты интерфейсов без файла — их index.html (если интерфейс собран). Корень сервиса — личный кабинет: туда
+    /// попадает пользователь, открывший адрес сервиса или вышедший; демо-страница для разработчика — на /dev/.
+    /// </summary>
     public static WebApplication MapFrontends(this WebApplication app)
     {
+        app.MapGet("/", () => Results.Redirect($"{ACCOUNT_PATH}/"));
         app.MapFallbackToFile($"{ADMIN_PATH}/{{*path:nonfile}}", "admin/index.html");
         app.MapFallbackToFile($"{ACCOUNT_PATH}/{{*path:nonfile}}", "account/index.html");
         return app;

@@ -38,7 +38,8 @@ scripts/keycloak/check-stand.sh
 | Админка доступа (своя, этап 4б) | http://localhost:8080/admin/ | админ проекта `1234567890`, админ «Менеджера 1С» `79990000007` |
 | Админка Keycloak | http://localhost:8180/admin | `admin` / `admin`, слева выбрать realm **sandbox** |
 | Discovery | http://localhost:8180/realms/sandbox/.well-known/openid-configuration | — |
-| Личный кабинет пользователя | http://localhost:8180/realms/sandbox/account | тестовый пользователь |
+| Личный кабинет (свой, этап 6б; на него ведёт и http://localhost:8080/) | http://localhost:8080/account/ | тестовый пользователь |
+| Демо-страница для разработчика: сессия, режимы, проверка эндпоинтов | http://localhost:8080/dev/ | тестовый пользователь |
 
 Тестовые пользователи (пароль у всех `Test1234!`; войти можно по телефону или по почте):
 
@@ -102,5 +103,5 @@ Keycloak; проекты друг друга не видят. **Приложен
 | `src/AuthService.LegacyImport` | разовый перенос пользователей боевого сервиса в Keycloak (этап 6): Id, роли, блокировка, BCrypt-хэш |
 | `infra/legacy/`, `scripts/legacy/seed-legacy.sh` | «боевая» база для спайка этапа 6: таблица `users` как в боевом сервисе, выдуманные пользователи (база `legacy_auth`) |
 | `src/AuthService.Infrastructure.Keycloak` | клиент Keycloak: PKCE, обмен кода, refresh, выход, Admin API от служебной учётки |
-| `src/AuthService.Api/wwwroot` | демо-страница для тестов входа (`/`) |
+| `src/AuthService.Api/wwwroot` | демо-страница для разработчика (`/dev/`); `/` ведёт в личный кабинет |
 | `.env.example` → блок Keycloak | порты и dev-пароли |

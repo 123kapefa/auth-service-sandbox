@@ -121,7 +121,7 @@ services:
       Cookies__Secure: ${AUTH_COOKIES_SECURE:-true}
       Cookies__Domain: ${AUTH_COOKIES_DOMAIN:-}
       ReturnUrls__AllowedOrigins__0: ${AUTH_RETURN_ORIGIN:?нужен AUTH_RETURN_ORIGIN — адрес приложения проекта}
-      ReturnUrls__Default: ${AUTH_RETURN_DEFAULT:-/}
+      ReturnUrls__Default: ${AUTH_RETURN_DEFAULT:-/account/}
     volumes:
       # Абсолютный путь на машине; файл доступен на чтение пользователю сервиса (uid 1654). Нет файла — compose
       # не стартует (без create_host_path Docker создал бы на его месте пустой каталог).
