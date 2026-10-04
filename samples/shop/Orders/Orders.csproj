@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <PackageReference Include="Platform.Authentication" />
+    <PackageReference Include="Platform.Authentication.Redis" />
+  </ItemGroup>
+</Project>

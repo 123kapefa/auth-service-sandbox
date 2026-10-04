@@ -21,6 +21,7 @@ import org.keycloak.representations.IDToken;
  * Роли и права приложения в токене. role и available_roles — только роли (режимы) клиента приложения, без прав
  * (стандартный маппер ролей клиента положил бы и права: роли составные). permissions — права активного режима:
  * админ в режиме покупателя получает права покупателя. Сервисы читают права из токена — карта в их коде не нужна.
+ * Режим ещё не выбран (атрибута нет) — роль приложения из ролей по умолчанию realm: она же в active_mode.
  * access_version и mode_version — версии доступа пользователя и роли активного режима: по ним сервисы узнают, что
  * доступ изменился, и просят клиента обновить токен (умный рефреш).
  * Токен служебной учётки (сервис проекта по ключу) — без ролей пользователя (у сервиса нет режимов, роли по умолчанию
@@ -37,6 +38,7 @@ public final class AppRolesMapper extends AbstractOIDCProtocolMapper
     static final String ACCESS_VERSION = "access_version";
     static final String MODE_VERSION = "mode_version";
     static final String SERVICE_CLIENT = "client_id";
+    static final String ACTIVE_MODE = "active_mode";
 
     private static final List<ProviderConfigProperty> CONFIG = new ArrayList<>();
 
@@ -105,6 +107,13 @@ public final class AppRolesMapper extends AbstractOIDCProtocolMapper
         token.getOtherClaims().put("role", roles);
         token.getOtherClaims().put("available_roles", roles);
         String activeMode = user.getFirstAttribute(modeAttribute);
+        if (activeMode == null) {
+            // Режим в приложении ещё не выбирали (новый пользователь, приложение подключили позже) — роль по умолчанию.
+            activeMode = AppRoles.defaultModeOf(client, user);
+            if (activeMode != null) {
+                token.getOtherClaims().put(ACTIVE_MODE, activeMode);
+            }
+        }
         token.getOtherClaims().put("permissions", AppRoles.permissionsOf(client, user, activeMode));
         putVersion(token, ACCESS_VERSION, user.getFirstAttribute(ACCESS_VERSION));
         putVersion(token, MODE_VERSION, AppRoles.versionOf(client, user, activeMode));

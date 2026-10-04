@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Пакеты сервиса входа: локальный фид (scripts/package/pack.sh → artifacts/nuget), см. nuget.config. -->
+    <PackageVersion Include="Platform.Authentication" Version="0.1.0" />
+    <PackageVersion Include="Platform.Authentication.Redis" Version="0.1.0" />
+    <PackageVersion Include="Platform.AuthService.Client" Version="0.1.0" />
+  </ItemGroup>
+</Project>

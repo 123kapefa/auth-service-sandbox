@@ -1,0 +1,12 @@
+<Project>
+  <!--
+    Магазин — чужой для сервиса входа проект: свои настройки сборки. Этот файл и Directory.Packages.props рядом
+    останавливают поиск выше — правила сборки песочницы (анализаторы, версии пакетов) сюда не попадают.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>

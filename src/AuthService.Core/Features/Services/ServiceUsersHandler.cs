@@ -72,6 +72,9 @@ public sealed class ServiceUsersHandler(
         string? mode = string.Equals(clientId, authentication.Value.Audience, StringComparison.Ordinal)
             ? user.Value.ActiveMode
             : user.Value.AppModes?.GetValueOrDefault(clientId);
+
+        // Режим ещё не выбирали — роль по умолчанию, как у маппера токена (первая по алфавиту).
+        mode ??= roles.Value.Defaults.Order(StringComparer.Ordinal).FirstOrDefault();
         if (!user.Value.Enabled)
         {
             return Denied(BLOCKED, mode);

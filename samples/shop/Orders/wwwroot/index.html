@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Заказы</title>
+  <style>
+    :root { --bg: #f4f4f5; --card: #fff; --text: #18181b; --muted: #71717a; --line: #d4d4d8; --accent: #18181b; --error: #b91c1c; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #18181b; --card: #27272a; --text: #f4f4f5; --muted: #a1a1aa; --line: #3f3f46; --accent: #f4f4f5; --error: #f87171; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+    header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--card); }
+    header h1 { font-size: 17px; margin: 0; flex: 1; }
+    main { max-width: 760px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+    section { background: var(--card); border: 1px solid var(--line); padding: 16px; }
+    h2 { font-size: 15px; margin: 0 0 12px; }
+    button { font: inherit; padding: 6px 14px; border: 1px solid var(--accent); background: var(--accent); color: var(--bg); cursor: pointer; }
+    button.secondary { background: transparent; color: var(--text); border-color: var(--line); }
+    input { font: inherit; padding: 6px 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); flex: 1; min-width: 0; }
+    form { display: flex; gap: 8px; }
+    table { width: 100%; border-collapse: collapse; }
+    td, th { text-align: left; padding: 6px 8px 6px 0; border-top: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 500; border-top: 0; }
+    .muted { color: var(--muted); }
+    .error { color: var(--error); }
+    .tags span { display: inline-block; border: 1px solid var(--line); padding: 0 6px; margin: 0 4px 4px 0; font-size: 13px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<header>
+  <h1 id="project">Магазин</h1>
+  <span id="who" class="muted"></span>
+  <button id="login" hidden>Войти</button>
+  <button id="logout" class="secondary" hidden>Выйти</button>
+</header>
+<main>
+  <p id="error" class="error" hidden></p>
+  <section id="welcome" hidden>
+    <h2>Заказы</h2>
+    <p class="muted">Вход — через сервис входа проекта: телефон или почта, пароль или код.</p>
+  </section>
+  <section id="me" hidden>
+    <h2>Мой доступ в «Заказах»</h2>
+    <p>Режим: <b id="mode"></b></p>
+    <div class="tags" id="permissions"></div>
+  </section>
+  <section id="mine" hidden>
+    <h2>Мои заказы</h2>
+    <form id="create">
+      <input id="item" placeholder="Что заказать" required maxlength="100">
+      <button>Заказать</button>
+    </form>
+    <table><thead><tr><th>№</th><th>Товар</th><th>Статус</th><th>Уведомление</th></tr></thead><tbody id="orders"></tbody></table>
+  </section>
+  <section id="all" hidden>
+    <h2>Все заказы (сотрудник)</h2>
+    <table><thead><tr><th>№</th><th>Покупатель</th><th>Товар</th><th>Статус</th><th></th></tr></thead><tbody id="all-orders"></tbody></table>
+  </section>
+</main>
+<script>
+// Вход — OAuth 2.0 Authorization Code + PKCE, клиент «Заказов» (orders-web) в realm проекта. Токены — в памяти
+// вкладки (sessionStorage), в API «Заказов» — заголовком Authorization.
+const $ = (id) => document.getElementById(id);
+const store = sessionStorage;
+let config;
+
+const b64url = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const random = () => b64url(crypto.getRandomValues(new Uint8Array(32)));
+const oidc = (path) => `${config.authority}/protocol/openid-connect/${path}`;
+const redirectUri = () => location.origin + '/';
+
+async function login() {
+  const verifier = random(), state = random();
+  store.setItem('pkce', JSON.stringify({ verifier, state }));
+  const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+  location.href = oidc('auth') + '?' + new URLSearchParams({
+    client_id: config.clientId, response_type: 'code', scope: 'openid', redirect_uri: redirectUri(), state,
+    code_challenge: challenge, code_challenge_method: 'S256',
+    platform_app: config.app, // оформление приложения на страницах входа
+  });
+}
+
+async function token(params) {
+  const response = await fetch(oidc('token'), { method: 'POST', body: new URLSearchParams({ client_id: config.clientId, ...params }) });
+  if (!response.ok) throw new Error('Сервис входа не выдал токен: ' + response.status);
+  const tokens = await response.json();
+  store.setItem('tokens', JSON.stringify(tokens));
+  return tokens;
+}
+
+// Возврат со страницы входа: код → токены.
+async function finishLogin() {
+  const query = new URLSearchParams(location.search);
+  if (!query.has('code') && !query.has('error')) return;
+  history.replaceState(null, '', '/');
+  const pkce = JSON.parse(store.getItem('pkce') || '{}');
+  store.removeItem('pkce');
+  if (query.has('error')) throw new Error(query.get('error_description') || query.get('error'));
+  if (query.get('state') !== pkce.state) throw new Error('Вход начат не здесь — войдите ещё раз');
+  await token({ grant_type: 'authorization_code', code: query.get('code'), code_verifier: pkce.verifier, redirect_uri: redirectUri() });
+}
+
+function logout() {
+  const tokens = JSON.parse(store.getItem('tokens') || '{}');
+  store.removeItem('tokens');
+  location.href = oidc('logout') + '?' + new URLSearchParams({ id_token_hint: tokens.id_token || '', post_logout_redirect_uri: redirectUri() });
+}
+
+// Запрос к «Заказам». 401 — токен истёк или доступ изменился (access_changed): обновить и повторить один раз.
+async function api(path, options = {}, retry = true) {
+  const tokens = JSON.parse(store.getItem('tokens') || 'null');
+  if (!tokens) return null;
+  const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tokens.access_token } });
+  if (response.status === 401 && retry && tokens.refresh_token) {
+    try { await token({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token }); } catch { store.removeItem('tokens'); return null; }
+    return api(path, options, false);
+  }
+  if (response.status === 401) { store.removeItem('tokens'); return null; }
+  if (response.status === 403) return { forbidden: true };
+  if (!response.ok) throw new Error(`«Заказы» ответили ${response.status}`);
+  return response.json();
+}
+
+const cell = (text) => { const td = document.createElement('td'); td.textContent = text ?? '—'; return td; };
+
+function renderOrders(tbody, orders, staff) {
+  tbody.replaceChildren(...orders.map((order) => {
+    const tr = document.createElement('tr');
+    tr.append(cell(order.number));
+    if (staff) tr.append(cell(order.customerPhone));
+    tr.append(cell(order.item), cell(order.status));
+    if (staff) {
+      const td = document.createElement('td');
+      for (const status of ['собран', 'отправлен']) {
+        const button = Object.assign(document.createElement('button'), { className: 'secondary', textContent: status });
+        button.onclick = () => run(() => api(`/api/orders/${order.number}/status`, { method: 'POST', body: JSON.stringify({ status }) }));
+        td.append(button, ' ');
+      }
+      tr.append(td);
+    } else {
+      tr.append(cell(order.notification));
+    }
+    return tr;
+  }));
+}
+
+async function render() {
+  const me = await api('/api/me');
+  $('login').hidden = !!me; $('logout').hidden = !me; $('welcome').hidden = !!me;
+  for (const id of ['me', 'mine', 'all']) $(id).hidden = true;
+  $('who').textContent = me ? me.phone || '' : '';
+  if (!me) return;
+  $('me').hidden = false;
+  $('mode').textContent = me.mode || 'не выбран';
+  $('permissions').replaceChildren(...(me.permissions.length ? me.permissions : ['прав нет']).map((p) => Object.assign(document.createElement('span'), { textContent: p })));
+  if (me.permissions.includes('orders.view')) {
+    $('mine').hidden = false;
+    $('create').hidden = !me.permissions.includes('orders.create');
+    renderOrders($('orders'), await api('/api/orders'), false);
+  }
+  if (me.permissions.includes('orders.manage')) {
+    $('all').hidden = false;
+    renderOrders($('all-orders'), await api('/api/orders/all'), true);
+  }
+}
+
+async function run(action) {
+  $('error').hidden = true;
+  try { await action(); await render(); } catch (error) { $('error').textContent = error.message; $('error').hidden = false; }
+}
+
+$('login').onclick = () => run(login);
+$('logout').onclick = logout;
+$('create').onsubmit = (event) => {
+  event.preventDefault();
+  run(async () => { await api('/api/orders', { method: 'POST', body: JSON.stringify({ item: $('item').value }) }); $('item').value = ''; });
+};
+
+run(async () => {
+  config = await (await fetch('/config')).json();
+  $('project').textContent = `${config.project} · Заказы`;
+  await finishLogin();
+});
+</script>
+</body>
+</html>
