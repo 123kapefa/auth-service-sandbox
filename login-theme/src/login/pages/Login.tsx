@@ -46,7 +46,10 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
       infoNode={
         <span>
           {msg("noAccount")}{" "}
-          <a href={url.registrationUrl} className="text-primary hover:underline">
+          <a
+            href={url.registrationUrl}
+            className="underline underline-offset-4 hover:text-muted-foreground"
+          >
             {msg("doRegister")}
           </a>
         </span>
@@ -83,7 +86,7 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
               {realm.resetPasswordAllowed && (
                 <a
                   href={url.loginResetCredentialsUrl}
-                  className="text-sm text-primary hover:underline"
+                  className="text-sm underline underline-offset-4 hover:text-muted-foreground"
                 >
                   {msg("doForgotPassword")}
                 </a>

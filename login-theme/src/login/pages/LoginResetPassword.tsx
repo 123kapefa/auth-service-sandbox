@@ -69,7 +69,10 @@ export default function LoginResetPassword(
             {msgStr("doSubmit")}
           </button>
         </div>
-        <a href={url.loginUrl} className="block text-center text-sm text-primary hover:underline">
+        <a
+          href={url.loginUrl}
+          className="block text-center text-sm underline underline-offset-4 hover:text-muted-foreground"
+        >
           {msg("backToLogin")}
         </a>
       </form>

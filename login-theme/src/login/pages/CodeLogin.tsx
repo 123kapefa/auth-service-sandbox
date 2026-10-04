@@ -73,9 +73,9 @@ export default function CodeLogin(
               {Array.from({ length }, (_, i) => (
                 <div
                   key={i}
-                  className={`flex h-12 items-center justify-center rounded-md border bg-card font-mono text-xl font-semibold transition-colors ${
+                  className={`flex h-12 items-center justify-center border bg-background font-mono text-xl font-semibold transition-colors ${
                     focused && i === Math.min(code.length, length - 1)
-                      ? "border-primary ring-2 ring-ring/40"
+                      ? "border-primary shadow-hard"
                       : "border-border"
                   }`}
                 >
@@ -137,7 +137,7 @@ export default function CodeLogin(
         <a
           id="platform-code-back"
           href={url.loginRestartFlowUrl}
-          className="text-primary hover:underline"
+          className="underline underline-offset-4 hover:text-muted-foreground"
         >
           {msg("platformCodeBackToPassword")}
         </a>

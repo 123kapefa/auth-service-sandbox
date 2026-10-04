@@ -19,6 +19,8 @@ export default defineConfig({
       },
     }),
   ],
+  // Шрифты — отдельными файлами темы, как в frontend/ (не data: в CSS).
+  build: { assetsInlineLimit: (file) => (/\.woff2?$/.test(file) ? false : undefined) },
   // 5174 — чтобы не занять порт админки (frontend/, 5173).
   server: { port: 5174, strictPort: true },
   test: {
