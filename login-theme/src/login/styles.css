@@ -1,43 +1,92 @@
+@import "@fontsource/golos-text/400.css";
+@import "@fontsource/golos-text/500.css";
+@import "@fontsource/golos-text/600.css";
+@import "@fontsource/golos-text/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
 @import "tailwindcss";
 
-/* Цвета — как у админки (токены в стиле shadcn/ui, база slate); тёмная тема — по настройке системы. */
+/*
+ * Стиль — как у кабинета и админки (frontend/src/app/styles.css): только оттенки серого без чёрного, без скруглений,
+ * жёсткие тени со сдвигом, опасное и предупреждения — пунктир и штриховка. Тёмная тема — по настройке системы.
+ */
 @theme {
-  --color-background: oklch(0.985 0.002 247);
-  --color-foreground: oklch(0.21 0.03 265);
-  --color-card: oklch(1 0 0);
-  --color-muted: oklch(0.96 0.006 247);
-  --color-muted-foreground: oklch(0.55 0.03 257);
-  --color-border: oklch(0.92 0.01 255);
-  --color-primary: oklch(0.45 0.18 264);
-  --color-primary-foreground: oklch(0.985 0.002 247);
-  --color-destructive: oklch(0.58 0.22 27);
-  --color-success: oklch(0.55 0.15 150);
-  --color-warning: oklch(0.7 0.15 75);
-  --color-ring: oklch(0.45 0.18 264);
+  --font-sans: "Golos Text", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-background: #f7f7f7;
+  --color-foreground: #2e2e2e;
+  --color-card: #eeeeee;
+  --color-muted: #e3e3e3;
+  --color-muted-foreground: #6a6a6a;
+  --color-border: #d0d0d0;
+  --color-primary: #3c3c3c;
+  --color-primary-foreground: #f7f7f7;
+  --color-destructive: #3c3c3c;
+  --color-success: #3c3c3c;
+  --color-warning: #3c3c3c;
+  --color-ring: #3c3c3c;
+  --color-shadow: #c4c4c4;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: oklch(0.17 0.02 265);
-    --color-foreground: oklch(0.96 0.006 247);
-    --color-card: oklch(0.21 0.03 265);
-    --color-muted: oklch(0.28 0.03 260);
-    --color-muted-foreground: oklch(0.7 0.02 257);
-    --color-border: oklch(0.3 0.03 260);
-    --color-primary: oklch(0.7 0.14 264);
-    --color-primary-foreground: oklch(0.17 0.02 265);
+@layer base {
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-background: #1c1c1c;
+      --color-foreground: #dedede;
+      --color-card: #262626;
+      --color-muted: #303030;
+      --color-muted-foreground: #9a9a9a;
+      --color-border: #3d3d3d;
+      --color-primary: #cdcdcd;
+      --color-primary-foreground: #1c1c1c;
+      --color-destructive: #cdcdcd;
+      --color-success: #cdcdcd;
+      --color-warning: #cdcdcd;
+      --color-ring: #cdcdcd;
+      --color-shadow: #474747;
+    }
   }
+}
+
+@utility shadow-hard {
+  box-shadow: 4px 4px 0 var(--color-shadow);
+}
+
+@utility bg-hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--color-border) 0 1px,
+    transparent 1px 7px
+  );
+}
+
+/* Квадрат в левом верхнем углу карточки. */
+@utility corner-mark {
+  position: relative;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    width: 10px;
+    height: 10px;
+    background: var(--color-primary);
+  }
+}
+
+/* Флажки и радио — в тон теме, без синего браузера. */
+:root {
+  accent-color: var(--color-primary);
+  color-scheme: light dark;
 }
 
 body {
   margin: 0;
   background: var(--color-background);
   color: var(--color-foreground);
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--font-sans);
 }
 
 /*
@@ -69,20 +118,20 @@ body {
     @apply my-2 list-disc pl-5;
   }
   #kc-content a:not([class]) {
-    @apply text-primary hover:underline;
+    @apply underline underline-offset-4 hover:text-muted-foreground;
   }
   #kc-content img {
-    @apply mx-auto my-3 rounded-md bg-white p-2;
+    @apply mx-auto my-3 border border-border bg-white p-2;
   }
   /* Разметка PatternFly в стандартных страницах: предупреждение и кнопки-ссылки. */
   #kc-content .pf-c-alert__title {
-    @apply mb-1 font-semibold text-warning;
+    @apply mb-1 font-semibold;
   }
   #kc-content .pf-screen-reader {
     @apply sr-only;
   }
   #kc-content .pf-c-button.pf-m-link {
-    @apply rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted;
+    @apply border border-primary px-3 py-1.5 text-sm hover:bg-muted;
   }
   #kc-content .checkbox label {
     @apply flex items-center gap-2;
@@ -93,6 +142,6 @@ body {
   #kc-content code,
   #kc-content .kc-totp-secret-key,
   #kc-totp-secret-key {
-    @apply rounded bg-muted px-2 py-1 font-mono text-xs break-all;
+    @apply bg-muted px-2 py-1 font-mono text-xs break-all;
   }
 }

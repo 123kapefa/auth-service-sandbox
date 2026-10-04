@@ -1,8 +1,9 @@
 # Тема входа (login-theme)
 
 Страницы входа Keycloak на React — Keycloakify 11. Собирается в jar темы `platform` (loginTheme realm) при сборке
-образа Keycloak (`infra/keycloak/Dockerfile`: Node + Maven + Java). Оформление — как у админки (`frontend/`): Tailwind,
-те же цвета, светлая и тёмная тема по системе.
+образа Keycloak (`infra/keycloak/Dockerfile`: Node + Maven + Java). Оформление — как у кабинета и админки (`frontend/`,
+раздел «Стиль» в его CLAUDE.md): «серый квадратный» стиль, те же токены и шрифты (`@fontsource/*`, файлами темы),
+светлая и тёмная тема по системе.
 
 ## Как устроено
 

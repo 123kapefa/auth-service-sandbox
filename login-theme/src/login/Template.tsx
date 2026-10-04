@@ -6,11 +6,12 @@ import { useEffect } from "react";
 import type { I18n } from "./i18n";
 import type { KcContext } from "./KcContext";
 
+// Без цвета: ошибка — залитый блок, предупреждение — пунктир и штриховка, успех — рамка, сведения — тонкая рамка.
 const ALERT = {
-  error: "border-destructive/40 text-destructive",
-  warning: "border-warning/50 text-warning",
-  success: "border-success/40 text-success",
-  info: "border-border text-foreground",
+  error: "border-primary bg-primary text-primary-foreground",
+  warning: "border-dashed border-primary bg-hatch",
+  success: "border-primary",
+  info: "border-border",
 } as const;
 
 /**
@@ -62,13 +63,13 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
               <a
                 id="reset-login"
                 href={url.loginRestartFlowUrl}
-                className="text-primary hover:underline"
+                className="underline underline-offset-4 hover:text-muted-foreground"
               >
                 {msg("restartLoginTooltip")}
               </a>
             </div>
           ) : (
-            <h1 id="kc-page-title" className="text-xl font-semibold">
+            <h1 id="kc-page-title" className="text-2xl font-bold tracking-tight">
               {headerNode}
             </h1>
           )}
@@ -93,7 +94,11 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
               className="mt-4 text-center text-sm"
             >
               <input type="hidden" name="tryAnotherWay" value="on" />
-              <button type="submit" id="try-another-way" className="text-primary hover:underline">
+              <button
+                type="submit"
+                id="try-another-way"
+                className="underline underline-offset-4 hover:text-muted-foreground"
+              >
                 {msg("doTryAnotherWay")}
               </button>
             </form>
