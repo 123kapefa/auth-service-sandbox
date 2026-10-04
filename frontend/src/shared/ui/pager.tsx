@@ -13,13 +13,13 @@ export function Pager({ page, hasMore, onPage }: PagerProps) {
   }
 
   return (
-    <div className="mt-3 flex items-center gap-2 text-sm">
+    <div className="mt-3 flex items-center gap-3 text-sm">
       <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => onPage(page - 1)}>
-        Назад
+        ← Назад
       </Button>
-      <span className="text-muted-foreground">Страница {page}</span>
+      <span className="font-mono text-[13px] text-muted-foreground">Страница {page}</span>
       <Button size="sm" variant="outline" disabled={!hasMore} onClick={() => onPage(page + 1)}>
-        Дальше
+        Дальше →
       </Button>
     </div>
   );

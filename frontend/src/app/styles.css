@@ -1,29 +1,110 @@
+@import "@fontsource/golos-text/400.css";
+@import "@fontsource/golos-text/500.css";
+@import "@fontsource/golos-text/600.css";
+@import "@fontsource/golos-text/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
 @import "tailwindcss";
 
-/* Цвета — токены (как у shadcn/ui, база slate); тёмная тема — по настройке системы. */
+/*
+ * Стиль «серый квадратный»: только оттенки серого (без чёрного), без скруглений, жёсткие тени со сдвигом,
+ * подписи и данные — моноширинным. Тема — по настройке системы или выбору пользователя (data-theme на <html>).
+ */
 @theme {
-  --color-background: oklch(0.985 0.002 247);
-  --color-foreground: oklch(0.21 0.03 265);
-  --color-card: oklch(1 0 0);
-  --color-muted: oklch(0.96 0.006 247);
-  --color-muted-foreground: oklch(0.55 0.03 257);
-  --color-border: oklch(0.92 0.01 255);
-  --color-primary: oklch(0.45 0.18 264);
-  --color-primary-foreground: oklch(0.985 0.002 247);
-  --color-destructive: oklch(0.58 0.22 27);
-  --color-ring: oklch(0.45 0.18 264);
+  --font-sans: "Golos Text", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-background: #f7f7f7;
+  --color-foreground: #2e2e2e;
+  --color-card: #eeeeee;
+  --color-muted: #e3e3e3;
+  --color-muted-foreground: #6a6a6a;
+  --color-border: #d0d0d0;
+  --color-primary: #3c3c3c;
+  --color-primary-foreground: #f7f7f7;
+  --color-destructive: #3c3c3c;
+  --color-ring: #3c3c3c;
+  --color-shadow: #c4c4c4;
+}
+
+@layer base {
+  :root[data-theme="dark"] {
+    --color-background: #1c1c1c;
+    --color-foreground: #dedede;
+    --color-card: #262626;
+    --color-muted: #303030;
+    --color-muted-foreground: #9a9a9a;
+    --color-border: #3d3d3d;
+    --color-primary: #cdcdcd;
+    --color-primary-foreground: #1c1c1c;
+    --color-destructive: #cdcdcd;
+    --color-ring: #cdcdcd;
+    --color-shadow: #474747;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --color-background: #1c1c1c;
+      --color-foreground: #dedede;
+      --color-card: #262626;
+      --color-muted: #303030;
+      --color-muted-foreground: #9a9a9a;
+      --color-border: #3d3d3d;
+      --color-primary: #cdcdcd;
+      --color-primary-foreground: #1c1c1c;
+      --color-destructive: #cdcdcd;
+      --color-ring: #cdcdcd;
+      --color-shadow: #474747;
+    }
+  }
+}
+
+/* Жёсткая тень со сдвигом: основная кнопка, поле в фокусе, активный пункт меню. */
+@utility shadow-hard {
+  box-shadow: 4px 4px 0 var(--color-shadow);
+}
+
+@utility shadow-hard-lg {
+  box-shadow: 8px 8px 0 var(--color-shadow);
+}
+
+/* Штриховка — опасные действия и «закрыто/заблокировано» вместо красного. */
+@utility bg-hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--color-border) 0 1px,
+    transparent 1px 7px
+  );
+}
+
+/* Квадрат в левом верхнем углу карточки. */
+@utility corner-mark {
+  position: relative;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    width: 10px;
+    height: 10px;
+    background: var(--color-primary);
+  }
+}
+
+/* Флажки, радио и календарь — в тон теме, без синего браузера. */
+:root {
+  accent-color: var(--color-primary);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: oklch(0.17 0.02 265);
-    --color-foreground: oklch(0.96 0.006 247);
-    --color-card: oklch(0.21 0.03 265);
-    --color-muted: oklch(0.28 0.03 260);
-    --color-muted-foreground: oklch(0.7 0.02 257);
-    --color-border: oklch(0.3 0.03 260);
-    --color-primary: oklch(0.7 0.14 264);
-    --color-primary-foreground: oklch(0.17 0.02 265);
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
   }
 }
 
@@ -31,9 +112,5 @@ body {
   margin: 0;
   background: var(--color-background);
   color: var(--color-foreground);
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--font-sans);
 }

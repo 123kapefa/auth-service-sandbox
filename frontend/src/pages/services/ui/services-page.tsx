@@ -41,7 +41,7 @@ export function ServicesPage() {
       ) : (
         <ul className="grid gap-3">
           {services.data.map((service) => (
-            <li key={service.code} className="rounded-md border border-border p-3">
+            <li key={service.code} className="border border-border bg-background p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{service.name}</span>
                 <span className="font-mono text-sm text-muted-foreground">{service.clientId}</span>

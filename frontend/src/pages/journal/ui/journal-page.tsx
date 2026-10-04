@@ -12,14 +12,14 @@ export function JournalPage() {
   const tab = params.get("tab") === "logins" ? "logins" : "actions";
   const tabClass = (active: boolean) =>
     cn(
-      "-mb-px border-b-2 border-transparent px-3 pb-2 text-sm",
-      active ? "border-primary font-medium" : "text-muted-foreground hover:text-foreground",
+      "-mb-px border-b-4 border-transparent px-4 pb-3 text-[15px]",
+      active ? "border-primary font-semibold" : "text-muted-foreground hover:text-foreground",
     );
 
   return (
     <div className="grid gap-4">
       <div className="flex flex-wrap items-end gap-4 border-b border-border">
-        <h1 className="pb-2 text-lg font-semibold">Журнал</h1>
+        <h1 className="pb-3 text-3xl font-bold tracking-tight">Журнал</h1>
         <nav className="flex gap-1" aria-label="Журнал">
           <Link to="?tab=actions" className={tabClass(tab === "actions")}>
             Действия

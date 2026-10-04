@@ -1,4 +1,4 @@
-import { type AdminAccess } from "@/entities/admin-session";
+import { type AdminAccess, type ManagedApp } from "@/entities/admin-session";
 import { appTabs } from "@/widgets/app-section";
 
 export interface NavItem {
@@ -6,6 +6,8 @@ export interface NavItem {
   label: string;
   /** Подсвечивать только на точном адресе (обзор), иначе — и на вложенных страницах. */
   end?: boolean;
+  /** Пункт приложения: в меню — в блоке «Приложения», под ним — его разделы. */
+  app?: ManagedApp;
 }
 
 /** Разделы в меню — по тому, что вызвавшему доступно (проверяет всё равно сервер). */
@@ -26,7 +28,7 @@ export function navItems(access: AdminAccess): NavItem[] {
   // Приложение — в меню, если в его разделе есть хоть одна вкладка (выдача ролей, роли и права, журнал).
   for (const app of access.apps) {
     if (appTabs(app).length > 0) {
-      items.push({ to: `/apps/${app.clientId}`, label: app.name ?? app.clientId });
+      items.push({ to: `/apps/${app.clientId}`, label: app.name ?? app.clientId, app });
     }
   }
 

@@ -42,8 +42,8 @@ export function AppUsersPage() {
           </EmptyState>
         ) : (
           <table className="w-full text-sm">
-            <thead className="text-left text-muted-foreground">
-              <tr className="border-b border-border">
+            <thead className="text-left font-mono text-[11px] tracking-[0.1em] text-muted-foreground uppercase">
+              <tr className="border-b-2 border-primary">
                 <th className="px-4 py-2 font-medium">Пользователь</th>
                 <th className="px-4 py-2 font-medium">Почта</th>
                 <th className="px-4 py-2 font-medium">Роли</th>

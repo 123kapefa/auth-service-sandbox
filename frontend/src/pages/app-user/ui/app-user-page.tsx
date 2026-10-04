@@ -53,9 +53,9 @@ export function AppUserPage() {
               <CardTitle>Доступ к приложению</CardTitle>
               <div className="flex items-center justify-between gap-3 text-sm">
                 {query.data.hasAccess ? (
-                  <Badge>открыт</Badge>
+                  <Badge variant="solid">открыт</Badge>
                 ) : (
-                  <Badge className="border-destructive text-destructive">закрыт</Badge>
+                  <Badge variant="warning">закрыт</Badge>
                 )}
                 {app.permissions.includes(Permissions.usersBlock) && (
                   <AppAccessToggle

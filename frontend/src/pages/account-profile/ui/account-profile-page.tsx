@@ -15,7 +15,7 @@ export function AccountProfilePage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-semibold">Профиль</h1>
+      <h1 className="text-3xl font-bold tracking-tight">Профиль</h1>
 
       <Card>
         <CardTitle>Телефон</CardTitle>
@@ -32,9 +32,9 @@ export function AccountProfilePage() {
             <>
               <span className="font-medium">{profile.email}</span>
               {profile.emailVerified ? (
-                <Badge>подтверждена</Badge>
+                <Badge variant="solid">подтверждена</Badge>
               ) : (
-                <Badge className="border-destructive text-destructive">не подтверждена</Badge>
+                <Badge variant="warning">не подтверждена</Badge>
               )}
             </>
           ) : (

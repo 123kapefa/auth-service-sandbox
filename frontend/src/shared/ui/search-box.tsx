@@ -25,9 +25,7 @@ export function SearchBox({ value, placeholder, label, onSearch }: SearchBoxProp
         aria-label={label}
         key={value}
       />
-      <Button type="submit" variant="outline">
-        Найти
-      </Button>
+      <Button type="submit">Найти →</Button>
     </form>
   );
 }

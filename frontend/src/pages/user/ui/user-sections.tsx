@@ -47,9 +47,9 @@ export function AppAccessSection({ userId, canChange }: { userId: string; canCha
               <span>
                 {app.name ?? app.clientId}{" "}
                 {app.hasAccess ? (
-                  <Badge>открыт</Badge>
+                  <Badge variant="solid">открыт</Badge>
                 ) : (
-                  <Badge className="border-destructive text-destructive">закрыт</Badge>
+                  <Badge variant="warning">закрыт</Badge>
                 )}
               </span>
               {canChange && (

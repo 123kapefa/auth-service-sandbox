@@ -30,15 +30,13 @@ export function Dialog({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 bg-black/50" />
+        <DialogPrimitive.Overlay className="fixed inset-0 bg-[#1c1c1c]/50" />
         <DialogPrimitive.Content
           onInteractOutside={keepOpen}
           onEscapeKeyDown={keepOpen}
-          className="fixed top-1/2 left-1/2 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-5 text-foreground shadow-lg"
+          className="fixed top-1/2 left-1/2 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 border-2 border-primary bg-background p-6 text-foreground shadow-hard-lg"
         >
-          <DialogPrimitive.Title className="mb-1 text-base font-semibold">
-            {title}
-          </DialogPrimitive.Title>
+          <DialogPrimitive.Title className="mb-1 text-lg font-bold">{title}</DialogPrimitive.Title>
           {description ? (
             <DialogPrimitive.Description className="mb-4 text-sm text-muted-foreground">
               {description}

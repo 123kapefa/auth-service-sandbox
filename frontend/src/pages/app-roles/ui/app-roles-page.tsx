@@ -48,10 +48,10 @@ export function AppRolesPage() {
         </div>
         <ul className="grid gap-3">
           {roles.data.map((role) => (
-            <li key={role.name} className="rounded-md border border-border p-3">
+            <li key={role.name} className="border border-border bg-background p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{role.name}</span>
-                {role.builtin && <Badge>встроенная</Badge>}
+                {role.builtin && <Badge variant="solid">встроенная</Badge>}
                 <span className="text-sm text-muted-foreground">{role.description}</span>
                 <span className="ml-auto flex gap-1">
                   <Button size="sm" variant="ghost" onClick={() => setEditing(role)}>

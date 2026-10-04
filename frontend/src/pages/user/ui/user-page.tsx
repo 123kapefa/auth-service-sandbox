@@ -37,10 +37,15 @@ export function UserPage() {
   return (
     <div className="grid gap-4">
       <div>
-        <Link to="/users" className="text-sm text-muted-foreground hover:underline">
+        <Link
+          to="/users"
+          className="font-mono text-xs tracking-[0.08em] text-muted-foreground uppercase hover:text-foreground"
+        >
           ← Пользователи
         </Link>
-        <h1 className="mt-1 text-lg font-semibold">{user.phone ?? user.username}</h1>
+        <h1 className="mt-1 font-mono text-3xl font-medium tracking-tight">
+          {user.phone ?? user.username}
+        </h1>
         {can.has(Permissions.auditView) && (
           <div className="mt-1 flex gap-4 text-sm">
             <Link
@@ -81,8 +86,7 @@ export function UserPage() {
           <dd>
             {user.isRestricted ? (
               <>
-                <Badge className="border-destructive text-destructive">заблокирован</Badge>{" "}
-                {formatDateTime(user.restrictedAt)}
+                <Badge variant="warning">заблокирован</Badge> {formatDateTime(user.restrictedAt)}
                 {user.restrictionReason && ` — ${user.restrictionReason}`}
               </>
             ) : (
