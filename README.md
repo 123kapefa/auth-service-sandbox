@@ -1,39 +1,46 @@
-# Auth Service
+# Auth Service (песочница)
 
-Отдельный IAM-микросервис на .NET 10: ASP.NET Core Identity, PostgreSQL и OpenIddict. Прикладной код организован vertical slices в `Core/Features`; HTTP/UI — тонкий адаптер над ними.
+Переиспользуемый сервис авторизации на .NET 10 поверх **Keycloak**.
+Keycloak отвечает за вход (пароль, почта, телефон, внешние провайдеры, 2FA, passkey)
+и хранит пользователей и роли; этот сервис — обёртка над ним: проверка токенов,
+роли и режимы, операции админки через Admin API Keycloak, свои данные в PostgreSQL.
+
+> Исходная реализация на OpenIddict сохранена тегом `openiddict-baseline`.
+> Цели и этапы: [docs/keycloak/README.md](docs/keycloak/README.md).
+
+## Состояние
+
+Идёт перестройка по архитектурной документации платформы (Clean Architecture,
+4 слоя + Api). Сейчас сервис ведёт вход через страницу Keycloak (code + PKCE), держит сессию в cookie
+`accessToken`/`refreshToken` с обновлением и выходом (этап 3), проверяет токены и пускает к эндпоинтам
+по ролям, активному режиму и правам (этап 2). Способы входа (этап 3а): телефон или почта с паролем,
+сброс пароля по почте, 2FA по желанию, ключ доступа (passkey). Демо-страница для проверки — http://localhost:8080.
+
+## Структура
+
+| Проект | Слой |
+|---|---|
+| `AuthService.Api` | web-слой: Program, эндпоинты, конфигурация |
+| `AuthService.Core` | сценарии (use cases) |
+| `AuthService.Domain` | доменная модель |
+| `AuthService.Contracts` | запросы/ответы и клиент для других сервисов |
+| `AuthService.Infrastructure.Postgres` | EF Core, схема `auth` |
 
 ## Локальный запуск
 
 ```bash
 cp .env.example .env
-docker compose up --build
 ```
 
-- Auth service: <http://localhost:8080>
-- Mailpit: <http://localhost:8025>
-- Discovery: <http://localhost:8080/.well-known/openid-configuration>
+```bash
+docker compose up -d --wait
+```
 
-Bootstrap-администратор создаётся только при `BOOTSTRAP_ENABLED=true`, получает роль `platform_admin`, но должен подтвердить email и включить TOTP перед использованием `/api/admin`. Development-клиенты: `dev-spa` (code + PKCE) и `dev-service` (client credentials; secret в `.env`).
+| Что | Адрес |
+|---|---|
+| Auth Service | http://localhost:8080/health/ready |
+| Keycloak (админка) | http://localhost:8180/admin |
+| Mailpit | http://localhost:8025 |
 
-## Контракт авторизации
-
-- `GET|POST /connect/authorize` — authorization code с PKCE S256.
-- `POST /connect/token` — authorization code, refresh token или client credentials.
-- `GET|POST /connect/userinfo`, `GET|POST /connect/logout`, `POST /connect/revocation`.
-- Discovery и JWKS публикуются OpenIddict; ресурсные сервисы валидируют `iss`, `aud`, подпись, срок действия и нужный scope через discovery, без общей БД.
-
-Access token действует 15 минут и подписывается асимметричным ключом. Refresh token хранится сервером и ротируется. Не включены password/implicit/device grants, dynamic client registration и introspection.
-
-## Администрирование
-
-Bearer access token с `platform_admin`, `auth.admin` и `amr=mfa` открывает:
-
-- `GET|POST /api/admin/clients`, `POST /api/admin/clients/{clientId}/rotate-secret`;
-- `GET|POST /api/admin/scopes`;
-- назначение платформенной роли и отзыв refresh-сессий пользователя.
-
-Client secret возвращается только при создании или ротации. Redirect URI принимаются только как точные HTTPS URI или loopback HTTP URI для локальной разработки.
-
-## Production
-
-Перед запуском production обязательно передайте `Oidc:Keys:SigningCertificatePath` и `Oidc:Keys:EncryptionCertificatePath` через secret mounts, установите HTTPS issuer, SMTP и защищённое хранилище PostgreSQL/Data Protection keys. При ротации добавьте прежний ключ через `Oidc:Keys:PreviousSigningCertificatePath` на срок, превышающий TTL access token. Не используйте `.env.example` как production-секрет.
+Окружения `Development` (`dotnet run`, порт 5080), `Docker` (compose, порт 8080) и `Production`,
+и что где хранится — [docs/environments.md](docs/environments.md).

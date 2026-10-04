@@ -1,0 +1,95 @@
+using AuthService.Contracts.Security;
+using AuthService.Core.Abstractions;
+using CSharpFunctionalExtensions;
+using SharedKernel;
+using PlatformAuth.Revocation;
+
+namespace AuthService.Core.Features.Security;
+
+/// <summary>
+/// Сессии пользователя на сервере входа (Keycloak): список, завершить одну, завершить все остальные.
+/// Текущая сессия — по claim sid токена. Завершённая сессия больше не обновляет токены, а её уже выданные
+/// access-токены отзываются сразу (отметка по sid). Устройство сессии — из записи сервиса при входе (LoginDevices).
+/// </summary>
+public sealed class SessionsHandler(IIdentityAdmin identityAdmin, ITokenRevocationStore revocations, LoginDevices devices)
+{
+    public async Task<Result<SessionsResponse, Error>> ListAsync(Guid userId, string? currentSessionId, CancellationToken cancellationToken)
+    {
+        Result<IReadOnlyList<IdentitySession>, Error> sessions = await identityAdmin.GetSessionsAsync(userId, cancellationToken);
+        if (sessions.IsFailure)
+        {
+            return sessions.Error;
+        }
+
+        IReadOnlyDictionary<string, string?> userAgents =
+            await devices.GetUserAgentsAsync(userId, [.. sessions.Value.Select(session => session.Id)], cancellationToken);
+        return new SessionsResponse(
+            [.. sessions.Value.Select(session => ToResponse(session, userAgents.GetValueOrDefault(session.Id), currentSessionId))]);
+    }
+
+    public async Task<Result<SessionsResponse, Error>> TerminateAsync(
+        Guid userId,
+        string sessionId,
+        string? currentSessionId,
+        CancellationToken cancellationToken)
+    {
+        Result<IReadOnlyList<IdentitySession>, Error> sessions = await identityAdmin.GetSessionsAsync(userId, cancellationToken);
+        if (sessions.IsFailure)
+        {
+            return sessions.Error;
+        }
+
+        // Только свою: чужая сессия выглядит так же, как несуществующая.
+        if (!sessions.Value.Any(session => string.Equals(session.Id, sessionId, StringComparison.Ordinal)))
+        {
+            return SessionErrors.NotFound();
+        }
+
+        UnitResult<Error> deleted = await identityAdmin.DeleteSessionAsync(sessionId, cancellationToken);
+        if (deleted.IsFailure)
+        {
+            return deleted.Error;
+        }
+
+        await revocations.RevokeSessionAsync(sessionId, cancellationToken);
+        return await ListAsync(userId, currentSessionId, cancellationToken);
+    }
+
+    public async Task<Result<TerminatedResponse, Error>> TerminateOthersAsync(
+        Guid userId,
+        string? currentSessionId,
+        CancellationToken cancellationToken)
+    {
+        Result<IReadOnlyList<IdentitySession>, Error> sessions = await identityAdmin.GetSessionsAsync(userId, cancellationToken);
+        if (sessions.IsFailure)
+        {
+            return sessions.Error;
+        }
+
+        int terminated = 0;
+        foreach (IdentitySession session in sessions.Value.Where(session => !string.Equals(session.Id, currentSessionId, StringComparison.Ordinal)))
+        {
+            UnitResult<Error> deleted = await identityAdmin.DeleteSessionAsync(session.Id, cancellationToken);
+            if (deleted.IsFailure)
+            {
+                return deleted.Error;
+            }
+
+            await revocations.RevokeSessionAsync(session.Id, cancellationToken);
+            terminated++;
+        }
+
+        return new TerminatedResponse(terminated);
+    }
+
+    private static SessionResponse ToResponse(IdentitySession session, string? userAgent, string? currentSessionId) =>
+        new(
+            session.Id,
+            userAgent,
+            session.IpAddress,
+            DeviceLabels.FromUserAgent(userAgent),
+            session.StartedAt,
+            session.LastAccessAt,
+            string.Equals(session.Id, currentSessionId, StringComparison.Ordinal),
+            session.Apps);
+}

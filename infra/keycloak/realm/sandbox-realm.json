@@ -1,0 +1,2008 @@
+{
+  "realm": "sandbox",
+  "enabled": true,
+  "displayName": "Auth Sandbox",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "verifyEmail": false,
+  "bruteForceProtected": true,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "maxDeltaTimeSeconds": 43200,
+  "passwordPolicy": "length(8) and maxLength(128) and notUsername",
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 2592000,
+  "ssoSessionMaxLifespan": 2592000,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "defaultSignatureAlgorithm": "RS256",
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "ru",
+    "en"
+  ],
+  "defaultLocale": "ru",
+  "loginTheme": "platform",
+  "emailTheme": "platform",
+  "browserFlow": "platform browser",
+  "webAuthnPolicyPasswordlessPasskeysEnabled": true,
+  "authenticationFlows": [
+    {
+      "alias": "platform browser",
+      "description": "Вход в браузере: способ входа, затем — открыт ли доступ к этому приложению",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": true,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "priority": 10,
+          "flowAlias": "platform who"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "platform-app-access-check",
+          "priority": 20
+        }
+      ]
+    },
+    {
+      "alias": "platform who",
+      "description": "Кто вы: живая сессия, внешний провайдер или форма входа",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "userSetupAllowed": false,
+          "authenticator": "auth-cookie",
+          "priority": 10
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "userSetupAllowed": false,
+          "authenticator": "identity-provider-redirector",
+          "priority": 25
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "userSetupAllowed": false,
+          "priority": 30,
+          "flowAlias": "platform forms"
+        }
+      ]
+    },
+    {
+      "alias": "platform forms",
+      "description": "Телефон или почта + пароль (или «Войти по коду»), затем 2FA, если пользователь её включил",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "platform-password-login",
+          "priority": 10
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "userSetupAllowed": false,
+          "priority": 20,
+          "flowAlias": "platform code login"
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "userSetupAllowed": false,
+          "priority": 30,
+          "flowAlias": "platform conditional 2FA"
+        }
+      ]
+    },
+    {
+      "alias": "platform code login",
+      "description": "Вход по коду из SMS — только если на форме нажали «Войти по коду»",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "platform-condition-code-requested",
+          "priority": 10
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "platform-code-login",
+          "priority": 20
+        }
+      ]
+    },
+    {
+      "alias": "platform conditional 2FA",
+      "description": "2FA только для тех, кто её настроил; вошедшим по passkey не нужна",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "conditional-user-configured",
+          "priority": 10
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "conditional-credential",
+          "authenticatorConfig": "platform-conditional-credential",
+          "priority": 20
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "userSetupAllowed": false,
+          "authenticator": "auth-otp-form",
+          "priority": 30
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "userSetupAllowed": false,
+          "authenticator": "auth-recovery-authn-code-form",
+          "priority": 40
+        }
+      ]
+    }
+  ],
+  "authenticatorConfig": [
+    {
+      "alias": "platform-conditional-credential",
+      "config": {
+        "credentials": "webauthn-passwordless"
+      }
+    }
+  ],
+  "requiredActions": [
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 10,
+      "config": {}
+    },
+    {
+      "alias": "TERMS_AND_CONDITIONS",
+      "name": "Terms and Conditions",
+      "providerId": "TERMS_AND_CONDITIONS",
+      "enabled": false,
+      "defaultAction": false,
+      "priority": 20,
+      "config": {}
+    },
+    {
+      "alias": "UPDATE_PASSWORD",
+      "name": "Update Password",
+      "providerId": "UPDATE_PASSWORD",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 30,
+      "config": {}
+    },
+    {
+      "alias": "UPDATE_PROFILE",
+      "name": "Update Profile",
+      "providerId": "UPDATE_PROFILE",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 40,
+      "config": {}
+    },
+    {
+      "alias": "VERIFY_EMAIL",
+      "name": "Verify Email",
+      "providerId": "VERIFY_EMAIL",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 50,
+      "config": {}
+    },
+    {
+      "alias": "delete_account",
+      "name": "Delete Account",
+      "providerId": "delete_account",
+      "enabled": false,
+      "defaultAction": false,
+      "priority": 60,
+      "config": {}
+    },
+    {
+      "alias": "UPDATE_EMAIL",
+      "name": "Update Email",
+      "providerId": "UPDATE_EMAIL",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 70,
+      "config": {
+        "verifyEmail": "true"
+      }
+    },
+    {
+      "alias": "webauthn-register",
+      "name": "Webauthn Register",
+      "providerId": "webauthn-register",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 80,
+      "config": {}
+    },
+    {
+      "alias": "webauthn-register-passwordless",
+      "name": "Webauthn Register Passwordless",
+      "providerId": "webauthn-register-passwordless",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 90,
+      "config": {}
+    },
+    {
+      "alias": "VERIFY_PROFILE",
+      "name": "Verify Profile",
+      "providerId": "VERIFY_PROFILE",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 100,
+      "config": {}
+    },
+    {
+      "alias": "delete_credential",
+      "name": "Delete Credential",
+      "providerId": "delete_credential",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 110,
+      "config": {}
+    },
+    {
+      "alias": "idp_link",
+      "name": "Linking Identity Provider",
+      "providerId": "idp_link",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 120,
+      "config": {}
+    },
+    {
+      "alias": "CONFIGURE_RECOVERY_AUTHN_CODES",
+      "name": "Recovery Authentication Codes",
+      "providerId": "CONFIGURE_RECOVERY_AUTHN_CODES",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 130,
+      "config": {}
+    },
+    {
+      "alias": "update_user_locale",
+      "name": "Update User Locale",
+      "providerId": "update_user_locale",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 1000,
+      "config": {}
+    }
+  ],
+  "smtpServer": {
+    "host": "mailpit",
+    "port": "1025",
+    "from": "no-reply@sandbox.test",
+    "fromDisplayName": "Auth Sandbox",
+    "auth": "false",
+    "ssl": "false",
+    "starttls": "false"
+  },
+  "localizationTexts": {
+    "ru": {
+      "usernameOrEmail": "Телефон или почта",
+      "requiredAction.webauthn-register-passwordless": "Регистрация ключа доступа",
+      "webauthn-display-name": "Ключ доступа",
+      "webauthn-help-text": "Войдите с помощью ключа доступа.",
+      "webauthn-passwordless-display-name": "Ключ доступа",
+      "webauthn-passwordless-help-text": "Вход без пароля: отпечаток пальца, лицо или PIN-код устройства.",
+      "webauthn-login-title": "Вход с ключом доступа",
+      "webauthn-available-authenticators": "Доступные ключи доступа",
+      "webauthn-doAuthenticate": "Войти с ключом доступа",
+      "webauthn-registration-init-label": "Ключ доступа (метка по умолчанию)",
+      "webauthn-error-registration": "Не удалось зарегистрировать ключ доступа.<br /> {0}",
+      "webauthn-error-api-get": "Не удалось войти с ключом доступа.<br /> {0}",
+      "webauthn-error-user-not-found": "Ключ доступа принадлежит неизвестному пользователю.",
+      "passkey-login-title": "Вход с ключом доступа",
+      "passkey-available-authenticators": "Доступные ключи доступа",
+      "passkey-unsupported-browser-text": "Этот браузер не поддерживает ключи доступа. Попробуйте другой или обратитесь к администратору.",
+      "passkey-doAuthenticate": "Войти с ключом доступа",
+      "passkey-createdAt-label": "Создан",
+      "passkey-autofill-select": "Выберите ключ доступа",
+      "notSetUp": "Не настроено: {{name}}."
+    },
+    "en": {
+      "usernameOrEmail": "Phone or email"
+    }
+  },
+  "adminPermissionsEnabled": true,
+  "eventsEnabled": true,
+  "eventsExpiration": 2592000,
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "default-roles-sandbox",
+        "description": "Роли, которые получает каждый новый пользователь",
+        "composite": true,
+        "composites": {
+          "client": {
+            "sandbox-api": [
+              "customer"
+            ],
+            "account": [
+              "view-profile",
+              "manage-account"
+            ]
+          }
+        }
+      },
+      {
+        "name": "manage-branding",
+        "description": "Служебная: менять оформление проекта (плагин platform-branding) — у учётки сервиса входа",
+        "composite": false,
+        "clientRole": false
+      }
+    ],
+    "client": {
+      "sandbox-api": [
+        {
+          "name": "customer",
+          "description": "Покупатель (есть у всех)",
+          "composite": true,
+          "clientRole": true,
+          "composites": {
+            "client": {
+              "sandbox-api": [
+                "profile.view"
+              ]
+            }
+          },
+          "attributes": {
+            "kind": [
+              "role"
+            ],
+            "builtin": [
+              "true"
+            ]
+          }
+        },
+        {
+          "name": "manager",
+          "description": "Менеджер",
+          "composite": true,
+          "clientRole": true,
+          "composites": {
+            "client": {
+              "sandbox-api": [
+                "profile.view",
+                "users.view",
+                "users.block"
+              ]
+            }
+          },
+          "attributes": {
+            "kind": [
+              "role"
+            ],
+            "builtin": [
+              "true"
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "description": "Администратор",
+          "composite": true,
+          "clientRole": true,
+          "composites": {
+            "client": {
+              "sandbox-api": [
+                "profile.view",
+                "users.view",
+                "users.block",
+                "users.roles.manage",
+                "users.sessions.manage",
+                "users.credentials.manage",
+                "audit.view",
+                "roles.manage",
+                "services.manage",
+                "branding.manage"
+              ]
+            }
+          },
+          "attributes": {
+            "kind": [
+              "role"
+            ],
+            "builtin": [
+              "true"
+            ]
+          }
+        },
+        {
+          "name": "profile.view",
+          "description": "Свой профиль",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "users.view",
+          "description": "Пользователи: список и карточка",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "users.block",
+          "description": "Блокировка аккаунта и доступ к приложению",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "users.roles.manage",
+          "description": "Смена ролей пользователей",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "users.sessions.manage",
+          "description": "«Выйти везде» за пользователя",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "users.credentials.manage",
+          "description": "Сброс пароля и 2FA",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "audit.view",
+          "description": "Журнал действий и входов",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "roles.manage",
+          "description": "Роли и права приложения",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "services.manage",
+          "description": "Сервисы проекта и их ключи доступа",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "branding.manage",
+          "description": "Оформление проекта: название, логотип, цвет, тема",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "service.users.read",
+          "description": "Сервис: читать пользователя",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "service.access.check",
+          "description": "Сервис: проверить доступ пользователя",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        }
+      ],
+      "account": [
+        {
+          "name": "view-profile",
+          "description": "${role_view-profile}",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {}
+        },
+        {
+          "name": "manage-account",
+          "description": "${role_manage-account}",
+          "composite": true,
+          "composites": {
+            "client": {
+              "account": [
+                "manage-account-links"
+              ]
+            }
+          },
+          "clientRole": true,
+          "attributes": {}
+        },
+        {
+          "name": "manage-account-links",
+          "description": "${role_manage-account-links}",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {}
+        },
+        {
+          "name": "manage-consent",
+          "description": "${role_manage-consent}",
+          "composite": true,
+          "composites": {
+            "client": {
+              "account": [
+                "view-consent"
+              ]
+            }
+          },
+          "clientRole": true,
+          "attributes": {}
+        },
+        {
+          "name": "view-consent",
+          "description": "${role_view-consent}",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {}
+        },
+        {
+          "name": "view-applications",
+          "description": "${role_view-applications}",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {}
+        },
+        {
+          "name": "delete-account",
+          "description": "${role_delete-account}",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {}
+        },
+        {
+          "name": "view-groups",
+          "description": "${role_view-groups}",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {}
+        }
+      ],
+      "sandbox-bff": [
+        {
+          "name": "access-denied",
+          "description": "Доступ к демо-приложению закрыт",
+          "composite": false,
+          "clientRole": true
+        }
+      ],
+      "account-console": [
+        {
+          "name": "access-denied",
+          "description": "Доступ к личному кабинету закрыт",
+          "composite": false,
+          "clientRole": true
+        }
+      ],
+      "manager-1c": [
+        {
+          "name": "operator",
+          "description": "Оператор",
+          "composite": true,
+          "clientRole": true,
+          "composites": {
+            "client": {
+              "manager-1c": [
+                "orders.view",
+                "orders.edit"
+              ]
+            }
+          },
+          "attributes": {
+            "kind": [
+              "role"
+            ],
+            "builtin": [
+              "true"
+            ]
+          }
+        },
+        {
+          "name": "accountant",
+          "description": "Бухгалтер",
+          "composite": true,
+          "clientRole": true,
+          "composites": {
+            "client": {
+              "manager-1c": [
+                "orders.view",
+                "reports.view"
+              ]
+            }
+          },
+          "attributes": {
+            "kind": [
+              "role"
+            ],
+            "builtin": [
+              "true"
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "description": "Администратор приложения",
+          "composite": true,
+          "clientRole": true,
+          "composites": {
+            "client": {
+              "manager-1c": [
+                "orders.view",
+                "orders.edit",
+                "reports.view",
+                "users.roles.manage",
+                "roles.manage",
+                "users.block",
+                "audit.view"
+              ]
+            }
+          },
+          "attributes": {
+            "kind": [
+              "role"
+            ],
+            "builtin": [
+              "true"
+            ]
+          }
+        },
+        {
+          "name": "orders.view",
+          "description": "Заказы: просмотр",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "orders.edit",
+          "description": "Заказы: изменение",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "reports.view",
+          "description": "Отчёты",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "users.roles.manage",
+          "description": "Выдача ролей приложения пользователям",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "roles.manage",
+          "description": "Роли и права приложения",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "users.block",
+          "description": "Закрыть и открыть доступ к приложению",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "audit.view",
+          "description": "Журнал приложения",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "access-denied",
+          "description": "Доступ к «Менеджеру 1С» закрыт",
+          "composite": false,
+          "clientRole": true
+        }
+      ]
+    }
+  },
+  "defaultRole": {
+    "name": "default-roles-sandbox"
+  },
+  "clientScopes": [
+    {
+      "name": "platform-contract",
+      "protocol": "openid-connect",
+      "description": "Контракт токена: role, available_roles, active_mode, phone, aud",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "роли приложения (role, available_roles)",
+          "protocol": "openid-connect",
+          "protocolMapper": "platform-app-roles",
+          "consentRequired": false,
+          "config": {
+            "roles.client": "sandbox-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "active_mode",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "active_mode",
+            "claim.name": "active_mode",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true",
+            "multivalued": "false"
+          }
+        },
+        {
+          "name": "phone",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "phone",
+            "claim.name": "phone",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true",
+            "multivalued": "false"
+          }
+        },
+        {
+          "name": "audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "sandbox-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "manager-1c-contract",
+      "protocol": "openid-connect",
+      "description": "Контракт токена «Менеджера 1С»: role, available_roles, permissions, active_mode (свой режим в приложении), phone, aud",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "роли приложения (role, available_roles, permissions)",
+          "protocol": "openid-connect",
+          "protocolMapper": "platform-app-roles",
+          "consentRequired": false,
+          "config": {
+            "roles.client": "manager-1c",
+            "mode.attribute": "active_mode.manager-1c",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "active_mode",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "active_mode.manager-1c",
+            "claim.name": "active_mode",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true",
+            "multivalued": "false"
+          }
+        },
+        {
+          "name": "phone",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "phone",
+            "claim.name": "phone",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true",
+            "multivalued": "false"
+          }
+        },
+        {
+          "name": "audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "manager-1c",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "openid-min",
+      "protocol": "openid-connect",
+      "description": "Только sub (встроенные scopes не используются)",
+      "attributes": {
+        "include.in.token.scope": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "sub",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "config": {
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "auth_time",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.session.note": "AUTH_TIME",
+            "claim.name": "auth_time",
+            "jsonType.label": "long",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "account-access",
+      "description": "Только для личного кабинета Keycloak: роли клиентов в токене (API кабинета проверяет роли клиента account)",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "client roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "claim.name": "resource_access.${client_id}.roles",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "defaultDefaultClientScopes": [
+    "platform-contract",
+    "openid-min"
+  ],
+  "clients": [
+    {
+      "id": "2631bc45-b176-4774-927a-b6dd4e310582",
+      "clientId": "sandbox-api",
+      "name": "Auth Sandbox",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "description": "Приложение сервиса входа: носитель ролей и audience"
+    },
+    {
+      "id": "5e0c1b7a-1c00-4d1c-9a11-3c1c0000a1c1",
+      "clientId": "manager-1c",
+      "name": "Менеджер 1С",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "description": "Второе демо-приложение: носитель ролей и audience"
+    },
+    {
+      "id": "7d0f5b8e-3c2a-4f51-9a6e-2b8d41c0e7a1",
+      "clientId": "sandbox-bff",
+      "name": "BFF: вход, cookie, refresh, logout, Admin API",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${SANDBOX_BFF_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "baseUrl": "http://localhost:8080/auth/account",
+      "redirectUris": [
+        "http://localhost:8080/auth/callback",
+        "http://localhost:5080/auth/callback"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:8080/*##http://localhost:5080/*",
+        "backchannel.logout.url": "http://auth-service:8080/auth/backchannel-logout",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false"
+      },
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "platform-contract",
+        "openid-min"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "dev-cli",
+      "name": "ТОЛЬКО DEV: токен по логину/паролю для отладки",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "platform-contract",
+        "openid-min"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "manager-1c-cli",
+      "name": "ТОЛЬКО DEV: токен «Менеджера 1С» по логину/паролю для отладки",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "manager-1c-contract",
+        "openid-min"
+      ],
+      "optionalClientScopes": [],
+      "attributes": {
+        "platform.app": "manager-1c"
+      }
+    },
+    {
+      "clientId": "account",
+      "name": "${client_account}",
+      "rootUrl": "${authBaseUrl}",
+      "baseUrl": "/realms/sandbox/account/",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "/realms/sandbox/account/*"
+      ],
+      "webOrigins": [],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "post.logout.redirect.uris": "+"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": false,
+      "nodeReRegistrationTimeout": 0,
+      "defaultClientScopes": [],
+      "optionalClientScopes": []
+    },
+    {
+      "id": "c41e9a20-6b7d-4e38-8f15-90a2d3b6c5f4",
+      "clientId": "account-console",
+      "name": "${client_account-console}",
+      "rootUrl": "${authBaseUrl}",
+      "baseUrl": "/realms/sandbox/account/",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "/realms/sandbox/account/*"
+      ],
+      "webOrigins": [],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "post.logout.redirect.uris": "+",
+        "pkce.code.challenge.method": "S256"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": false,
+      "nodeReRegistrationTimeout": 0,
+      "protocolMappers": [
+        {
+          "name": "audience resolve",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-resolve-mapper",
+          "consentRequired": false,
+          "config": {}
+        }
+      ],
+      "defaultClientScopes": [
+        "openid-min",
+        "account-access"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "admin-permissions",
+      "name": "Точечные права администрирования (FGAP v2)",
+      "description": "Создаётся Keycloak при adminPermissionsEnabled; здесь — политика и разрешение для служебной учётки sandbox-bff",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "fullScopeAllowed": false,
+      "authorizationSettings": {
+        "allowRemoteResourceManagement": true,
+        "policyEnforcementMode": "ENFORCING",
+        "resources": [
+          {
+            "name": "Clients",
+            "type": "Clients",
+            "ownerManagedAccess": false,
+            "attributes": {},
+            "uris": [],
+            "scopes": [
+              {
+                "name": "view"
+              },
+              {
+                "name": "map-roles-client-scope"
+              },
+              {
+                "name": "map-roles"
+              },
+              {
+                "name": "manage"
+              },
+              {
+                "name": "map-roles-composite"
+              }
+            ]
+          },
+          {
+            "name": "Roles",
+            "type": "Roles",
+            "ownerManagedAccess": false,
+            "attributes": {},
+            "uris": [],
+            "scopes": [
+              {
+                "name": "map-role-composite"
+              },
+              {
+                "name": "map-role-client-scope"
+              },
+              {
+                "name": "map-role"
+              }
+            ]
+          },
+          {
+            "name": "Groups",
+            "type": "Groups",
+            "ownerManagedAccess": false,
+            "attributes": {},
+            "uris": [],
+            "scopes": [
+              {
+                "name": "manage-members"
+              },
+              {
+                "name": "view"
+              },
+              {
+                "name": "manage-membership"
+              },
+              {
+                "name": "view-members"
+              },
+              {
+                "name": "manage"
+              },
+              {
+                "name": "impersonate-members"
+              }
+            ]
+          },
+          {
+            "name": "Users",
+            "type": "Users",
+            "ownerManagedAccess": false,
+            "attributes": {},
+            "uris": [],
+            "scopes": [
+              {
+                "name": "view"
+              },
+              {
+                "name": "manage-group-membership"
+              },
+              {
+                "name": "impersonate"
+              },
+              {
+                "name": "map-roles"
+              },
+              {
+                "name": "reset-password"
+              },
+              {
+                "name": "manage"
+              }
+            ]
+          },
+          {
+            "name": "2631bc45-b176-4774-927a-b6dd4e310582",
+            "ownerManagedAccess": false,
+            "attributes": {},
+            "uris": [],
+            "scopes": [
+              {
+                "name": "view"
+              },
+              {
+                "name": "map-roles-client-scope"
+              },
+              {
+                "name": "map-roles"
+              },
+              {
+                "name": "manage"
+              },
+              {
+                "name": "map-roles-composite"
+              }
+            ]
+          },
+          {
+            "name": "7d0f5b8e-3c2a-4f51-9a6e-2b8d41c0e7a1",
+            "ownerManagedAccess": false,
+            "attributes": {},
+            "uris": [],
+            "scopes": [
+              {
+                "name": "view"
+              },
+              {
+                "name": "map-roles-client-scope"
+              },
+              {
+                "name": "map-roles"
+              },
+              {
+                "name": "manage"
+              },
+              {
+                "name": "map-roles-composite"
+              }
+            ]
+          },
+          {
+            "name": "c41e9a20-6b7d-4e38-8f15-90a2d3b6c5f4",
+            "ownerManagedAccess": false,
+            "attributes": {},
+            "uris": [],
+            "scopes": [
+              {
+                "name": "view"
+              },
+              {
+                "name": "map-roles-client-scope"
+              },
+              {
+                "name": "map-roles"
+              },
+              {
+                "name": "manage"
+              },
+              {
+                "name": "map-roles-composite"
+              }
+            ]
+          },
+          {
+            "name": "5e0c1b7a-1c00-4d1c-9a11-3c1c0000a1c1",
+            "ownerManagedAccess": false,
+            "attributes": {},
+            "uris": [],
+            "scopes": [
+              {
+                "name": "view"
+              },
+              {
+                "name": "map-roles-client-scope"
+              },
+              {
+                "name": "map-roles"
+              },
+              {
+                "name": "manage"
+              },
+              {
+                "name": "map-roles-composite"
+              }
+            ]
+          }
+        ],
+        "policies": [
+          {
+            "name": "sandbox-bff service account",
+            "description": "Служебная учётка сервиса входа — как пользователь",
+            "type": "user",
+            "logic": "POSITIVE",
+            "decisionStrategy": "UNANIMOUS",
+            "config": {
+              "users": "[\"service-account-sandbox-bff\"]"
+            }
+          },
+          {
+            "name": "клиент sandbox-bff",
+            "description": "Та же учётка — как клиент: часть проверок Admin API Keycloak оценивает от клиента",
+            "type": "client",
+            "logic": "POSITIVE",
+            "decisionStrategy": "UNANIMOUS",
+            "config": {
+              "clients": "[\"sandbox-bff\"]"
+            }
+          },
+          {
+            "name": "Клиенты приложений с ролями: view, map-roles, manage, map-roles-composite",
+            "description": "sandbox-api и manager-1c: роли и права приложений — читать, выдавать, создавать, менять и собирать состав ролей (секретов у клиентов нет)",
+            "type": "scope",
+            "logic": "POSITIVE",
+            "decisionStrategy": "AFFIRMATIVE",
+            "config": {
+              "defaultResourceType": "Clients",
+              "resources": "[\"2631bc45-b176-4774-927a-b6dd4e310582\", \"5e0c1b7a-1c00-4d1c-9a11-3c1c0000a1c1\"]",
+              "scopes": "[\"view\",\"map-roles\",\"manage\",\"map-roles-composite\"]",
+              "applyPolicies": "[\"sandbox-bff service account\",\"клиент sandbox-bff\"]"
+            }
+          },
+          {
+            "name": "Клиенты приложений: view и map-roles",
+            "description": "Клиенты для входа: видеть и выдавать роль access-denied",
+            "type": "scope",
+            "logic": "POSITIVE",
+            "decisionStrategy": "AFFIRMATIVE",
+            "config": {
+              "defaultResourceType": "Clients",
+              "resources": "[\"7d0f5b8e-3c2a-4f51-9a6e-2b8d41c0e7a1\",\"c41e9a20-6b7d-4e38-8f15-90a2d3b6c5f4\"]",
+              "scopes": "[\"view\",\"map-roles\"]",
+              "applyPolicies": "[\"sandbox-bff service account\",\"клиент sandbox-bff\"]"
+            }
+          }
+        ],
+        "scopes": [
+          {
+            "name": "manage-group-membership"
+          },
+          {
+            "name": "map-roles-client-scope"
+          },
+          {
+            "name": "map-role"
+          },
+          {
+            "name": "view-members"
+          },
+          {
+            "name": "reset-password"
+          },
+          {
+            "name": "manage"
+          },
+          {
+            "name": "impersonate-members"
+          },
+          {
+            "name": "manage-members"
+          },
+          {
+            "name": "view"
+          },
+          {
+            "name": "manage-membership"
+          },
+          {
+            "name": "impersonate"
+          },
+          {
+            "name": "map-role-composite"
+          },
+          {
+            "name": "map-roles"
+          },
+          {
+            "name": "map-role-client-scope"
+          },
+          {
+            "name": "map-roles-composite"
+          }
+        ],
+        "decisionStrategy": "UNANIMOUS",
+        "authorizationSchema": {
+          "resourceTypes": {
+            "Clients": {
+              "type": "Clients",
+              "scopes": [
+                "manage",
+                "map-roles-composite",
+                "view",
+                "map-roles-client-scope",
+                "map-roles"
+              ],
+              "scopeAliases": {}
+            },
+            "Roles": {
+              "type": "Roles",
+              "scopes": [
+                "map-role-client-scope",
+                "map-role",
+                "map-role-composite"
+              ],
+              "scopeAliases": {}
+            },
+            "Groups": {
+              "type": "Groups",
+              "scopes": [
+                "manage",
+                "impersonate-members",
+                "view-members",
+                "manage-members",
+                "manage-membership",
+                "view"
+              ],
+              "scopeAliases": {}
+            },
+            "Users": {
+              "type": "Users",
+              "scopes": [
+                "manage",
+                "map-roles",
+                "impersonate",
+                "view",
+                "reset-password",
+                "manage-group-membership"
+              ],
+              "scopeAliases": {
+                "view": [
+                  "view-members"
+                ],
+                "impersonate": [
+                  "impersonate-members"
+                ],
+                "manage": [
+                  "manage-members"
+                ]
+              },
+              "groupType": "Groups"
+            }
+          }
+        }
+      }
+    },
+    {
+      "clientId": "legacy-import",
+      "name": "Перенос пользователей из боевого сервиса (этап 6) — временный: в бою создать перед переездом и удалить после",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${LEGACY_IMPORT_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect"
+    }
+  ],
+  "users": [
+    {
+      "username": "79990000001",
+      "enabled": true,
+      "email": "customer@sandbox.test",
+      "emailVerified": true,
+      "attributes": {
+        "phone": [
+          "+79990000001"
+        ],
+        "active_mode": [
+          "customer"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
+    },
+    {
+      "username": "79990000002",
+      "enabled": true,
+      "email": "customer-admin@sandbox.test",
+      "emailVerified": true,
+      "attributes": {
+        "phone": [
+          "+79990000002"
+        ],
+        "active_mode": [
+          "customer"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test1234!",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "sandbox-api": [
+          "admin"
+        ]
+      },
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
+    },
+    {
+      "username": "79990000003",
+      "enabled": true,
+      "email": "customer-manager@sandbox.test",
+      "emailVerified": true,
+      "attributes": {
+        "phone": [
+          "+79990000003"
+        ],
+        "active_mode": [
+          "customer"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test1234!",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "sandbox-api": [
+          "manager"
+        ]
+      },
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
+    },
+    {
+      "username": "79990000004",
+      "enabled": false,
+      "email": "blocked@sandbox.test",
+      "emailVerified": true,
+      "attributes": {
+        "phone": [
+          "+79990000004"
+        ],
+        "active_mode": [
+          "customer"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
+    },
+    {
+      "username": "71234567890",
+      "enabled": true,
+      "email": "admin@sandbox.test",
+      "emailVerified": true,
+      "attributes": {
+        "phone": [
+          "+71234567890"
+        ],
+        "active_mode": [
+          "admin"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test1234!",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "sandbox-api": [
+          "admin"
+        ]
+      },
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
+    },
+    {
+      "username": "70987654321",
+      "enabled": true,
+      "email": "manager@sandbox.test",
+      "emailVerified": true,
+      "attributes": {
+        "phone": [
+          "+70987654321"
+        ],
+        "active_mode": [
+          "manager"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test1234!",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "sandbox-api": [
+          "manager"
+        ]
+      },
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
+    },
+    {
+      "username": "79990000005",
+      "enabled": true,
+      "email": "reset@sandbox.test",
+      "emailVerified": true,
+      "attributes": {
+        "phone": [
+          "+79990000005"
+        ],
+        "active_mode": [
+          "customer"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
+    },
+    {
+      "username": "79990000006",
+      "enabled": true,
+      "email": "otp@sandbox.test",
+      "emailVerified": true,
+      "attributes": {
+        "phone": [
+          "+79990000006"
+        ],
+        "active_mode": [
+          "customer"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test1234!",
+          "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Тестовое приложение (секрет в репозитории)",
+          "secretData": "{\"value\":\"sandbox-otp-test-secret\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\"}"
+        }
+      ],
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
+    },
+    {
+      "username": "79990000007",
+      "enabled": true,
+      "email": "1c-admin@sandbox.test",
+      "emailVerified": true,
+      "attributes": {
+        "phone": [
+          "+79990000007"
+        ],
+        "active_mode": [
+          "customer"
+        ],
+        "active_mode.manager-1c": [
+          "admin"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test1234!",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "manager-1c": [
+          "admin"
+        ]
+      },
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
+    },
+    {
+      "username": "79990000008",
+      "enabled": true,
+      "email": "1c-operator@sandbox.test",
+      "emailVerified": true,
+      "attributes": {
+        "phone": [
+          "+79990000008"
+        ],
+        "active_mode": [
+          "customer"
+        ],
+        "active_mode.manager-1c": [
+          "operator"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test1234!",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "manager-1c": [
+          "operator"
+        ]
+      },
+      "realmRoles": [
+        "default-roles-sandbox"
+      ]
+    },
+    {
+      "username": "service-account-sandbox-bff",
+      "enabled": true,
+      "serviceAccountClientId": "sandbox-bff",
+      "clientRoles": {
+        "realm-management": [
+          "view-users",
+          "manage-users",
+          "view-events",
+          "query-clients"
+        ]
+      },
+      "realmRoles": [
+        "manage-branding"
+      ]
+    },
+    {
+      "username": "service-account-legacy-import",
+      "enabled": true,
+      "serviceAccountClientId": "legacy-import",
+      "clientRoles": {
+        "realm-management": [
+          "manage-realm",
+          "manage-users",
+          "view-users"
+        ]
+      }
+    }
+  ],
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"unmanagedAttributePolicy\": \"ADMIN_EDIT\", \"attributes\": [{\"name\": \"username\", \"displayName\": \"${username}\", \"validations\": {\"length\": {\"min\": 3, \"max\": 255}, \"username-prohibited-characters\": {}, \"up-username-not-idn-homograph\": {}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"email\", \"displayName\": \"${email}\", \"validations\": {\"email\": {}, \"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"firstName\", \"displayName\": \"${firstName}\", \"validations\": {\"length\": {\"max\": 255}, \"person-name-prohibited-characters\": {}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"lastName\", \"displayName\": \"${lastName}\", \"validations\": {\"length\": {\"max\": 255}, \"person-name-prohibited-characters\": {}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}], \"groups\": []}"
+          ]
+        }
+      }
+    ]
+  },
+  "clientScopeMappings": {
+    "account": [
+      {
+        "client": "account-console",
+        "roles": [
+          "manage-account",
+          "view-groups"
+        ]
+      }
+    ]
+  },
+  "clientProfiles": {
+    "profiles": [
+      {
+        "name": "platform-app-access",
+        "description": "Не выдавать токены приложения тем, у кого закрыт доступ к нему (роль access-denied клиента)",
+        "executors": [
+          {
+            "executor": "platform-app-access",
+            "configuration": {}
+          }
+        ]
+      }
+    ]
+  },
+  "clientPolicies": {
+    "policies": [
+      {
+        "name": "platform-app-access",
+        "description": "Доступ к приложению — для всех клиентов realm",
+        "enabled": true,
+        "conditions": [
+          {
+            "condition": "any-client",
+            "configuration": {}
+          }
+        ],
+        "profiles": [
+          "platform-app-access"
+        ]
+      }
+    ]
+  }
+}

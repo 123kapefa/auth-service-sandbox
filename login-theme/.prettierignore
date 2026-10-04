@@ -1,0 +1,6 @@
+dist
+dist_keycloak
+node_modules
+package-lock.json
+src/kc.gen.tsx
+public/keycloakify-dev-resources

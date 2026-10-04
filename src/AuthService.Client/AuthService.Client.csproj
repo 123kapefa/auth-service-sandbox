@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Клиент API сервиса входа для сервисов проекта (по ключу доступа): читать пользователя, проверять доступ. -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Platform.AuthService.Client</PackageId>
+    <Description>Клиент API сервиса входа для сервисов проекта по ключу доступа: читать пользователя, проверять доступ.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../AuthService.Contracts/AuthService.Contracts.csproj" />
+    <ProjectReference Include="../Shared/Authentication/Authentication.csproj" />
+    <ProjectReference Include="../Shared/SharedKernel/SharedKernel.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>

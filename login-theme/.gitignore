@@ -1,0 +1,5 @@
+node_modules
+dist
+dist_keycloak
+*.tsbuildinfo
+public/keycloakify-dev-resources

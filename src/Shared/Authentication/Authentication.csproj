@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Platform.Authentication</PackageId>
+    <Description>Проверка токенов сервиса входа (Keycloak): JWT, права из токена, RequireUser/RequireService, CurrentUser; токен сервиса по ключу доступа (ServiceToken).</Description>
+  </PropertyGroup>
+  <PropertyGroup>
+    <RootNamespace>PlatformAuth</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+  </ItemGroup>
+</Project>

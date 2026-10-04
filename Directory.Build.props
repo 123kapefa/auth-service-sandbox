@@ -1,10 +1,77 @@
 <Project>
+  <!-- Common properties for ALL backend projects. Put at backend/ (solution) root.
+       Analyzer PackageReferences here have NO Version — versions come from
+       Directory.Packages.props (central package management). Ship both files together. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>All</AnalysisMode>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <AnalysisLevel>latest-recommended</AnalysisLevel>
-    <NoWarn>$(NoWarn);CA1861</NoWarn>
+    <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
+    <!-- Globally exclude bin/obj from default items -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/bin/**;**/obj/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <!--
+    Поставка сервиса входа как компонента: версия — одна на пакеты и образы (scripts/package/pack.sh,
+    scripts/package/build-images.sh). Пакетами становятся только библиотеки для сервисов проекта (IsPackable=true в
+    их csproj); сам сервис — Docker-образ.
+  -->
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <IsPackable>false</IsPackable>
+    <Authors>Platform Auth</Authors>
+    <PackageProjectUrl>https://github.com/123kapefa/auth-service-sandbox</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/123kapefa/auth-service-sandbox</RepositoryUrl>
+    <PackageTags>platform;auth;keycloak</PackageTags>
+  </PropertyGroup>
+
+  <!-- Analyzer packages: applied to ALL projects -->
+  <ItemGroup>
+    <PackageReference Include="Roslynator.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Meziantou.Analyzer">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="AsyncFixer">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="SonarAnalyzer.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- Banned API symbols file -->
+  <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" Condition="Exists('$(MSBuildThisFileDirectory)BannedSymbols.txt')" />
+  </ItemGroup>
+
+  <!--
+    .globalconfig is picked up automatically by the SDK — no explicit
+    <GlobalAnalyzerConfigFiles/> item is needed (adding one causes duplicates
+    which can silently suppress severity overrides).
+  -->
+
+  <!-- Test project relaxation -->
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true' OR $(MSBuildProjectName.EndsWith('Tests')) OR $(MSBuildProjectName.EndsWith('IntegrationTests'))">
+    <NoWarn>$(NoWarn);RS0030;RS0031</NoWarn>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+    <NoWarn>$(NoWarn);CA1515;CA1812;CA1051</NoWarn>
+    <NoWarn>$(NoWarn);MA0004;MA0006;MA0025;MA0026;MA0048;MA0051;MA0053;MA0062;MA0076</NoWarn>
+    <NoWarn>$(NoWarn);S4144;S2925;S125;S1481;S2325;S2699;S1939</NoWarn>
   </PropertyGroup>
 </Project>

@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auth Sandbox</title>
+  <style>
+    :root {
+      --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e3e2dc;
+      --ok: #1f7a3d; --deny: #b3261e; --warn: #9a6400; --accent: #2f5bd3;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #161614; --panel: #201f1d; --text: #ecebe6; --muted: #9d9c95; --line: #34332f;
+        --ok: #5fc27e; --deny: #f08b84; --warn: #e2b458; --accent: #8aa8ff;
+      }
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; } /* иначе display: grid у блока «кто я» перебивает атрибут hidden */
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 880px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    h2 { font-size: 15px; margin: 0 0 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    p.lead { margin: 0 0 20px; color: var(--muted); }
+    section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    button, a.button {
+      font: inherit; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--line);
+      background: var(--panel); color: var(--text); cursor: pointer; text-decoration: none;
+    }
+    button.primary, a.button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button:disabled { opacity: .5; cursor: default; }
+    .status { font-weight: 600; }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 12px 0 0; }
+    dt { color: var(--muted); }
+    dd { margin: 0; word-break: break-word; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 500; }
+    code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; }
+    .code-200 { color: var(--ok); font-weight: 600; }
+    .code-401, .code-403 { color: var(--deny); font-weight: 600; }
+    .code-other { color: var(--warn); font-weight: 600; }
+    ol#log { margin: 0; padding-left: 20px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; }
+    .hint { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
+    .table-wrap { overflow-x: auto; }
+    .notice { border: 1px solid var(--accent); border-radius: 8px; padding: 10px 12px; margin-top: 12px; }
+    .notice .added { color: var(--ok); }
+    .notice .removed { color: var(--deny); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Auth Sandbox</h1>
+  <p class="lead">Демо-страница для проверки входа через Keycloak: cookie, обновление токена, выход и права.</p>
+
+  <section>
+    <h2>Сессия</h2>
+    <div class="row">
+      <span class="status" id="status">Проверяю…</span>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <a class="button primary" id="login" href="/auth/login?return_to=/dev/">Войти</a>
+      <button id="refresh">Обновить токен</button>
+      <button id="logout">Выйти</button>
+      <a class="button" id="account" href="/auth/account">Личный кабинет</a>
+    </div>
+    <div class="notice" id="changes" hidden></div>
+    <dl id="me" hidden></dl>
+    <div class="row" id="modes" hidden style="margin-top:12px"><span>Режим:</span></div>
+    <p class="hint">«Личный кабинет» — профиль, смена пароля и почты; оттуда же — 2FA (приложение-аутентификатор, коды восстановления) и ключ доступа (passkey).</p>
+    <p class="hint">Токены лежат в httpOnly-cookie: страница их не видит и не может украсть — так и задумано.
+      Тестовые пользователи и пароль — в <code>docs/keycloak/README.md</code>.</p>
+  </section>
+
+  <section>
+    <h2>Доступ</h2>
+    <div class="row" style="margin-bottom:12px"><button id="check">Проверить все эндпоинты</button></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Эндпоинт</th><th>Что требует</th><th>Ответ</th></tr></thead>
+        <tbody id="access"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Журнал</h2>
+    <ol id="log" reversed></ol>
+  </section>
+</main>
+
+<script>
+  const endpoints = [
+    ["/me/", "вошёл"],
+    ["/demo/admin-only/", "AdminOnly — роль и режим admin"],
+    ["/demo/manager-or-admin/", "ManagerOrAdmin — роль и режим manager или admin"],
+    ["/demo/profile/", "право profile.view"],
+    ["/demo/users/", "право users.view"],
+    ["/demo/users/block/", "право users.block"],
+    ["/demo/users/roles/", "право users.roles.manage"],
+    ["/demo/audit/", "право audit.view"],
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  const codeClass = (code) => code === 200 ? "code-200" : (code === 401 || code === 403) ? `code-${code}` : "code-other";
+
+  function log(text, code) {
+    const item = document.createElement("li");
+    const time = new Date().toLocaleTimeString();
+    item.innerHTML = `${time} ${text} → <span class="${codeClass(code)}">${code}</span>`;
+    $("log").prepend(item);
+  }
+
+  async function send(method, path) {
+    const response = await fetch(path, { method, credentials: "same-origin", headers: { Accept: "application/json" } });
+    let body = null;
+    try { body = await response.json(); } catch { /* 401/403 приходят без тела */ }
+    return { code: response.status, body, response };
+  }
+
+  // Умный рефреш: 401 с error_description="access_changed" — доступ изменился (роли или состав роли), сессия жива.
+  // Обновляем токен без перелогина, показываем, что изменилось, и повторяем запрос.
+  async function call(method, path) {
+    const first = await send(method, path);
+    const changed = first.code === 401 && (first.response.headers.get("WWW-Authenticate") ?? "").includes("access_changed");
+    if (!changed) { return first; }
+    log(`${method} ${path}: доступ изменился`, 401);
+    const refreshed = await send("POST", "/auth/refresh");
+    log("POST /auth/refresh (умный рефреш)", refreshed.code);
+    if (refreshed.code !== 200) { return first; }
+    showChanges(refreshed.body.result.changes);
+    const retried = await send(method, path);
+    if (path !== "/me/") { await loadSession(); } // роли и режимы на странице — из нового токена
+    return retried;
+  }
+
+  // Плашка «стало доступно / больше недоступно» по ответу /auth/refresh.
+  function showChanges(changes) {
+    if (!changes) { return; }
+    const part = (title, items, css) => items.length ? `<div class="${css}">${title}: ${items.join(", ")}</div>` : "";
+    $("changes").innerHTML = "<strong>Ваш доступ изменился</strong>"
+      + part("Стало доступно", changes.addedPermissions, "added")
+      + part("Больше недоступно", changes.removedPermissions, "removed")
+      + part("Новые роли", changes.addedRoles, "added")
+      + part("Сняты роли", changes.removedRoles, "removed")
+      + `<div>Режим: ${changes.activeMode ?? "—"}</div>`;
+    $("changes").hidden = false;
+  }
+
+  function showMe(me) {
+    const rows = [
+      ["Телефон", me.phone ?? "—"],
+      ["Активный режим", me.activeMode ?? "—"],
+      ["Роли", me.roles.join(", ") || "—"],
+      ["Права режима", me.permissions.join(", ") || "—"],
+      ["Id", me.id ?? "—"],
+    ];
+    $("me").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+    $("me").hidden = false;
+    showModes(me);
+  }
+
+  // Кнопки режимов: доступные пользователю, текущий выключен. POST /auth/mode сразу ставит новые токены в cookie.
+  function showModes(me) {
+    const modes = $("modes");
+    modes.querySelectorAll("button").forEach((button) => button.remove());
+    for (const mode of me.availableModes) {
+      const button = document.createElement("button");
+      button.textContent = mode;
+      button.disabled = mode === me.activeMode;
+      button.addEventListener("click", () => switchMode(mode));
+      modes.append(button);
+    }
+    modes.hidden = me.availableModes.length < 2;
+  }
+
+  async function switchMode(mode) {
+    const response = await fetch("/auth/mode", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ activeMode: mode }),
+    });
+    log(`POST /auth/mode ${mode}`, response.status);
+    await loadSession();
+    await checkAccess();
+  }
+
+  async function loadSession() {
+    const { code, body } = await call("GET", "/me/");
+    const signedIn = code === 200;
+    $("status").textContent = signedIn ? "Вы вошли" : "Вы не вошли";
+    $("login").hidden = signedIn;
+    $("refresh").disabled = $("logout").disabled = !signedIn;
+    $("account").hidden = !signedIn;
+    if (signedIn) { showMe(body.result); } else { $("me").hidden = $("modes").hidden = $("changes").hidden = true; }
+    return signedIn;
+  }
+
+  async function checkAccess() {
+    $("access").innerHTML = "";
+    for (const [path, rule] of endpoints) {
+      const { code } = await call("GET", path);
+      const row = document.createElement("tr");
+      row.innerHTML = `<td><code>${path}</code></td><td>${rule}</td><td class="${codeClass(code)}">${code}</td>`;
+      $("access").append(row);
+    }
+  }
+
+  $("refresh").addEventListener("click", async () => {
+    const { code, body } = await send("POST", "/auth/refresh");
+    log("POST /auth/refresh", code);
+    if (code === 200) { showChanges(body.result.changes); }
+    await loadSession();
+    await checkAccess();
+  });
+
+  $("logout").addEventListener("click", async () => {
+    const { code } = await call("POST", "/auth/logout");
+    log("POST /auth/logout", code);
+    await loadSession();
+    await checkAccess();
+  });
+
+  $("check").addEventListener("click", checkAccess);
+
+  loadSession().then(checkAccess);
+</script>
+</body>
+</html>

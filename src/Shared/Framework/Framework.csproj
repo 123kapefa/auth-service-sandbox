@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Platform.Framework</PackageId>
+    <Description>IEndpoint и EndpointResult: эндпоинты Minimal API с ответом в Envelope.</Description>
+  </PropertyGroup>
+  <PropertyGroup>
+    <RootNamespace>Framework</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../SharedKernel/SharedKernel.csproj" />
+  </ItemGroup>
+</Project>

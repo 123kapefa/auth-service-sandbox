@@ -1,14 +1,24 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/AuthService.Api/AuthService.Api.csproj" />
+    <Project Path="src/AuthService.Client/AuthService.Client.csproj" />
     <Project Path="src/AuthService.Contracts/AuthService.Contracts.csproj" />
     <Project Path="src/AuthService.Core/AuthService.Core.csproj" />
     <Project Path="src/AuthService.Domain/AuthService.Domain.csproj" />
+    <Project Path="src/AuthService.Infrastructure.Keycloak/AuthService.Infrastructure.Keycloak.csproj" />
     <Project Path="src/AuthService.Infrastructure.Postgres/AuthService.Infrastructure.Postgres.csproj" />
-    <Project Path="src/AuthService.Migrator/AuthService.Migrator.csproj" />
+    <Project Path="src/AuthService.LegacyImport/AuthService.LegacyImport.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/">
+    <Project Path="src/Shared/Authentication/Authentication.csproj" />
+    <Project Path="src/Shared/Authentication.Redis/Authentication.Redis.csproj" />
+    <Project Path="src/Shared/Framework/Framework.csproj" />
+    <Project Path="src/Shared/SharedKernel/SharedKernel.csproj" />
+    <Project Path="src/Shared/Validation/Validation.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AuthService.IntegrationTests/AuthService.IntegrationTests.csproj" />
     <Project Path="tests/AuthService.UnitTests/AuthService.UnitTests.csproj" />
+    <Project Path="tests/Shared.UnitTests/Shared.UnitTests.csproj" />
   </Folder>
 </Solution>

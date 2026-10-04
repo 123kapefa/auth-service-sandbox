@@ -1,58 +1,45 @@
-using AuthService.Domain.Audit;
-using AuthService.Domain.Identity;
-using AuthService.Infrastructure.Postgres.Identity;
+using AuthService.Domain.AuditLog;
+using AuthService.Domain.ServiceKeys;
+using AuthService.Domain.Sessions;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using OpenIddict.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
 
 namespace AuthService.Infrastructure.Postgres;
 
-public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options)
-    : IdentityDbContext<Account, Role, Guid>(options), IDataProtectionKeyContext
+public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(options), IDataProtectionKeyContext
 {
-    public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
+    public const string SCHEMA = "auth";
 
-    public DbSet<SecurityAuditEvent> SecurityAuditEvents { get; set; } = null!;
+    /// <summary>Таблица истории миграций — одна и та же во время работы и в дизайн-тайме (иначе snapshot разъедется).</summary>
+    public const string MIGRATIONS_HISTORY_TABLE = "__ef_migrations_history";
 
-    protected override void OnModelCreating(ModelBuilder builder)
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
+    public DbSet<ServiceKey> ServiceKeys => Set<ServiceKey>();
+
+    /// <summary>С какого устройства начата сессия сервера входа (раздел «Устройства» кабинета).</summary>
+    public DbSet<LoginDevice> LoginDevices => Set<LoginDevice>();
+
+    /// <summary>
+    /// Ключи DataProtection (шифрование state входа, токенов управления ключами сервисов): в базе, а не в памяти —
+    /// иначе после рестарта или на втором экземпляре зашифрованное не прочитать.
+    /// </summary>
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+
+    /// <summary>Общие настройки Npgsql: схема истории миграций и сборка с миграциями.</summary>
+    public static void ConfigureNpgsql(NpgsqlDbContextOptionsBuilder npgsql)
     {
-        base.OnModelCreating(builder);
+        ArgumentNullException.ThrowIfNull(npgsql);
+        npgsql.MigrationsHistoryTable(MIGRATIONS_HISTORY_TABLE, SCHEMA);
+        npgsql.MigrationsAssembly(typeof(AuthDbContext).Assembly.GetName().Name);
+    }
 
-        builder.HasDefaultSchema("auth");
-        builder.UseOpenIddict<OidcApplication, OidcAuthorization, OidcScope, OidcToken, Guid>();
-
-        builder.Entity<Account>(entity =>
-        {
-            entity.ToTable("users");
-            entity.Property(account => account.DisplayName).HasMaxLength(80);
-            entity.Property(account => account.CreatedAt).IsRequired();
-            entity.Property(account => account.UpdatedAt).IsRequired();
-        });
-        builder.Entity<Role>().ToTable("roles");
-        builder.Entity<IdentityUserClaim<Guid>>().ToTable("user_claims");
-        builder.Entity<IdentityUserRole<Guid>>().ToTable("user_roles");
-        builder.Entity<IdentityUserLogin<Guid>>().ToTable("user_logins");
-        builder.Entity<IdentityUserToken<Guid>>().ToTable("user_tokens");
-        builder.Entity<IdentityRoleClaim<Guid>>().ToTable("role_claims");
-
-        builder.Entity<OidcApplication>().ToTable("oidc_applications");
-        builder.Entity<OidcAuthorization>().ToTable("oidc_authorizations");
-        builder.Entity<OidcScope>().ToTable("oidc_scopes");
-        builder.Entity<OidcToken>().ToTable("oidc_tokens");
-
-        builder.Entity<DataProtectionKey>().ToTable("data_protection_keys");
-        builder.Entity<SecurityAuditEvent>(entity =>
-        {
-            entity.ToTable("security_audit_events");
-            entity.HasKey(entry => entry.Id);
-            entity.Property(entry => entry.EventType).HasMaxLength(120).IsRequired();
-            entity.Property(entry => entry.ClientId).HasMaxLength(200);
-            entity.Property(entry => entry.IpAddress).HasMaxLength(64);
-            entity.Property(entry => entry.Metadata).HasMaxLength(4_000);
-            entity.HasIndex(entry => new { entry.SubjectId, entry.OccurredAt });
-            entity.HasIndex(entry => new { entry.EventType, entry.OccurredAt });
-        });
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.HasDefaultSchema(SCHEMA);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AuthDbContext).Assembly);
+        base.OnModelCreating(modelBuilder);
     }
 }

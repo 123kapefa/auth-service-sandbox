@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Platform.SharedKernel</PackageId>
+    <Description>Error, Envelope, GeneralErrors — общий формат ошибок и ответов сервисов платформы.</Description>
+  </PropertyGroup>
+  <PropertyGroup>
+    <RootNamespace>SharedKernel</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CSharpFunctionalExtensions" />
+  </ItemGroup>
+</Project>

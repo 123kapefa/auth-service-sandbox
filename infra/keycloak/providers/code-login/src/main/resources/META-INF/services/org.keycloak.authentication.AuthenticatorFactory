@@ -1,0 +1,4 @@
+platform.keycloak.auth.CodeLoginAuthenticatorFactory
+platform.keycloak.auth.PasswordLoginFormFactory
+platform.keycloak.auth.CodeRequestedConditionFactory
+platform.keycloak.auth.AppAccessAuthenticatorFactory

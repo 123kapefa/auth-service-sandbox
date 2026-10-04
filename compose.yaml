@@ -10,46 +10,122 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    # Порт наружу — для окружения Development: приложение, запущенное на машине (dotnet run),
+    # ходит в базу через localhost. Контейнерам он не нужен, они ходят по имени postgres.
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  # Отметки мгновенного отзыва токенов (этап 4.8): пишет сервис входа, читают все сервисы платформы.
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # Порт наружу — для окружения Development (dotnet run на машине).
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
 
   mailpit:
     image: axllent/mailpit:v1.26
     ports:
       - "${MAILPIT_UI_PORT:-8025}:8025"
 
-  migrator:
+  # Миграции базы сервиса: efbundle из образа сервиса (стандарт платформы — мигратор-sidecar). Отрабатывает и
+  # завершается; сервис ждёт его успеха. Образ собирается здесь, сервис берёт его по имени.
+  auth-migrator:
     build:
       context: .
-      target: migrator
-    environment:
-      DOTNET_ENVIRONMENT: Development
-      ConnectionStrings__AuthDb: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      target: api
+    image: auth_service-api:local
+    entrypoint: ["./efbundle", "--connection", "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"]
     depends_on:
       postgres:
         condition: service_healthy
 
   auth-service:
-    build:
-      context: .
-      target: api
+    image: auth_service-api:local
+    # dotnet не должен быть PID 1: иначе упавший при старте процесс зависает, а контейнер остаётся "running".
+    init: true
     ports:
       - "8080:8080"
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: Docker
       ConnectionStrings__AuthDb: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
-      Bootstrap__Enabled: ${BOOTSTRAP_ENABLED}
-      Bootstrap__AdminEmail: ${BOOTSTRAP_ADMIN_EMAIL}
-      Bootstrap__AdminUserName: ${BOOTSTRAP_ADMIN_USERNAME}
-      Bootstrap__AdminPassword: ${BOOTSTRAP_ADMIN_PASSWORD}
-      Bootstrap__DevServiceSecret: ${DEV_SERVICE_SECRET}
+      Keycloak__ClientSecret: ${SANDBOX_BFF_CLIENT_SECRET}
+      # Разрешение на регистрацию клиентов — выдача ключей сервисам (scripts/keycloak/registration-token.sh).
+      Keycloak__RegistrationToken: ${KEYCLOAK_REGISTRATION_TOKEN:-}
+      ConnectionStrings__Redis: redis:6379
     depends_on:
       postgres:
         condition: service_healthy
-      mailpit:
-        condition: service_started
-      migrator:
+      redis:
+        condition: service_healthy
+      auth-migrator:
         condition: service_completed_successfully
+
+  # --- Keycloak (этап 1, docs/keycloak/01-stand.md) ---------------------------------
+  # Отдельная БД: в реальных проектах Keycloak не делит базу с приложениями.
+  keycloak-postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - keycloak_postgres_data:/var/lib/postgresql/data
+
+  keycloak:
+    # Свой образ: Keycloak 26.4.7 + плагин «вход по коду» и тема входа platform (Keycloakify) — собираются в Docker.
+    build:
+      context: .
+      dockerfile: infra/keycloak/Dockerfile
+    image: auth_service-keycloak:26.4.7-sandbox
+    # start-dev: http, без кэша тем, подробные ошибки. Realm импортируется из JSON,
+    # только если его ещё нет в БД (изменили JSON → docker compose down -v).
+    command: ["start-dev", "--import-realm"]
+    ports:
+      - "${KEYCLOAK_PORT:-8180}:8180"
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak-postgres
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      # Адрес, от которого зависит `iss` в токенах: браузер и приложения должны видеть один и тот же.
+      KC_HOSTNAME: http://localhost:${KEYCLOAK_PORT:-8180}
+      # Служебные адреса (jwks_uri, token_endpoint) — по адресу, с которого пришёл запрос:
+      # контейнер, спросивший keycloak:8180, получит ключи с keycloak:8180, а iss останется localhost:8180.
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HTTP_PORT: "8180"
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      # Подставляются в realm JSON при импорте (${SANDBOX_BFF_CLIENT_SECRET}, ${LEGACY_IMPORT_CLIENT_SECRET}).
+      SANDBOX_BFF_CLIENT_SECRET: ${SANDBOX_BFF_CLIENT_SECRET}
+      LEGACY_IMPORT_CLIENT_SECRET: ${LEGACY_IMPORT_CLIENT_SECRET}
+    volumes:
+      - ./infra/keycloak/realm:/opt/keycloak/data/import:ro
+      # Тема входа — в образе (jar из login-theme/). Правки страниц без Keycloak — npm run dev в login-theme/.
+    healthcheck:
+      # В образе нет curl — спрашиваем management-порт 9000 через bash /dev/tcp.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:
+  keycloak_postgres_data:
