@@ -47,19 +47,17 @@ describe("AccountProfilePage", () => {
     toast.error.mockReset();
   });
 
-  it("телефон, почта со статусом, ссылки на смену пароля и почты — через вход с действием", () => {
+  it("телефон, почта со статусом, ссылка на смену почты — через вход с действием", () => {
     renderPage(profile);
 
     expect(screen.getByText("+79990000001")).toBeInTheDocument();
     expect(screen.getByText("customer@sandbox.test")).toBeInTheDocument();
     expect(screen.getByText("подтверждена")).toBeInTheDocument();
 
-    const password = linkUrl("Сменить пароль");
-    expect(password.pathname).toBe("/auth/login");
-    expect(password.searchParams.get("action")).toBe("update-password");
-    expect(password.searchParams.get("return_to")).toBe("/account/?action=update-password");
-    expect(linkUrl("Сменить почту").searchParams.get("action")).toBe("update-email");
-    expect(linkUrl("Настроить").pathname).toBe("/auth/account/security");
+    const email = linkUrl("Сменить почту");
+    expect(email.pathname).toBe("/auth/login");
+    expect(email.searchParams.get("action")).toBe("update-email");
+    expect(email.searchParams.get("return_to")).toBe("/account/?action=update-email");
   });
 
   it("без почты — «Добавить почту»", () => {

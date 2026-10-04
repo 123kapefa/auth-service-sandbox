@@ -5,13 +5,18 @@ import { ACTION_PARAM } from "../model/status";
 
 /**
  * Кнопка действия с учётной записью: уход на страницу сервера входа (тема проекта) и возврат на текущую страницу
- * кабинета. Обычная ссылка — пароль и почта вводятся там, страница кабинета их не видит.
+ * кабинета. Обычная ссылка — пароль, почта, коды и ключи вводятся и подтверждаются там, страница кабинета их не видит.
+ * credential — что удалить (delete-credential): подтверждение спросит сам сервер входа.
  */
 export function AccountActionLink({
   action,
+  credential,
+  destructive = false,
   children,
 }: {
   action: AccountAction;
+  credential?: string;
+  destructive?: boolean;
   children: ReactNode;
 }) {
   const here = new URL(window.location.href);
@@ -19,8 +24,13 @@ export function AccountActionLink({
   const returnTo = `${path}?${new URLSearchParams({ [ACTION_PARAM]: action }).toString()}`;
 
   return (
-    <Button asChild variant="outline" size="sm">
-      <a href={accountActionUrl(action, returnTo)}>{children}</a>
+    <Button
+      asChild
+      variant="outline"
+      size="sm"
+      className={destructive ? "text-destructive hover:text-destructive" : undefined}
+    >
+      <a href={accountActionUrl(action, returnTo, credential)}>{children}</a>
     </Button>
   );
 }

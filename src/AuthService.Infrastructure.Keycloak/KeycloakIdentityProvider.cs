@@ -33,7 +33,7 @@ internal sealed partial class KeycloakIdentityProvider(
     public async Task<Result<AuthorizationRequest, Error>> CreateAuthorizationRequestAsync(
         Uri redirectUri,
         bool forceLogin,
-        AccountAction? action,
+        AccountActionRequest? action,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(redirectUri);
@@ -66,11 +66,16 @@ internal sealed partial class KeycloakIdentityProvider(
         if (action is { } requested)
         {
             // Application Initiated Action: Keycloak показывает страницу действия, итог — kc_action_status в callback.
-            parameters["kc_action"] = requested switch
+            parameters["kc_action"] = requested.Action switch
             {
                 AccountAction.UpdatePassword => "UPDATE_PASSWORD",
                 AccountAction.UpdateEmail => "UPDATE_EMAIL",
-                _ => throw new ArgumentOutOfRangeException(nameof(action), requested, "Unknown account action"),
+                AccountAction.ConfigureTotp => "CONFIGURE_TOTP",
+                AccountAction.RegisterPasskey => "webauthn-register-passwordless",
+                AccountAction.ConfigureRecoveryCodes => "CONFIGURE_RECOVERY_AUTHN_CODES",
+                // Keycloak сам проверит, что учётные данные — этого пользователя и что их можно удалять (пароль — нельзя).
+                AccountAction.DeleteCredential => $"delete_credential:{requested.CredentialId}",
+                _ => throw new ArgumentOutOfRangeException(nameof(action), requested.Action, "Unknown account action"),
             };
         }
 

@@ -55,14 +55,51 @@ public sealed class LoginFlowTests : IClassFixture<AuthServiceWebFactory>
     [Theory]
     [InlineData("update-password", AccountAction.UpdatePassword)]
     [InlineData("update-email", AccountAction.UpdateEmail)]
+    [InlineData("configure-totp", AccountAction.ConfigureTotp)]
+    [InlineData("register-passkey", AccountAction.RegisterPasskey)]
+    [InlineData("configure-recovery-codes", AccountAction.ConfigureRecoveryCodes)]
     public async Task Login_WithAccountAction_AsksLoginPageForAction(string action, AccountAction expected)
     {
         using HttpClient browser = _factory.CreateBrowserClient();
 
-        HttpResponseMessage response = await browser.GetAsync(new Uri($"/auth/login?return_to=/account/&action={action}", UriKind.Relative));
+        // credential у действий, кроме удаления, не используется — не уходит и в Keycloak.
+        HttpResponseMessage response = await browser.GetAsync(
+            new Uri($"/auth/login?return_to=/account/&action={action}&credential=4b4f2c3e-8f1a-4d7e-9a51-0d6a1c2b3e4f", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Equal(expected, _keycloak.LastAction);
+        Assert.Equal(new AccountActionRequest(expected), _keycloak.LastAction);
+    }
+
+    [Fact]
+    public async Task Login_DeleteCredential_PassesCanonicalCredentialId()
+    {
+        using HttpClient browser = _factory.CreateBrowserClient();
+
+        HttpResponseMessage response = await browser.GetAsync(new Uri(
+            "/auth/login?return_to=/account/security&action=delete-credential&credential=4B4F2C3E-8F1A-4D7E-9A51-0D6A1C2B3E4F",
+            UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(
+            new AccountActionRequest(AccountAction.DeleteCredential, "4b4f2c3e-8f1a-4d7e-9a51-0d6a1c2b3e4f"),
+            _keycloak.LastAction);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("&credential=")]
+    [InlineData("&credential=password")]
+    [InlineData("&credential=x%26kc_action%3DUPDATE_PASSWORD")]
+    [InlineData("&credential=%7B0x4b4f2c3e%2C0x8f1a%2C0x4d7e%2C%7B0x9a%2C0x51%2C0x0d%2C0x6a%2C0x1c%2C0x2b%2C0x3e%2C0x4f%7D%7D")]
+    public async Task Login_DeleteCredential_WithoutValidId_Rejected(string credential)
+    {
+        using HttpClient browser = _factory.CreateBrowserClient();
+
+        HttpResponseMessage response = await browser.GetAsync(
+            new Uri($"/auth/login?return_to=/account/&action=delete-credential{credential}", UriKind.Relative));
+
+        await AssertErrorAsync(response, HttpStatusCode.BadRequest, "auth.action.credential_required");
+        Assert.Null(_keycloak.LastAuthorization);
     }
 
     [Fact]

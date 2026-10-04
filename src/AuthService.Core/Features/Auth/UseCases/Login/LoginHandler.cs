@@ -16,10 +16,11 @@ public sealed class LoginHandler(IIdentityProvider identityProvider, ReturnUrlVa
         string? returnTo,
         bool reauthenticate,
         string? action,
+        string? credential,
         Uri callbackUrl,
         CancellationToken cancellationToken)
     {
-        AccountAction? accountAction = null;
+        AccountActionRequest? accountAction = null;
         if (!string.IsNullOrEmpty(action))
         {
             if (!AccountActions.TryParse(action, out AccountAction parsed))
@@ -27,7 +28,17 @@ public sealed class LoginHandler(IIdentityProvider identityProvider, ReturnUrlVa
                 return AuthErrors.UnknownAccountAction(action);
             }
 
-            accountAction = parsed;
+            // Удалить — что именно: Id учётных данных строго в виде GUID (xxxxxxxx-xxxx-…), иначе в kc_action попал бы
+            // произвольный текст; дальше уходит его каноническая запись.
+            Guid credentialId = Guid.Empty;
+            if (parsed == AccountAction.DeleteCredential && !Guid.TryParseExact(credential, "D", out credentialId))
+            {
+                return AuthErrors.CredentialRequired();
+            }
+
+            accountAction = new AccountActionRequest(
+                parsed,
+                parsed == AccountAction.DeleteCredential ? credentialId.ToString("D") : null);
         }
 
         Result<AuthorizationRequest, Error> request =
