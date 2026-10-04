@@ -1,5 +1,6 @@
 using AuthService.Domain.AuditLog;
 using AuthService.Domain.ServiceKeys;
+using AuthService.Domain.Sessions;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -17,6 +18,9 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
     public DbSet<ServiceKey> ServiceKeys => Set<ServiceKey>();
+
+    /// <summary>С какого устройства начата сессия сервера входа (раздел «Устройства» кабинета).</summary>
+    public DbSet<LoginDevice> LoginDevices => Set<LoginDevice>();
 
     /// <summary>
     /// Ключи DataProtection (шифрование state входа, токенов управления ключами сервисов): в базе, а не в памяти —

@@ -1,4 +1,5 @@
 import { createBrowserRouter } from "react-router";
+import { AccountDevicesPage } from "@/pages/account-devices";
 import { AccountProfilePage } from "@/pages/account-profile";
 import { AccountSecurityPage } from "@/pages/account-security";
 import { NotFoundPage } from "@/pages/not-found";
@@ -12,6 +13,7 @@ export const router = createBrowserRouter(
       children: [
         { index: true, element: <AccountProfilePage /> },
         { path: "security", element: <AccountSecurityPage /> },
+        { path: "devices", element: <AccountDevicesPage /> },
         { path: "*", element: <NotFoundPage /> },
       ],
     },

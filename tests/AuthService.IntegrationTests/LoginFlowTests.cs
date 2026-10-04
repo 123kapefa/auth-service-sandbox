@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using AuthService.Core.Abstractions;
+using AuthService.Domain.Sessions;
 using AuthService.IntegrationTests.Infrastructure;
 using CSharpFunctionalExtensions;
 using Microsoft.AspNetCore.WebUtilities;
@@ -24,6 +25,7 @@ public sealed class LoginFlowTests : IClassFixture<AuthServiceWebFactory>
         _factory = factory;
         _keycloak = factory.IdentityProvider;
         _keycloak.Reset();
+        factory.LoginDevices.Reset();
     }
 
     [Fact]
@@ -145,6 +147,38 @@ public sealed class LoginFlowTests : IClassFixture<AuthServiceWebFactory>
         Assert.Equal("http://localhost/auth/callback", redirectUri.ToString());
         Assert.Equal("access-1", SetCookie(response, AuthCookies.ACCESS_TOKEN).Value.ToString());
         Assert.Equal("/auth/", SetCookie(response, AuthCookies.REFRESH_TOKEN).Path.ToString());
+    }
+
+    [Fact]
+    public async Task Callback_RecordsBrowserOfSession()
+    {
+        _keycloak.TokenResult = FakeIdentityProvider.Tokens(_factory.CreateToken(TestUser.Customer, sessionId: "s-new"), "refresh-1");
+        (HttpClient browser, string loginCookie) = await StartLoginAsync("/account/");
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get, new Uri($"/auth/callback?code=c&state={_keycloak.LastAuthorization!.State}", UriKind.Relative));
+        request.Headers.Add("Cookie", $"{LOGIN_COOKIE}={loginCookie}");
+        request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Gecko/20100101 Firefox/143.0");
+        HttpResponseMessage response = await browser.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        LoginDevice device = Assert.Single(_factory.LoginDevices.Devices);
+        Assert.Equal(("s-new", TestUser.Customer.Id), (device.SessionId, device.UserId));
+        Assert.Contains("Firefox/143.0", device.UserAgent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Callback_DevicesUnavailable_LoginStillCompletes()
+    {
+        _factory.LoginDevices.Broken = true;
+        _keycloak.TokenResult = FakeIdentityProvider.Tokens(_factory.CreateToken(TestUser.Customer, sessionId: "s-new"), "refresh-1");
+        (HttpClient browser, string loginCookie) = await StartLoginAsync("/account/");
+
+        HttpResponseMessage response = await Callback(browser, loginCookie, $"code=c&state={_keycloak.LastAuthorization!.State}");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/account/", response.Headers.Location!.ToString());
+        Assert.Empty(_factory.LoginDevices.Devices);
     }
 
     [Fact]

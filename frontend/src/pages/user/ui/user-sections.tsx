@@ -88,7 +88,8 @@ export function SessionsSection({ userId, canLogout }: { userId: string; canLogo
           {query.data.map((session) => (
             <li key={session.id} className="flex flex-wrap justify-between gap-2">
               <span>
-                {session.ipAddress ?? "—"} · {session.apps.join(", ") || "—"}
+                {session.deviceLabel ?? "Неизвестное устройство"} · {session.ipAddress ?? "—"} ·{" "}
+                {session.apps.join(", ") || "—"}
               </span>
               <span className="text-muted-foreground">
                 вход {formatDateTime(session.createdAt)}, активность{" "}

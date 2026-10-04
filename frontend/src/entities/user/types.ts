@@ -39,6 +39,8 @@ export interface AppAccess {
 export interface UserSession {
   id: string;
   ipAddress: string | null;
+  /** «Chrome · macOS» — браузер, с которого вошли; null — не узнали. */
+  deviceLabel: string | null;
   createdAt: string;
   lastSeenAt: string;
   apps: string[];

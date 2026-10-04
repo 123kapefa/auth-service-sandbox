@@ -15,6 +15,7 @@ public sealed class FrontendTests(AuthServiceWebFactory factory) : IClassFixture
     [InlineData("/admin/assets/app.js")]
     [InlineData("/account/")]
     [InlineData("/account/security")]
+    [InlineData("/account/devices")]
     [InlineData("/account/assets/app.js")]
     public async Task FrontendPaths_StrictScriptPolicy(string path)
     {

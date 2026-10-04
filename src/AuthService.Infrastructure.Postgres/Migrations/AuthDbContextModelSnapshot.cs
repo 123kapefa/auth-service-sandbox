@@ -160,6 +160,38 @@ namespace AuthService.Infrastructure.Postgres.Migrations
                     b.ToTable("service_keys", "auth");
                 });
 
+            modelBuilder.Entity("AuthService.Domain.Sessions.LoginDevice", b =>
+                {
+                    b.Property<string>("SessionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("session_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("user_agent");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("SessionId")
+                        .HasName("pk_login_devices");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_login_devices_created_at");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_login_devices_user_id");
+
+                    b.ToTable("login_devices", "auth");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
                 {
                     b.Property<int>("Id")
