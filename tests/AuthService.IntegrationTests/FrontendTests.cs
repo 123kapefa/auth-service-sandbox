@@ -33,7 +33,7 @@ public sealed class FrontendTests(AuthServiceWebFactory factory) : IClassFixture
     {
         using HttpClient client = factory.CreateClient();
 
-        HttpResponseMessage response = await client.GetAsync(new Uri("/", UriKind.Relative));
+        HttpResponseMessage response = await client.GetAsync(new Uri("/dev/", UriKind.Relative));
 
         Assert.False(response.Headers.Contains("Content-Security-Policy"));
     }

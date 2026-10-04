@@ -40,7 +40,7 @@ check "CSP: стили — свои и тег уведомлений по хэш
   "$(grep -c "unsafe-inline" <<< "$CSP") $(grep -o "style-src 'self' 'sha256-[^']*'" <<< "$CSP" | cut -c1-25)" "0 style-src 'self' 'sha256-"
 check "CSP: в рамку не встроить" "$(grep -o "frame-ancestors 'none'" <<< "$CSP")" "frame-ancestors 'none'"
 check "nosniff" "$(header "$WORK/h" x-content-type-options)" nosniff
-check "демо-страница — без CSP админки" "$(curl -s -D - -o /dev/null "$API/" | grep -ci 'content-security-policy')" 0
+check "демо-страница — без CSP админки" "$(curl -s -D - -o /dev/null "$API/dev/" | grep -ci 'content-security-policy')" 0
 check "без входа API админки — 401" "$(status "$WORK/none" GET /auth/admin/me)" 401
 
 echo "3. Админ проекта: что показывает админка"

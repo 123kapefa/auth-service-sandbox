@@ -30,7 +30,7 @@
 | Сценарии `/auth/*` — хендлер (`Result`) + эндпоинт (cookie, ответ) + валидатор | `AuthService.Core/Features/Auth/UseCases` |
 | Cookie, состояние входа, проверка `return_to` | `AuthService.Core/Features/Auth/{Cookies,ReturnUrls}` |
 | Токен из cookie для всех сервисов | `Shared/Authentication` (`AccessTokenCookie`) |
-| Демо-страница для тестов | `AuthService.Api/wwwroot/index.html` на `/` |
+| Демо-страница для разработчика | `AuthService.Api/wwwroot/dev/index.html` на `/dev/`; `/` ведёт в личный кабинет |
 
 ## Эндпоинты
 

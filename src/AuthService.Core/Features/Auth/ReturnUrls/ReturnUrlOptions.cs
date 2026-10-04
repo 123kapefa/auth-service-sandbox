@@ -8,6 +8,6 @@ public sealed class ReturnUrlOptions
     /// <summary>Белый список origin'ов приложений (scheme://host[:port]). Защита от open redirect.</summary>
     public IReadOnlyList<string> AllowedOrigins { get; init; } = [];
 
-    /// <summary>Куда вернуть, если return_to нет или он не разрешён.</summary>
-    public string Default { get; init; } = "/";
+    /// <summary>Куда вернуть, если return_to нет или он не разрешён: личный кабинет.</summary>
+    public string Default { get; init; } = "/account/";
 }
