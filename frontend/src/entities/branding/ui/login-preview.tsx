@@ -1,10 +1,11 @@
 import { type CSSProperties } from "react";
-import { PALETTES, textOn } from "../model";
+import { accentFor, PALETTES, textOn } from "../model";
 import { type Branding } from "../types";
 
 /**
  * Страница входа в миниатюре — как её увидит посетитель с этим оформлением: название и логотип над карточкой, кнопка и
- * квадрат в углу — цветом проекта. Палитра — своя (светлая или тёмная), не тема админки.
+ * квадрат у названия — акцентом проекта (в тёмной теме — его тёмным цветом), линии и уголок карточки — серые.
+ * Палитра — своя (светлая или тёмная), не тема админки.
  */
 export function LoginPreview({
   branding,
@@ -14,15 +15,16 @@ export function LoginPreview({
   scheme: "light" | "dark";
 }) {
   const palette = PALETTES[scheme];
-  const primary = branding.color ?? palette.primary;
+  const accent = accentFor(branding, scheme);
   const style = {
     "--p-bg": palette.background,
     "--p-card": palette.card,
     "--p-fg": palette.foreground,
     "--p-muted": palette.muted,
     "--p-border": palette.border,
-    "--p-primary": primary,
-    "--p-primary-fg": branding.color ? textOn(branding.color) : palette.background,
+    "--p-primary": palette.primary,
+    "--p-accent": accent ?? palette.primary,
+    "--p-accent-fg": accent ? textOn(accent) : palette.background,
     "--p-shadow": palette.shadow,
   } as CSSProperties;
 
@@ -36,7 +38,7 @@ export function LoginPreview({
         {branding.logo ? (
           <img src={branding.logo} alt="Логотип" className="h-7 max-w-24 object-contain" />
         ) : (
-          <span aria-hidden className="size-2.5 shrink-0 bg-[var(--p-primary)]" />
+          <span aria-hidden className="size-2.5 shrink-0 bg-[var(--p-accent)]" />
         )}
         <span className="truncate font-mono text-[10px] font-medium tracking-[0.16em] text-[var(--p-muted)] uppercase">
           {branding.name.trim() || "Название проекта"}
@@ -49,7 +51,7 @@ export function LoginPreview({
           Телефон или почта
         </span>
         <span className="h-7 border border-[var(--p-border)] bg-[var(--p-bg)]" />
-        <span className="mt-1 grid h-7 place-items-center bg-[var(--p-primary)] text-xs font-semibold text-[var(--p-primary-fg)] shadow-[3px_3px_0_var(--p-shadow)]">
+        <span className="mt-1 grid h-7 place-items-center bg-[var(--p-accent)] text-xs font-semibold text-[var(--p-accent-fg)] shadow-[3px_3px_0_var(--p-shadow)]">
           Войти
         </span>
       </div>

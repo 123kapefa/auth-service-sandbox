@@ -11,7 +11,7 @@ using Validation;
 namespace AuthService.Core.Features.Admin.UseCases.BrandingSettings;
 
 /// <summary>
-/// Оформление приложения поверх проекта: своё название, логотип, цвет (null — как у проекта; тема — всегда проекта).
+/// Оформление приложения поверх проекта: своё название, логотип, акцент (null — как у проекта; тема — всегда проекта).
 /// Хранится у клиента приложения в Keycloak, показывается на страницах входа в приложение, в его письмах и в кабинете,
 /// открытом из него. Приложение — клиент с ролями (AppCatalog). Изменение — в журнал проекта и приложения.
 /// </summary>
@@ -54,7 +54,11 @@ public sealed class AppBrandingHandler(
             return project.Error;
         }
 
-        var wanted = new AppBranding(request.Name?.Trim(), request.Logo, request.Color?.ToLower(CultureInfo.InvariantCulture));
+        var wanted = new AppBranding(
+            request.Name?.Trim(),
+            request.Logo,
+            request.Color?.ToLower(CultureInfo.InvariantCulture),
+            request.ColorDark?.ToLower(CultureInfo.InvariantCulture));
         if (wanted == current.Value)
         {
             return ToResponse(clientId, wanted, project.Value);
@@ -103,9 +107,20 @@ public sealed class AppBrandingHandler(
             changes["color"] = new { old = old.Color, @new = wanted.Color };
         }
 
+        if (!string.Equals(old.ColorDark, wanted.ColorDark, StringComparison.Ordinal))
+        {
+            changes["colorDark"] = new { old = old.ColorDark, @new = wanted.ColorDark };
+        }
+
         return changes;
     }
 
     private static AppBrandingResponse ToResponse(string clientId, AppBranding own, ProjectBranding project) =>
-        new(clientId, own.Name, own.Logo, own.Color, new BrandingResponse(project.Name, project.Logo, project.Color, project.Theme));
+        new(
+            clientId,
+            own.Name,
+            own.Logo,
+            own.Color,
+            new BrandingResponse(project.Name, project.Logo, project.Color, project.Theme, project.ColorDark),
+            own.ColorDark);
 }

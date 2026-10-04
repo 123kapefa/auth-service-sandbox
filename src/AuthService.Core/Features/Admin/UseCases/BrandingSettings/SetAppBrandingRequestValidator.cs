@@ -21,6 +21,12 @@ public sealed partial class SetAppBrandingRequestValidator : AbstractValidator<S
         RuleFor(request => request.Color)
             .Must(color => color is null || SetBrandingRequestValidator.IsColor(color))
             .WithError(GeneralErrors.InvalidFormat("color"));
+        RuleFor(request => request.ColorDark)
+            .Must(color => color is null || SetBrandingRequestValidator.IsColor(color))
+            .WithError(GeneralErrors.InvalidFormat("colorDark"));
+        RuleFor(request => request.ColorDark)
+            .Must((request, color) => color is null || request.Color is not null)
+            .WithError(SetBrandingRequestValidator.ColorDarkWithoutColor);
         RuleFor(request => request.Logo)
             .Must(logo => logo is null || SetBrandingRequestValidator.IsLogo(logo))
             .WithError(GeneralErrors.InvalidFormat("logo"));

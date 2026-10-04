@@ -13,39 +13,49 @@ vi.mock("@/entities/branding", async (original) => {
   return { ...actual, brandingApi: { ...actual.brandingApi, saveApp } };
 });
 
-const PROJECT = { name: "Магазин", logo: null, color: "#1f6feb", theme: "light" } as const;
+const PROJECT = {
+  name: "Магазин",
+  logo: null,
+  color: "#1f6feb",
+  colorDark: "#7aa7ff",
+  theme: "light",
+} as const;
 const AS_PROJECT = {
   clientId: "manager-1c",
   name: null,
   logo: null,
   color: null,
+  colorDark: null,
   project: PROJECT,
 };
 
 describe("оформление приложения — как на сервере", () => {
   it("пустое название и «как у проекта» — null; свой цвет — строчными", () => {
-    expect(fromAppForm(toAppForm(AS_PROJECT, PROJECT.color))).toEqual({
-      name: null,
+    const form = toAppForm(AS_PROJECT, PROJECT.color);
+    expect(fromAppForm(form)).toEqual({ name: null, logo: null, color: null, colorDark: null });
+    expect(fromAppForm({ ...form, name: " Менеджер ", hasColor: true, color: "#AA3300" })).toEqual({
+      name: "Менеджер",
       logo: null,
-      color: null,
+      color: "#aa3300",
+      colorDark: null,
     });
-    expect(
-      fromAppForm({ name: " Менеджер ", logo: null, hasColor: true, color: "#AA3300" }),
-    ).toEqual({ name: "Менеджер", logo: null, color: "#aa3300" });
-    expect(
-      appBrandingSchema.safeParse({ name: "", logo: null, hasColor: true, color: "red" }).success,
-    ).toBe(false);
-    expect(
-      appBrandingSchema.safeParse({ name: "x".repeat(61), logo: null, hasColor: false, color: "" })
-        .success,
-    ).toBe(false);
+    expect(appBrandingSchema.safeParse({ ...form, hasColor: true, color: "red" }).success).toBe(
+      false,
+    );
+    expect(appBrandingSchema.safeParse({ ...form, name: "x".repeat(61) }).success).toBe(false);
   });
 
-  it("итог — проект, поверх своё; тема — проекта", () => {
-    expect(effectiveBranding(PROJECT, { name: "Менеджер", logo: null, color: null })).toEqual({
-      ...PROJECT,
-      name: "Менеджер",
+  it("итог — проект, поверх своё; тема — проекта; свой акцент — парой", () => {
+    const own = { name: "Менеджер", logo: null, color: null, colorDark: null };
+    expect(effectiveBranding(PROJECT, own)).toEqual({ ...PROJECT, name: "Менеджер" });
+    // Свой цвет без своего тёмного — тот же и в тёмной теме, не тёмный цвет проекта.
+    expect(effectiveBranding(PROJECT, { ...own, color: "#aa3300" })).toMatchObject({
+      color: "#aa3300",
+      colorDark: null,
     });
+    expect(
+      effectiveBranding(PROJECT, { ...own, color: "#aa3300", colorDark: "#ff8866" }),
+    ).toMatchObject({ color: "#aa3300", colorDark: "#ff8866" });
   });
 });
 
@@ -67,9 +77,9 @@ describe("AppBrandingEditor", () => {
 
     await user.type(screen.getByLabelText("Название приложения"), "Менеджер 1С");
     await user.click(screen.getByRole("radio", { name: "Свой цвет" }));
-    expect(screen.getByLabelText("Цвет в виде #rrggbb")).toHaveValue("#1f6feb");
-    await user.clear(screen.getByLabelText("Цвет в виде #rrggbb"));
-    await user.type(screen.getByLabelText("Цвет в виде #rrggbb"), "#AA3300");
+    expect(screen.getByLabelText("Светлая тема, #rrggbb")).toHaveValue("#1f6feb");
+    await user.clear(screen.getByLabelText("Светлая тема, #rrggbb"));
+    await user.type(screen.getByLabelText("Светлая тема, #rrggbb"), "#AA3300");
 
     expect(screen.getByRole("figure", { name: /светлая тема/ })).toHaveTextContent("Менеджер 1С");
     expect(screen.queryByRole("figure", { name: /тёмная тема/ })).not.toBeInTheDocument();
@@ -80,6 +90,7 @@ describe("AppBrandingEditor", () => {
       name: "Менеджер 1С",
       logo: null,
       color: "#aa3300",
+      colorDark: null,
     });
   });
 });

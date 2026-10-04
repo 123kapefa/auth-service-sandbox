@@ -41,7 +41,7 @@ export function Sidebar({
         {logo ? (
           <img src={logo} alt="" className="h-7 max-w-20 shrink-0 object-contain" />
         ) : (
-          <span className="size-3.5 shrink-0 bg-primary" aria-hidden />
+          <span className="size-3.5 shrink-0 bg-accent" aria-hidden />
         )}
         <div className="grid min-w-0">
           <span className="truncate text-[17px] font-bold tracking-tight">{title}</span>
@@ -99,11 +99,11 @@ export function SidebarLink({
           cn(
             "group flex items-baseline gap-2.5 px-3 py-2.5 text-[15px] hover:bg-background",
             isActive &&
-              "bg-primary font-semibold text-primary-foreground shadow-hard hover:bg-primary",
+              "bg-accent font-semibold text-accent-foreground shadow-hard hover:bg-accent",
           )
         }
       >
-        <span className="w-[18px] shrink-0 font-mono text-[11px] text-muted-foreground group-aria-[current=page]:text-primary-foreground">
+        <span className="w-[18px] shrink-0 font-mono text-[11px] text-muted-foreground group-aria-[current=page]:text-accent-foreground">
           {String(number).padStart(2, "0")}
         </span>
         {children}
@@ -121,7 +121,7 @@ export function SidebarSubLink({ to, children }: { to: string; children: ReactNo
         className={({ isActive }) =>
           cn(
             "block py-1.5 pr-3 pl-10 text-sm text-muted-foreground hover:text-foreground",
-            isActive && "border-l-[3px] border-primary pl-[37px] font-semibold text-foreground",
+            isActive && "border-l-[3px] border-accent pl-[37px] font-semibold text-foreground",
           )
         }
       >

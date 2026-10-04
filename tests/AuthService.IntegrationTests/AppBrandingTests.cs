@@ -57,6 +57,15 @@ public sealed class AppBrandingTests : IClassFixture<AuthServiceWebFactory>
     }
 
     [Fact]
+    public async Task Set_ColorDark_SavedWithColor()
+    {
+        JsonElement branding = await ResultAsync(await SendAsync(HttpMethod.Put, PATH, new { color = "#aa3300", colorDark = "#FF8866" }));
+
+        Assert.Equal(new AppBranding(null, null, "#aa3300", "#ff8866"), _factory.Branding.Apps[APP]);
+        Assert.Equal("#ff8866", branding.GetProperty("colorDark").GetString());
+    }
+
+    [Fact]
     public async Task Set_AllNull_AsProject_Unchanged_NotSaved()
     {
         await ResultAsync(await SendAsync(HttpMethod.Put, PATH, new { name = (string?)null, logo = (string?)null, color = (string?)null }));
@@ -70,6 +79,8 @@ public sealed class AppBrandingTests : IClassFixture<AuthServiceWebFactory>
         { "name", """{ "name": "  " }""", "length.is.invalid" },
         { "name", $$"""{ "name": "{{new string('x', 61)}}" }""", "length.is.invalid" },
         { "color", """{ "color": "#fff" }""", "invalid.format" },
+        { "colorDark", """{ "color": "#aa3300", "colorDark": "red" }""", "invalid.format" },
+        { "colorDark", """{ "colorDark": "#ff8866" }""", "branding.color_dark_without_color" },
         { "logo", """{ "logo": "https://evil.example/logo.png" }""", "invalid.format" },
         { "logo", $$"""{ "logo": "data:image/png;base64,{{Convert.ToBase64String(new byte[(100 * 1024) + 1])}}" }""", "branding.logo_too_large" },
     };
@@ -113,13 +124,18 @@ public sealed class AppBrandingTests : IClassFixture<AuthServiceWebFactory>
     [Fact]
     public async Task Account_Effective_ProjectWithAppOnTop_AnyUser()
     {
-        _factory.Branding.Current = new ProjectBranding("Магазин", PNG, "#1f6feb", "light");
+        _factory.Branding.Current = new ProjectBranding("Магазин", PNG, "#1f6feb", "light", "#7aa7ff");
         _factory.Branding.Apps[APP] = new AppBranding("Менеджер 1С", null, "#aa3300");
 
         JsonElement project = await ResultAsync(await SendAsync(HttpMethod.Get, "/me/branding", caller: TestUser.Customer));
         JsonElement app = await ResultAsync(await SendAsync(HttpMethod.Get, $"/me/branding?app={APP}", caller: TestUser.Customer));
 
-        Assert.Equal(("Магазин", "#1f6feb"), (project.GetProperty("name").GetString(), project.GetProperty("color").GetString()));
+        Assert.Equal(("Магазин", "#1f6feb", "#7aa7ff"), (
+            project.GetProperty("name").GetString(),
+            project.GetProperty("color").GetString(),
+            project.GetProperty("colorDark").GetString()));
+        // Свой акцент приложения — парой: без своего тёмного не берёт тёмный проекта.
+        Assert.Equal(JsonValueKind.Null, app.GetProperty("colorDark").ValueKind);
         Assert.Equal(("Менеджер 1С", PNG, "#aa3300", "light"), (
             app.GetProperty("name").GetString(),
             app.GetProperty("logo").GetString(),

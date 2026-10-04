@@ -1,15 +1,21 @@
 /**
- * Оформление на страницах входа: название, логотип, цвет и тема — из плагина Keycloak platform-branding
+ * Оформление на страницах входа: название, логотип, акцент (для светлой и тёмной темы) и тема — из плагина Keycloak platform-branding
  * (GET /realms/{realm}/platform-branding): проекта (атрибуты realm) и поверх него — приложения, в которое входят
- * (название, логотип, цвет). Приложение плагин узнаёт по клиенту входа и сессии входа этой вкладки (client_id, tab_id
+ * (название, логотип, акцент). Приложение плагин узнаёт по клиенту входа и сессии входа этой вкладки (client_id, tab_id
  * и cookie сессии входа). Меняется в админке без пересборки темы: страница читает его при открытии.
  */
 export interface Branding {
   name: string;
   logo: string | null;
+  /** Акцент — кнопки, отметки и фокус; null — серый стиль. */
   color: string | null;
+  /** Акцент в тёмной теме; null — тот же, что color. */
+  colorDark: string | null;
   theme: "system" | "light" | "dark";
 }
+
+const isColor = (value: unknown): value is string =>
+  typeof value === "string" && /^#[0-9a-f]{6}$/.test(value);
 
 /** Не дождались за это время — страница показывается в сером стиле: вход важнее оформления. */
 const TIMEOUT_MS = 1500;
@@ -66,8 +72,8 @@ export async function loadBranding(
     current = {
       name: body.name ?? "",
       logo: typeof body.logo === "string" && body.logo.startsWith("data:image/") ? body.logo : null,
-      color:
-        typeof body.color === "string" && /^#[0-9a-f]{6}$/.test(body.color) ? body.color : null,
+      color: isColor(body.color) ? body.color : null,
+      colorDark: isColor(body.color) && isColor(body.colorDark) ? body.colorDark : null,
       theme: body.theme === "light" || body.theme === "dark" ? body.theme : "system",
     };
     return current;
@@ -79,8 +85,9 @@ export async function loadBranding(
 }
 
 /**
- * Тема — data-theme на <html> (как в кабинете: светлые и тёмные токены в styles.css), цвет — токены primary и ring
- * поверх темы; текст на цвете — тёмный или светлый по яркости (как в админке, frontend/src/entities/branding).
+ * Тема — data-theme на <html> (как в кабинете: светлые и тёмные токены в styles.css), акцент — токены accent и ring
+ * поверх темы: светлый — в светлой, тёмный (или тот же) — в тёмной; линии, рамки и ошибки остаются своими. Текст на
+ * акценте — тёмный или светлый по яркости (как в кабинете, frontend/src/entities/branding).
  */
 export function applyBranding(
   branding: Branding,
@@ -93,10 +100,25 @@ export function applyBranding(
   }
 
   if (branding.color) {
-    root.style.setProperty("--color-primary", branding.color);
-    root.style.setProperty("--color-ring", branding.color);
-    root.style.setProperty("--color-primary-foreground", textOn(branding.color));
+    // CSSOM, не <style>: не зависит от CSP страницы (как в кабинете).
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(accentCss(branding.color, branding.colorDark ?? branding.color));
+    const doc = root.ownerDocument;
+    // До первой записи в jsdom (тесты) списка ещё нет.
+    const adopted = doc.adoptedStyleSheets as CSSStyleSheet[] | undefined;
+    doc.adoptedStyleSheets = [...(adopted ?? []), sheet];
   }
+}
+
+/** Правила акцента: светлый — для светлой темы, тёмный — для тёмной (закреплённой или системной). */
+export function accentCss(light: string, dark: string): string {
+  const tokens = (color: string) =>
+    `--color-accent:${color};--color-accent-foreground:${textOn(color)};--color-ring:${color};`;
+  return [
+    `:root{${tokens(light)}}`,
+    `:root[data-theme="dark"]{${tokens(dark)}}`,
+    `@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${tokens(dark)}}}`,
+  ].join("\n");
 }
 
 /** Цвет текста на заливке цветом проекта: тёмный на светлом, светлый на тёмном (яркость WCAG). */

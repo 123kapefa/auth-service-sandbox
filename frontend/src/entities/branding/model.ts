@@ -60,33 +60,69 @@ export async function readLogo(file: File): Promise<{ logo: string } | { error: 
   return { logo: await readAsDataUrl(file) };
 }
 
-/** Итоговое оформление приложения: проект, поверх — заданное у приложения (тема — проекта). */
+/**
+ * Итоговое оформление приложения: проект, поверх — заданное у приложения (тема — проекта). Акцент приложения — парой:
+ * свой цвет без своего тёмного — тот же и в тёмной теме, не тёмный цвет проекта (как в плагине Keycloak).
+ */
 export function effectiveBranding(project: Branding, own: AppBrandingOwn): Branding {
   return {
     name: own.name ?? project.name,
     logo: own.logo ?? project.logo,
     color: own.color ?? project.color,
+    colorDark: own.color ? own.colorDark : project.colorDark,
     theme: project.theme,
   };
 }
 
+/** Акцент в теме: в тёмной — свой тёмный, иначе тот же; null — серый стиль. */
+export function accentFor(
+  branding: Pick<Branding, "color" | "colorDark">,
+  scheme: "light" | "dark",
+): string | null {
+  return scheme === "dark" ? (branding.colorDark ?? branding.color) : branding.color;
+}
+
 /**
- * Цвет проекта (приложения) — в токены primary и ring поверх темы, текст на цвете — по яркости; без цвета — серые
- * токены темы. Как на страницах входа (login-theme/src/login/branding.ts).
+ * Правила CSS акцента поверх темы: светлый — для светлой, тёмный — для тёмной (выбранной или системной). Только
+ * токены accent и ring — линии, рамки и ошибки остаются своими. Текст на акценте — по яркости. Так же — на страницах
+ * входа (login-theme/src/login/branding.ts).
  */
-export function applyBrandingColor(
-  color: string | null,
-  root: HTMLElement = document.documentElement,
-): void {
-  if (color) {
-    root.style.setProperty("--color-primary", color);
-    root.style.setProperty("--color-ring", color);
-    root.style.setProperty("--color-primary-foreground", textOn(color));
-  } else {
-    root.style.removeProperty("--color-primary");
-    root.style.removeProperty("--color-ring");
-    root.style.removeProperty("--color-primary-foreground");
+export function accentCss(branding: Pick<Branding, "color" | "colorDark">): string {
+  const light = accentFor(branding, "light");
+  const dark = accentFor(branding, "dark");
+  if (!light || !dark) {
+    return "";
   }
+
+  const tokens = (color: string) =>
+    `--color-accent:${color};--color-accent-foreground:${textOn(color)};--color-ring:${color};`;
+  return [
+    `:root{${tokens(light)}}`,
+    `:root[data-theme="dark"]{${tokens(dark)}}`,
+    `@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${tokens(dark)}}}`,
+  ].join("\n");
+}
+
+const accentSheets = new WeakMap<Document, CSSStyleSheet>();
+
+/**
+ * Акцент проекта (приложения) — в кабинет; без цвета — серые токены темы. Таблицей стилей через CSSOM
+ * (adoptedStyleSheets), не <style>: CSP кабинета не пускает встроенные стили.
+ */
+export function applyBrandingAccent(
+  branding: Pick<Branding, "color" | "colorDark">,
+  doc: Document = document,
+): void {
+  let sheet = accentSheets.get(doc);
+  if (!sheet) {
+    sheet = new CSSStyleSheet();
+    accentSheets.set(doc, sheet);
+    // До первой записи в jsdom (тесты) списка ещё нет.
+    const adopted = doc.adoptedStyleSheets as CSSStyleSheet[] | undefined;
+    doc.adoptedStyleSheets = [...(adopted ?? []), sheet];
+  }
+
+  sheet.replaceSync(accentCss(branding));
 }
 
 /** Файл картинки → data URL для логотипа. */

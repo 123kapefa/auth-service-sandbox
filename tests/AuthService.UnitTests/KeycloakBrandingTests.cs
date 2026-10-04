@@ -46,16 +46,17 @@ public sealed class KeycloakBrandingTests : IDisposable
         Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("logo").ValueKind);
         Assert.Equal("#1f6feb", body.RootElement.GetProperty("color").GetString());
         Assert.Equal("light", body.RootElement.GetProperty("theme").GetString());
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("colorDark").ValueKind);
     }
 
     [Fact]
     public async Task GetApp_OwnValues_NullAsProject()
     {
-        _keycloak.Body = """{ "name": "Менеджер 1С", "logo": null, "color": "#aa3300" }""";
+        _keycloak.Body = """{ "name": "Менеджер 1С", "logo": null, "color": "#aa3300", "colorDark": "#ff8866" }""";
 
         AppBranding branding = (await CreateBranding().GetAppAsync("manager-1c", default)).Value;
 
-        Assert.Equal(new AppBranding("Менеджер 1С", null, "#aa3300"), branding);
+        Assert.Equal(new AppBranding("Менеджер 1С", null, "#aa3300", "#ff8866"), branding);
         Assert.Equal(("GET", $"{BRANDING}/apps/manager-1c"), (_keycloak.Calls[0].Method, _keycloak.Calls[0].Url));
     }
 

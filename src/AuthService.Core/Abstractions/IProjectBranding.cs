@@ -27,15 +27,17 @@ public interface IProjectBranding
 /// <summary>Оформление проекта.</summary>
 /// <param name="Name">Название проекта.</param>
 /// <param name="Logo">Логотип — data URL; null — нет.</param>
-/// <param name="Color">Цвет #rrggbb (строчные); null — серый стиль.</param>
+/// <param name="Color">Акцент #rrggbb (строчные); null — серый стиль.</param>
 /// <param name="Theme">BrandingThemes: system, light, dark.</param>
-public sealed record ProjectBranding(string Name, string? Logo, string? Color, string Theme);
+/// <param name="ColorDark">Акцент в тёмной теме; null — тот же, что Color. Задаётся только вместе с Color.</param>
+public sealed record ProjectBranding(string Name, string? Logo, string? Color, string Theme, string? ColorDark = null);
 
 /// <summary>Оформление приложения поверх проекта: null — как у проекта.</summary>
 /// <param name="Name">Название приложения на его страницах входа и в письмах.</param>
 /// <param name="Logo">Логотип — data URL.</param>
-/// <param name="Color">Цвет #rrggbb (строчные).</param>
-public sealed record AppBranding(string? Name, string? Logo, string? Color)
+/// <param name="Color">Акцент #rrggbb (строчные).</param>
+/// <param name="ColorDark">Акцент в тёмной теме; null — тот же, что Color. Задаётся только вместе с Color.</param>
+public sealed record AppBranding(string? Name, string? Logo, string? Color, string? ColorDark = null)
 {
     public static AppBranding AsProject { get; } = new(null, null, null);
 }

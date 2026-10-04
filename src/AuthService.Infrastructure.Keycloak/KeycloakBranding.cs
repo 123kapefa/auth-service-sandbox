@@ -31,25 +31,25 @@ internal sealed partial class KeycloakBranding(
         string path = string.IsNullOrEmpty(app) ? PATH : $"{PATH}?app={Uri.EscapeDataString(app)}";
         Result<BrandingRepresentation, Error> body = await GetJsonAsync<BrandingRepresentation>(path, cancellationToken);
         return body.Map(branding =>
-            new ProjectBranding(branding.Name ?? string.Empty, branding.Logo, branding.Color, branding.Theme ?? BrandingRules.THEME_SYSTEM));
+            new ProjectBranding(branding.Name ?? string.Empty, branding.Logo, branding.Color, branding.Theme ?? BrandingRules.THEME_SYSTEM, branding.ColorDark));
     }
 
     public async Task<Result<AppBranding, Error>> GetAppAsync(string clientId, CancellationToken cancellationToken)
     {
         Result<AppBrandingRepresentation, Error> body = await GetJsonAsync<AppBrandingRepresentation>(AppPath(clientId), cancellationToken);
-        return body.Map(branding => new AppBranding(branding.Name, branding.Logo, branding.Color));
+        return body.Map(branding => new AppBranding(branding.Name, branding.Logo, branding.Color, branding.ColorDark));
     }
 
     public Task<UnitResult<Error>> SetAppAsync(string clientId, AppBranding branding, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(branding);
-        return PutAsync(AppPath(clientId), new AppBrandingRepresentation(branding.Name, branding.Logo, branding.Color), cancellationToken);
+        return PutAsync(AppPath(clientId), new AppBrandingRepresentation(branding.Name, branding.Logo, branding.Color, branding.ColorDark), cancellationToken);
     }
 
     public Task<UnitResult<Error>> SetAsync(ProjectBranding branding, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(branding);
-        return PutAsync(PATH, new BrandingRepresentation(branding.Name, branding.Logo, branding.Color, branding.Theme), cancellationToken);
+        return PutAsync(PATH, new BrandingRepresentation(branding.Name, branding.Logo, branding.Color, branding.Theme, branding.ColorDark), cancellationToken);
     }
 
     private static string AppPath(string clientId) => $"{PATH}/apps/{Uri.EscapeDataString(clientId)}";
@@ -187,12 +187,14 @@ internal sealed partial class KeycloakBranding(
         [property: JsonPropertyName("name")] string? Name,
         [property: JsonPropertyName("logo")] string? Logo,
         [property: JsonPropertyName("color")] string? Color,
-        [property: JsonPropertyName("theme")] string? Theme);
+        [property: JsonPropertyName("theme")] string? Theme,
+        [property: JsonPropertyName("colorDark")] string? ColorDark);
 
     private sealed record AppBrandingRepresentation(
         [property: JsonPropertyName("name")] string? Name,
         [property: JsonPropertyName("logo")] string? Logo,
-        [property: JsonPropertyName("color")] string? Color);
+        [property: JsonPropertyName("color")] string? Color,
+        [property: JsonPropertyName("colorDark")] string? ColorDark);
 
     private sealed record PluginError([property: JsonPropertyName("error")] string? Error);
 }

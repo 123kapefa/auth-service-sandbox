@@ -28,6 +28,10 @@ Node 22 (`.nvmrc`), npm, `package-lock.json` в git. `sonner` закреплён
 пользователя (`data-theme` на `<html>`, `shared/lib/theme.ts`, кнопка `ThemeToggle`). Шрифты — Golos Text и JetBrains
 Mono из `@fontsource/*` (свои файлы: CSP пускает только `'self'`). Навигация — боковое меню (`shared/ui/sidebar.tsx`),
 разделы приложения — под ним в меню. Метки (`Badge`): `solid` — включено, `warning` — закрыто/заблокировано.
+Токены: `primary` — линии, рамки, уголки (всегда серые); `accent` — основная кнопка, активный пункт меню, фокус
+(`ring`): в кабинете их подменяет акцент проекта или приложения (`applyBrandingAccent`, свой для тёмной темы);
+`danger` и `danger-muted` — ошибки (`FieldError`, `ErrorState`, неудачный вход): красный текст на бледном фоне.
+Новое «активное» — `accent`, новая ошибка — `danger`, остальное — `primary`.
 
 ## Раскладка (Feature-Sliced Design)
 

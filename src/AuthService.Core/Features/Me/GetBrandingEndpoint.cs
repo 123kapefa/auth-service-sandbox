@@ -26,6 +26,6 @@ public sealed class GetBrandingEndpoint : IEndpoint
         CancellationToken cancellationToken)
     {
         Result<ProjectBranding, Error> result = await branding.GetEffectiveAsync(BrandingApps.Normalize(from), cancellationToken);
-        return result.Map(effective => new BrandingResponse(effective.Name, effective.Logo, effective.Color, effective.Theme));
+        return result.Map(effective => new BrandingResponse(effective.Name, effective.Logo, effective.Color, effective.Theme, effective.ColorDark));
     }
 }

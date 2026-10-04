@@ -73,6 +73,7 @@ final class BrandingResolver {
         branding.put("name", name == null || name.isBlank() ? realm.getName() : name);
         branding.put("logo", realm.getAttribute(Branding.ATTRIBUTE_LOGO));
         branding.put("color", realm.getAttribute(Branding.ATTRIBUTE_COLOR));
+        branding.put("colorDark", realm.getAttribute(Branding.ATTRIBUTE_COLOR_DARK));
         String theme = realm.getAttribute(Branding.ATTRIBUTE_THEME);
         branding.put("theme", theme == null ? Branding.THEME_SYSTEM : theme);
         return branding;
@@ -84,14 +85,22 @@ final class BrandingResolver {
         branding.put("name", app.getAttribute(Branding.ATTRIBUTE_NAME));
         branding.put("logo", app.getAttribute(Branding.ATTRIBUTE_LOGO));
         branding.put("color", app.getAttribute(Branding.ATTRIBUTE_COLOR));
+        branding.put("colorDark", app.getAttribute(Branding.ATTRIBUTE_COLOR_DARK));
         return branding;
     }
 
-    /** Итоговое: проект, поверх — заданное у приложения (название, логотип, цвет). */
+    /**
+     * Итоговое: проект, поверх — заданное у приложения (название, логотип, акцент). Акцент приложения заменяет акцент
+     * проекта парой: свой цвет без цвета для тёмной темы — тот же цвет и в тёмной, не тёмный цвет проекта.
+     */
     static Map<String, Object> effective(RealmModel realm, ClientModel app) {
         Map<String, Object> branding = project(realm);
         if (app != null) {
-            own(app).forEach((key, value) -> {
+            Map<String, Object> own = own(app);
+            if (own.get("color") != null) {
+                branding.put("colorDark", null);
+            }
+            own.forEach((key, value) -> {
                 if (value != null) {
                     branding.put(key, value);
                 }

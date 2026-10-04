@@ -12,7 +12,13 @@ vi.mock("@/entities/branding", async (original) => {
   return { ...actual, brandingApi: { ...actual.brandingApi, save } };
 });
 
-const GRAY = { name: "Auth Sandbox", logo: null, color: null, theme: "system" } as const;
+const GRAY = {
+  name: "Auth Sandbox",
+  logo: null,
+  color: null,
+  colorDark: null,
+  theme: "system",
+} as const;
 
 describe("форма оформления — как на сервере", () => {
   it("цвет — #rrggbb, сохраняется строчными; без своего цвета — null", () => {
@@ -24,6 +30,25 @@ describe("форма оформления — как на сервере", () =>
     expect(fromForm({ ...toForm(GRAY), hasColor: true, color: "#1F6FEB" }).color).toBe("#1f6feb");
     expect(fromForm(toForm({ ...GRAY, color: "#1f6feb" }))).toEqual({ ...GRAY, color: "#1f6feb" });
     expect(fromForm({ ...toForm(GRAY), hasColor: false, color: "#1f6feb" }).color).toBeNull();
+  });
+
+  it("цвет для тёмной темы — только вместе со своим, проверяется, только если включён", () => {
+    const form = { ...toForm(GRAY), hasColor: true, color: "#1f6feb" };
+    const valid = (colorDark: string, hasColorDark = true) =>
+      brandingSchema.safeParse({ ...form, hasColorDark, colorDark }).success;
+    expect(valid("#7AA7FF")).toBe(true);
+    expect(valid("#fff")).toBe(false);
+    expect(valid("#fff", false)).toBe(true);
+    expect(fromForm({ ...form, hasColorDark: true, colorDark: "#7AA7FF" }).colorDark).toBe(
+      "#7aa7ff",
+    );
+    expect(fromForm({ ...form, hasColorDark: false, colorDark: "#7aa7ff" }).colorDark).toBeNull();
+    // Свой цвет выключили — тёмный не уходит на сервер (иначе «тёмный без основного»).
+    expect(
+      fromForm({ ...form, hasColor: false, hasColorDark: true, colorDark: "#7aa7ff" }).colorDark,
+    ).toBeNull();
+    const saved = { ...GRAY, color: "#1f6feb", colorDark: "#7aa7ff" };
+    expect(fromForm(toForm(saved))).toEqual(saved);
   });
 
   it("название обязательно, до 60 символов", () => {
@@ -39,7 +64,7 @@ describe("BrandingEditor", () => {
     save.mockReset().mockImplementation((branding: unknown) => Promise.resolve(branding)),
   );
 
-  it("тема «как в системе» — две миниатюры, «тёмная» — одна; сохраняет название, цвет и тему", async () => {
+  it("тема «как в системе» — две миниатюры, «тёмная» — одна; сохраняет название, акценты и тему", async () => {
     const user = userEvent.setup();
     renderWithProviders(<BrandingEditor branding={GRAY} />);
 
@@ -50,11 +75,20 @@ describe("BrandingEditor", () => {
     await user.clear(screen.getByLabelText("Название проекта"));
     await user.type(screen.getByLabelText("Название проекта"), "Магазин");
     await user.click(screen.getByRole("radio", { name: "Свой цвет" }));
-    await user.clear(screen.getByLabelText("Цвет в виде #rrggbb"));
-    await user.type(screen.getByLabelText("Цвет в виде #rrggbb"), "#1F6FEB");
+    await user.clear(screen.getByLabelText("Светлая тема, #rrggbb"));
+    await user.type(screen.getByLabelText("Светлая тема, #rrggbb"), "#1F6FEB");
+    expect(
+      screen.getByRole("figure", { name: /тёмная тема/ }).style.getPropertyValue("--p-accent"),
+    ).toBe("#1f6feb");
+    await user.click(screen.getByRole("radio", { name: "Другой цвет" }));
+    await user.clear(screen.getByLabelText("Цвет для тёмной темы, #rrggbb"));
+    await user.type(screen.getByLabelText("Цвет для тёмной темы, #rrggbb"), "#7AA7FF");
     await user.click(screen.getByRole("radio", { name: "Тёмная" }));
 
     expect(screen.queryByRole("figure", { name: /светлая тема/ })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("figure", { name: /тёмная тема/ }).style.getPropertyValue("--p-accent"),
+    ).toBe("#7aa7ff");
     expect(screen.getAllByText("Магазин").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: "Сохранить" }));
@@ -63,6 +97,7 @@ describe("BrandingEditor", () => {
       name: "Магазин",
       logo: null,
       color: "#1f6feb",
+      colorDark: "#7aa7ff",
       theme: "dark",
     });
   });

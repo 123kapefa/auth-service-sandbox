@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { Outlet } from "react-router";
 import { accountProfileApi, type AccountProfile } from "@/entities/account-profile";
-import { applyBrandingColor, brandingQueries } from "@/entities/branding";
+import { applyBrandingAccent, brandingQueries } from "@/entities/branding";
 import { accountApp } from "@/shared/lib/account-app";
 import { setDefaultTheme } from "@/shared/lib/theme";
 import {
@@ -17,7 +17,7 @@ import { accountNav } from "../model/nav";
 
 /**
  * Каркас кабинета: боковое меню разделов, кто вошёл, тема, выход. Оформление — проекта (или приложения, из которого
- * кабинет открыт): название и логотип в меню, цвет — в токены, тема проекта — пока пользователь не выбрал свою.
+ * кабинет открыт): название и логотип в меню, акцент (свой для светлой и тёмной темы) — в кнопки и активный пункт, тема проекта — пока пользователь не выбрал свою.
  * Не загрузилось — серый кабинет, как раньше.
  */
 export function AccountShell({ profile }: { profile: AccountProfile }) {
@@ -27,7 +27,7 @@ export function AccountShell({ profile }: { profile: AccountProfile }) {
       return;
     }
 
-    applyBrandingColor(branding.color);
+    applyBrandingAccent(branding);
     setDefaultTheme(branding.theme === "system" ? null : branding.theme);
     document.title = `Личный кабинет — ${branding.name}`;
   }, [branding]);

@@ -15,7 +15,7 @@ export const classes = {
     "mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-6 px-4 py-10 lg:has-[#kc-totp-settings]:max-w-4xl lg:has-[#kc-totp-settings]:gap-4 lg:has-[#kc-totp-settings]:py-4",
   kcHeaderClass: "text-center",
   kcHeaderWrapperClass:
-    "inline-flex items-center gap-2.5 font-mono text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase before:size-3 before:bg-primary before:content-[''] has-[#kc-logo]:before:hidden",
+    "inline-flex items-center gap-2.5 font-mono text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase before:size-3 before:bg-accent before:content-[''] has-[#kc-logo]:before:hidden",
   kcFormCardClass:
     "corner-mark border border-border bg-card p-6 sm:p-8 lg:has-[#kc-totp-settings]:py-6",
   kcFormHeaderClass: "mb-4 grid gap-2",
@@ -30,7 +30,7 @@ export const classes = {
   kcTextareaClass:
     "min-h-20 w-full border border-border bg-background px-3 py-2 text-sm focus-visible:border-primary focus-visible:shadow-hard focus-visible:outline-none",
   kcInputErrorMessageClass:
-    "inline-flex items-center gap-2 self-start bg-primary px-2 py-1 text-[13px] text-primary-foreground before:font-mono before:font-bold before:content-['!']",
+    "inline-flex items-center gap-2 self-start bg-danger-muted px-2 py-1 text-[13px] text-danger before:font-mono before:font-bold before:content-['!']",
   kcInputHelperTextBeforeClass: "text-xs text-muted-foreground",
   kcInputHelperTextAfterClass: "text-xs text-muted-foreground",
   kcInputGroup: "relative flex",
@@ -47,7 +47,7 @@ export const classes = {
   kcFormButtonsWrapperClass: "grid gap-2",
   kcButtonClass: button,
   kcButtonPrimaryClass:
-    "border-primary bg-primary font-semibold text-primary-foreground shadow-hard hover:bg-primary/90 active:translate-x-1 active:translate-y-1 active:shadow-none",
+    "border-accent bg-accent font-semibold text-accent-foreground shadow-hard hover:bg-accent/90 active:translate-x-1 active:translate-y-1 active:shadow-none",
   kcButtonDefaultClass: "border-primary bg-transparent hover:bg-muted",
   kcButtonSecondaryClass: "border-primary bg-transparent hover:bg-muted",
   kcButtonBlockClass: "w-full",

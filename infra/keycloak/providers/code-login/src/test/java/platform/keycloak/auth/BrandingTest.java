@@ -81,6 +81,24 @@ class BrandingTest {
     }
 
     @Test
+    void colorDark_onlyWithColor_andChecked() {
+        Branding.Representation project = branding("Магазин", null, "#1f6feb", "system");
+        project.colorDark = "#7aa7ff";
+        assertNull(Branding.validate(project));
+        project.colorDark = "#7AA7FF";
+        assertEquals("Цвет для тёмной темы — в виде #rrggbb (строчные).", Branding.validate(project));
+        project.colorDark = "#7aa7ff";
+        project.color = null;
+        assertEquals("Цвет для тёмной темы — только вместе с основным.", Branding.validate(project));
+
+        Branding.AppRepresentation own = app(null, null, null);
+        own.colorDark = "#7aa7ff";
+        assertEquals("Цвет для тёмной темы — только вместе с основным.", Branding.validate(own));
+        own.color = "#1f6feb";
+        assertNull(Branding.validate(own));
+    }
+
+    @Test
     void decodeLogo_typeAndBytes_orNull() {
         Branding.Image image = Branding.decodeLogo("data:image/svg+xml;base64," + Base64.getEncoder().encodeToString(new byte[] {1, 2}));
         assertEquals("image/svg+xml", image.contentType());

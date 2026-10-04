@@ -8,9 +8,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Основная: заливка и жёсткая тень; при нажатии кнопка «садится» на тень.
+        // Основная: заливка акцентом (цвет проекта) и жёсткая тень; при нажатии кнопка «садится» на тень.
         default:
-          "border-primary bg-primary font-semibold text-primary-foreground shadow-hard hover:bg-primary/90 active:translate-x-1 active:translate-y-1 active:shadow-none",
+          "border-accent bg-accent font-semibold text-accent-foreground shadow-hard hover:bg-accent/90 active:translate-x-1 active:translate-y-1 active:shadow-none",
         outline: "border-primary bg-transparent hover:bg-muted",
         ghost: "border-transparent hover:bg-muted",
         // Опасное действие — пунктир и штриховка, не красный.

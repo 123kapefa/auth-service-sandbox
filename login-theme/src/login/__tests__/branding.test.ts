@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { applyBranding, brandingUrl, getBranding, loadBranding, textOn } from "../branding";
+import {
+  accentCss,
+  applyBranding,
+  brandingUrl,
+  getBranding,
+  loadBranding,
+  textOn,
+} from "../branding";
 
 describe("оформление проекта на страницах входа", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -27,17 +34,38 @@ describe("оформление проекта на страницах входа
     );
   });
 
-  it("тема закрепляется на <html>, цвет — в токены primary и ring, текст на цвете — по яркости", () => {
+  it("тема закрепляется на <html>, акцент — в токены accent и ring (свой для тёмной темы), линии не трогает", () => {
     const root = document.createElement("html");
+    const accent = () =>
+      document.adoptedStyleSheets
+        .flatMap((sheet) => [...sheet.cssRules].map((rule) => rule.cssText))
+        .join("\n")
+        .replaceAll(": ", ":")
+        .replaceAll("; ", ";")
+        .replaceAll(" {", "{")
+        .replaceAll("{ ", "{");
 
-    applyBranding({ name: "Магазин", logo: null, color: "#1f3a93", theme: "dark" }, root);
+    applyBranding(
+      { name: "Магазин", logo: null, color: "#1f3a93", colorDark: "#7aa7ff", theme: "dark" },
+      root,
+    );
     expect(root.dataset.theme).toBe("dark");
-    expect(root.style.getPropertyValue("--color-primary")).toBe("#1f3a93");
-    expect(root.style.getPropertyValue("--color-ring")).toBe("#1f3a93");
-    expect(root.style.getPropertyValue("--color-primary-foreground")).toBe("#f7f7f7");
+    expect(accent()).toContain(":root{--color-accent:#1f3a93;--color-accent-foreground:#f7f7f7;");
+    expect(accent()).toContain(':root[data-theme="dark"]{--color-accent:#7aa7ff;');
+    expect(accent()).toContain("--color-ring:#7aa7ff;");
+    expect(accent()).not.toContain("--color-primary");
+    document.adoptedStyleSheets = [];
 
-    applyBranding({ name: "Магазин", logo: null, color: null, theme: "system" }, root);
+    applyBranding(
+      { name: "Магазин", logo: null, color: null, colorDark: null, theme: "system" },
+      root,
+    );
     expect(root.dataset.theme).toBeUndefined();
+    expect(document.adoptedStyleSheets).toEqual([]);
+  });
+
+  it("без своего тёмного — тот же цвет и в тёмной теме", () => {
+    expect(accentCss("#aa3300", "#aa3300")).not.toContain("#cdcdcd");
   });
 
   it("текст на светлом цвете — тёмный, на тёмном — светлый", () => {
@@ -54,6 +82,7 @@ describe("оформление проекта на страницах входа
             name: "Магазин",
             logo: "javascript:alert(1)",
             color: "red",
+            colorDark: "#7aa7ff",
             theme: "neon",
           }),
         ),
@@ -64,6 +93,8 @@ describe("оформление проекта на страницах входа
       name: "Магазин",
       logo: null,
       color: null,
+      // Тёмный без основного не берётся: страница целиком серая.
+      colorDark: null,
       theme: "system",
     });
     expect(getBranding()?.name).toBe("Магазин");

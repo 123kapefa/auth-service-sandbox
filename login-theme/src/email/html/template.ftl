@@ -1,6 +1,7 @@
-<#-- Каркас писем в сером квадратном стиле: логотип и название проекта (или приложения), карточка с квадратом цвета
-     проекта в углу, подпись. branding — от плагина (BrandingEmailTemplateProvider): name, color, onColor, logoUrl;
-     без него — серый стиль и название realm. Стили — в атрибутах: почтовые программы не читают <style>. -->
+<#-- Каркас писем в сером квадратном стиле: логотип (или квадрат акцента) и название проекта (или приложения), серая
+     карточка, подпись. Акцент проекта — только на кнопке и квадрате у названия, линии — серые, как в кабинете. Письма —
+     всегда светлые: акцент светлой темы. branding — от плагина (BrandingEmailTemplateProvider): name, color, onColor,
+     logoUrl; без него — серый стиль и название realm. Стили — в атрибутах: почтовые программы не читают <style>. -->
 <#assign brandName = (branding.name)!(realmName!"")>
 <#assign brandColor = (branding.color)!"#3c3c3c">
 <#assign brandOnColor = (branding.onColor)!"#f7f7f7">
@@ -24,7 +25,7 @@
           </td>
         </tr>
         <tr>
-          <td style="background:#eeeeee;border:1px solid #d0d0d0;border-top:4px solid ${brandColor};padding:28px;font-size:14px;line-height:1.6;">
+          <td style="background:#eeeeee;border:1px solid #d0d0d0;border-top:4px solid #3c3c3c;padding:28px;font-size:14px;line-height:1.6;">
             <#nested>
           </td>
         </tr>

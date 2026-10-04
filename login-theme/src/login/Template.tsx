@@ -7,9 +7,10 @@ import { getBranding } from "./branding";
 import type { I18n } from "./i18n";
 import type { KcContext } from "./KcContext";
 
-// Без цвета: ошибка — залитый блок, предупреждение — пунктир и штриховка, успех — рамка, сведения — тонкая рамка.
+// Ошибка — бледно-красный блок с красной рамкой (не цвет проекта), предупреждение — пунктир и штриховка, успех — рамка, сведения —
+// тонкая рамка.
 const ALERT = {
-  error: "border-primary bg-primary text-primary-foreground",
+  error: "border-danger bg-danger-muted text-danger",
   warning: "border-dashed border-primary bg-hatch",
   success: "border-primary",
   info: "border-border",

@@ -66,7 +66,12 @@ public sealed class FakeProjectBranding : IProjectBranding
         ProjectBranding effective = Current;
         if (app is not null && Apps.TryGetValue(app, out AppBranding? own))
         {
-            effective = effective with { Name = own.Name ?? effective.Name, Logo = own.Logo ?? effective.Logo, Color = own.Color ?? effective.Color };
+            effective = effective with { Name = own.Name ?? effective.Name, Logo = own.Logo ?? effective.Logo };
+            if (own.Color is not null)
+            {
+                // Акцент приложения — парой, как в плагине: без своего тёмного — тот же цвет и в тёмной теме.
+                effective = effective with { Color = own.Color, ColorDark = own.ColorDark };
+            }
         }
 
         return Task.FromResult(Result.Success<ProjectBranding, Error>(effective));

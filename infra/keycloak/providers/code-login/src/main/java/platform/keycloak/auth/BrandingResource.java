@@ -82,6 +82,7 @@ public final class BrandingResource implements RealmResourceProvider {
         realm.setAttribute(Branding.ATTRIBUTE_THEME, branding.theme);
         setRealm(realm, Branding.ATTRIBUTE_LOGO, branding.logo);
         setRealm(realm, Branding.ATTRIBUTE_COLOR, branding.color);
+        setRealm(realm, Branding.ATTRIBUTE_COLOR_DARK, branding.colorDark);
         return Response.ok(BrandingResolver.project(realm)).build();
     }
 
@@ -120,6 +121,7 @@ public final class BrandingResource implements RealmResourceProvider {
         setClient(app, Branding.ATTRIBUTE_NAME, branding.name == null ? null : branding.name.trim());
         setClient(app, Branding.ATTRIBUTE_LOGO, branding.logo);
         setClient(app, Branding.ATTRIBUTE_COLOR, branding.color);
+        setClient(app, Branding.ATTRIBUTE_COLOR_DARK, branding.colorDark);
         return Response.ok(BrandingResolver.own(app)).build();
     }
 

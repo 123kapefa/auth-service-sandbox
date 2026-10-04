@@ -6,7 +6,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Оформление проекта: название (displayName realm), логотип, цвет и тема страниц входа. Логотип, цвет и тема —
+ * Оформление проекта: название (displayName realm), логотип, акцент (для светлой и тёмной темы) и тема страниц входа.
+ * Акцент красит только кнопки, активный пункт и фокус — линии и ошибки остаются своими. Логотип, цвет и тема —
  * атрибуты realm: их меняет админка проекта (через сервис входа) без пересборки темы, страница входа читает их
  * при открытии (GET /realms/{realm}/platform-branding). Приложение может переопределить название, логотип и цвет —
  * атрибуты его клиента (те же имена плюс platform.branding.name); тема — общая для проекта.
@@ -16,6 +17,8 @@ public final class Branding {
 
     public static final String ATTRIBUTE_LOGO = "platform.branding.logo";
     public static final String ATTRIBUTE_COLOR = "platform.branding.color";
+    /** Акцент в тёмной теме; без него — тот же, что в светлой. Задаётся только вместе с основным. */
+    public static final String ATTRIBUTE_COLOR_DARK = "platform.branding.color-dark";
     public static final String ATTRIBUTE_THEME = "platform.branding.theme";
     /** Название приложения на его страницах входа и в письмах (у проекта название — displayName realm). */
     public static final String ATTRIBUTE_NAME = "platform.branding.name";
@@ -45,6 +48,7 @@ public final class Branding {
         public String name;
         public String logo;
         public String color;
+        public String colorDark;
         public String theme;
     }
 
@@ -53,6 +57,7 @@ public final class Branding {
         public String name;
         public String logo;
         public String color;
+        public String colorDark;
     }
 
     /** Ошибка проверки по-русски или null — всё верно. */
@@ -69,7 +74,7 @@ public final class Branding {
         if (branding.theme == null || !THEMES.contains(branding.theme)) {
             return "Тема — system, light или dark.";
         }
-        return validateLook(branding.logo, branding.color);
+        return validateLook(branding.logo, branding.color, branding.colorDark);
     }
 
     /** Приложение: всё необязательно (null — как у проекта), но заданное — по тем же правилам. */
@@ -80,12 +85,18 @@ public final class Branding {
         if (branding.name != null && (branding.name.isBlank() || branding.name.trim().length() > NAME_MAX_LENGTH)) {
             return "Название — от 1 до " + NAME_MAX_LENGTH + " символов (или как у проекта).";
         }
-        return validateLook(branding.logo, branding.color);
+        return validateLook(branding.logo, branding.color, branding.colorDark);
     }
 
-    private static String validateLook(String logo, String color) {
+    private static String validateLook(String logo, String color, String colorDark) {
         if (color != null && !COLOR.matcher(color).matches()) {
             return "Цвет — в виде #rrggbb (строчные).";
+        }
+        if (colorDark != null && !COLOR.matcher(colorDark).matches()) {
+            return "Цвет для тёмной темы — в виде #rrggbb (строчные).";
+        }
+        if (colorDark != null && color == null) {
+            return "Цвет для тёмной темы — только вместе с основным.";
         }
         if (logo != null) {
             Matcher matcher = LOGO.matcher(logo);

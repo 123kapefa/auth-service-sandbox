@@ -27,6 +27,12 @@
   --color-success: #3c3c3c;
   --color-warning: #3c3c3c;
   --color-ring: #3c3c3c;
+  /* Акцент — кнопки, активный пункт и фокус; оформление проекта подменяет его (свой для светлой и тёмной темы). */
+  --color-accent: #3c3c3c;
+  --color-accent-foreground: #f7f7f7;
+  /* Ошибки — всегда свой красный (текст и бледный фон), не цвет проекта: акцент — заливка, ошибка — плашка. */
+  --color-danger: #9f1d17;
+  --color-danger-muted: #f6dcda;
   --color-shadow: #c4c4c4;
 }
 
@@ -48,6 +54,10 @@
     --color-success: #cdcdcd;
     --color-warning: #cdcdcd;
     --color-ring: #cdcdcd;
+    --color-accent: #cdcdcd;
+    --color-accent-foreground: #1c1c1c;
+    --color-danger: #f4a9a3;
+    --color-danger-muted: #45201e;
     --color-shadow: #474747;
   }
   @media (prefers-color-scheme: dark) {
@@ -64,6 +74,10 @@
       --color-success: #cdcdcd;
       --color-warning: #cdcdcd;
       --color-ring: #cdcdcd;
+      --color-accent: #cdcdcd;
+      --color-accent-foreground: #1c1c1c;
+      --color-danger: #f4a9a3;
+      --color-danger-muted: #45201e;
       --color-shadow: #474747;
     }
   }
@@ -98,7 +112,7 @@
 
 /* Флажки и радио — в тон теме, без синего браузера. */
 :root {
-  accent-color: var(--color-primary);
+  accent-color: var(--color-accent);
   color-scheme: light dark;
 }
 :root[data-theme="light"] {

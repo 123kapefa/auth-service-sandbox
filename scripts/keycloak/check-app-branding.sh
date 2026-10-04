@@ -65,11 +65,11 @@ login "$ADMIN" /admin/ 1234567890 > /dev/null
 login "$MANAGER" /admin/ 0987654321 > /dev/null
 login "$CUSTOMER" /account/ 79990000001 > /dev/null
 PROJECT=$(curl -s -b "$ADMIN" "$API/auth/admin/branding" | json 'json.dumps(r["result"])')
-OWN=$(curl -s -b "$ADMIN" "$API/auth/admin/apps/$APP/branding" | json 'json.dumps({k: r["result"][k] for k in ("name", "logo", "color")})')
+OWN=$(curl -s -b "$ADMIN" "$API/auth/admin/apps/$APP/branding" | json 'json.dumps({k: r["result"][k] for k in ("name", "logo", "color", "colorDark")})')
 trap 'curl -s -o /dev/null -b "$ADMIN" -X PUT -H "Content-Type: application/json" -d "$PROJECT" "$API/auth/admin/branding"
       curl -s -o /dev/null -b "$ADMIN" -X PUT -H "Content-Type: application/json" -d "$OWN" "$API/auth/admin/apps/$APP/branding"
       rm -rf "$WORK"' EXIT
-api "$ADMIN" PUT /auth/admin/branding '{"name":"Магазин","logo":null,"color":"#1f6feb","theme":"system"}' > /dev/null
+api "$ADMIN" PUT /auth/admin/branding '{"name":"Магазин","logo":null,"color":"#1f6feb","colorDark":"#7aa7ff","theme":"system"}' > /dev/null
 api "$ADMIN" PUT "/auth/admin/apps/$APP/branding" '{"name":null,"logo":null,"color":null}' > /dev/null
 
 echo "1. Плагин Keycloak: своё у приложения читать — всем, менять — только учётке с manage-branding"
@@ -94,6 +94,9 @@ check "сохранено (цвет — строчными), проект — р
 check "у клиента — атрибуты, у проекта — без изменений" \
   "$(curl -s "$PLUGIN?app=$APP" | json 'r["name"], r["color"], r["theme"]') / $(curl -s "$PLUGIN" | json 'r["name"], r["color"]')" \
   "Менеджер 1С #aa3300 system / Магазин #1f6feb"
+check "свой акцент — парой: тёмный проекта не берётся (свой цвет и в тёмной теме)" \
+  "$(curl -s "$PLUGIN?app=$APP" | json '"colorDark" in r') / $(curl -s "$PLUGIN" | json 'r["colorDark"]')" "False / #7aa7ff"
+check "тёмный без своего основного — нет" "$(api "$ADMIN" PUT "/auth/admin/apps/$APP/branding" '{"colorDark":"#ff8866"}')" "400 branding.color_dark_without_color"
 check "в журнале приложения — изменение, без картинки" \
   "$(curl -s -b "$ADMIN" "$API/auth/admin/audit?pageSize=1" | json '(lambda i: (i["action"], i["app"], "base64" in json.dumps(i["changes"])))(r["result"]["items"][0])')" \
   "('AppBrandingChanged', '$APP', False)"
@@ -110,9 +113,9 @@ curl -s -o /dev/null -D "$WORK/h" -b "$JAR" -c "$JAR" "$API/auth/login?return_to
 curl -s -o "$WORK/page.html" -b "$JAR" -c "$JAR" "$(header "$WORK/h" location)"
 curl -s -o "$WORK/page.html" -b "$JAR" -c "$JAR" "$KC$(kc "$WORK/page.html" 'c["url"]["loginResetCredentialsUrl"]')"
 curl -s -o "$WORK/page.html" -b "$JAR" -c "$JAR" --data-urlencode "username=$RESET_LOGIN" "$(form_action "$WORK/page.html")"
-check "сброс пароля со входа в приложение — от его имени, его цветом" \
-  "$(mail "$RESET_EMAIL" '"Менеджер 1С" in html, "Менеджер 1С" in text, "background:#aa3300" in html, "border-radius" in html')" \
-  "True True True False"
+check "сброс пароля со входа в приложение — от его имени, кнопка его цветом, линии серые" \
+  "$(mail "$RESET_EMAIL" '"Менеджер 1С" in html, "Менеджер 1С" in text, "background:#aa3300" in html, "solid #aa3300" in html, "border-radius" in html')" \
+  "True True True False False"
 LOGO=$(mail "$RESET_EMAIL" '__import__("html").unescape(__import__("re").search(r"<img src=\"([^\"]+)\"", html).group(1))')
 check "логотип — ссылкой на плагин приложения" "$(starts "$LOGO" "$KC/realms/$REALM/platform-branding/logo?")" "$KC/realms/$REALM/platform-branding/logo?"
 check "по ссылке — картинка, в песочнице (CSP sandbox)" \
@@ -128,11 +131,13 @@ echo "6. Личный кабинет, открытый из приложения
 check "/auth/account?app=… — в кабинет с app" \
   "$(curl -s -o /dev/null -w '%{redirect_url}' "$API/auth/account?app=$APP" | sed "s|^$API||")" "/account/?app=$APP"
 check "оформление кабинета из приложения" "$(curl -s -b "$CUSTOMER" "$API/me/branding?app=$APP" | json 'r["result"]["name"], r["result"]["color"]')" "Менеджер 1С #aa3300"
-check "без app — проекта" "$(curl -s -b "$CUSTOMER" "$API/me/branding" | json 'r["result"]["name"], r["result"]["color"]')" "Магазин #1f6feb"
+api "$ADMIN" PUT "/auth/admin/apps/$APP/branding" "{\"name\":\"Менеджер 1С\",\"logo\":\"$PNG\",\"color\":\"#aa3300\",\"colorDark\":\"#FF8866\"}" > /dev/null
+check "свой тёмный акцент — в кабинет (строчными)" "$(curl -s -b "$CUSTOMER" "$API/me/branding?app=$APP" | json 'r["result"]["color"], r["result"]["colorDark"]')" "#aa3300 #ff8866"
+check "без app — проекта" "$(curl -s -b "$CUSTOMER" "$API/me/branding" | json 'r["result"]["name"], r["result"]["color"], r["result"]["colorDark"]')" "Магазин #1f6feb #7aa7ff"
 check "без входа — нет" "$(curl -s -o /dev/null -w '%{http_code}' "$API/me/branding")" 401
 
 echo "7. Вернуть «как у проекта»"
-check "null — как у проекта" "$(api "$ADMIN" PUT "/auth/admin/apps/$APP/branding" '{"name":null,"logo":null,"color":null}' | cut -d' ' -f1)" 200
+check "null — как у проекта" "$(api "$ADMIN" PUT "/auth/admin/apps/$APP/branding" '{"name":null,"logo":null,"color":null,"colorDark":null}' | cut -d' ' -f1)" 200
 check "вход в приложение — снова оформление проекта" "$(login_page "$WORK/b5" "$APP")" "Магазин #1f6feb"
 
 summary

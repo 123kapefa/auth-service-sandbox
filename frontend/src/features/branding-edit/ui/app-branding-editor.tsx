@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type ChangeEvent, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { type UseFormReturn, useForm, useWatch } from "react-hook-form";
 import {
   type AppBranding,
   BRANDING_LOGO_TYPES,
@@ -9,6 +9,7 @@ import {
   readLogo,
 } from "@/entities/branding";
 import { Button, FieldError, Input, Label } from "@/shared/ui";
+import { type AccentForm, previewAccent } from "../model/accent";
 import {
   type AppBrandingForm as Form,
   appBrandingSchema,
@@ -16,14 +17,12 @@ import {
   toAppForm,
 } from "../model/app-schemas";
 import { useSaveAppBranding } from "../model/use-save-app-branding";
-
-const segment =
-  "flex h-10 cursor-pointer items-center justify-center border border-primary px-3 text-sm has-checked:bg-primary has-checked:font-semibold has-checked:text-primary-foreground has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring";
+import { AccentFields } from "./accent-fields";
 
 const legend = "mb-1 font-mono text-[11px] tracking-[0.1em] text-muted-foreground uppercase";
 
 /**
- * Оформление приложения поверх проекта: своё название, логотип, цвет — или как у проекта; тема — всегда проекта.
+ * Оформление приложения поверх проекта: своё название, логотип, акцент — или как у проекта; тема — всегда проекта.
  * Справа — страница входа в приложение в миниатюре.
  */
 export function AppBrandingEditor({ branding }: { branding: AppBranding }) {
@@ -35,13 +34,7 @@ export function AppBrandingEditor({ branding }: { branding: AppBranding }) {
     defaultValues: toAppForm(branding, project.color),
   });
   const values = useWatch({ control: form.control }) as Form;
-  const preview = effectiveBranding(
-    project,
-    fromAppForm({
-      ...values,
-      color: /^#[0-9a-fA-F]{6}$/.test(values.color) ? values.color : "#3c3c3c",
-    }),
-  );
+  const preview = effectiveBranding(project, fromAppForm({ ...values, ...previewAccent(values) }));
   const { errors, isDirty } = form.formState;
 
   const pickLogo = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -135,60 +128,14 @@ export function AppBrandingEditor({ branding }: { branding: AppBranding }) {
           <FieldError id="app-branding-logo-error" message={logoError} />
         </fieldset>
 
-        <fieldset className="grid gap-2">
-          <legend className={legend}>Цвет</legend>
-          <div className="grid grid-cols-2 gap-2 sm:max-w-sm">
-            <label className={segment}>
-              <input
-                type="radio"
-                className="sr-only"
-                checked={!values.hasColor}
-                onChange={() => form.setValue("hasColor", false, { shouldDirty: true })}
-              />
-              Как у проекта
-            </label>
-            <label className={segment}>
-              <input
-                type="radio"
-                className="sr-only"
-                checked={values.hasColor}
-                onChange={() => form.setValue("hasColor", true, { shouldDirty: true })}
-              />
-              Свой цвет
-            </label>
-          </div>
-          {values.hasColor && (
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                aria-label="Выбрать цвет"
-                value={
-                  /^#[0-9a-fA-F]{6}$/.test(values.color) ? values.color.toLowerCase() : "#3c3c3c"
-                }
-                onChange={(event) =>
-                  form.setValue("color", event.target.value, {
-                    shouldDirty: true,
-                    shouldValidate: true,
-                  })
-                }
-                className="h-10 w-12 cursor-pointer border border-border bg-background p-1"
-              />
-              <Input
-                aria-label="Цвет в виде #rrggbb"
-                aria-invalid={errors.color ? true : undefined}
-                aria-describedby="app-branding-color-error"
-                className="w-32 font-mono"
-                {...form.register("color")}
-              />
-            </div>
-          )}
-          {values.hasColor && (
-            <FieldError id="app-branding-color-error" message={errors.color?.message} />
-          )}
-          <p className="text-xs text-muted-foreground">
-            Тема страниц (светлая, тёмная) — общая для проекта, в его «Оформлении».
-          </p>
-        </fieldset>
+        <AccentFields
+          form={form as unknown as UseFormReturn<AccentForm>}
+          id="app-branding"
+          offLabel="Как у проекта"
+        />
+        <p className="-mt-3 text-xs text-muted-foreground">
+          Тема страниц (светлая, тёмная) — общая для проекта, в его «Оформлении».
+        </p>
 
         <div className="flex flex-wrap gap-2">
           <Button type="submit" disabled={mutation.isPending || !isDirty}>

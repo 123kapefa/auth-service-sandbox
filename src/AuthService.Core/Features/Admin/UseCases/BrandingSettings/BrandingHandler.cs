@@ -11,7 +11,7 @@ using Validation;
 namespace AuthService.Core.Features.Admin.UseCases.BrandingSettings;
 
 /// <summary>
-/// Оформление проекта: название, логотип, цвет и тема страниц входа. Хранится в Keycloak (realm), меняется через
+/// Оформление проекта: название, логотип, акцент (для светлой и тёмной темы) и тема страниц входа. Хранится в Keycloak (realm), меняется через
 /// плагин platform-branding; страницы входа подхватывают его при следующем открытии. Изменение — в журнал (без
 /// самой картинки: только был ли логотип и есть ли теперь).
 /// </summary>
@@ -42,7 +42,8 @@ public sealed class BrandingHandler(IProjectBranding branding, IValidator<SetBra
             request.Name!.Trim(),
             request.Logo,
             request.Color?.ToLower(CultureInfo.InvariantCulture),
-            request.Theme!);
+            request.Theme!,
+            request.ColorDark?.ToLower(CultureInfo.InvariantCulture));
         if (wanted == current.Value)
         {
             return ToResponse(wanted);
@@ -83,6 +84,11 @@ public sealed class BrandingHandler(IProjectBranding branding, IValidator<SetBra
             changes["color"] = new { old = old.Color, @new = wanted.Color };
         }
 
+        if (!string.Equals(old.ColorDark, wanted.ColorDark, StringComparison.Ordinal))
+        {
+            changes["colorDark"] = new { old = old.ColorDark, @new = wanted.ColorDark };
+        }
+
         if (!string.Equals(old.Theme, wanted.Theme, StringComparison.Ordinal))
         {
             changes["theme"] = new { old = old.Theme, @new = wanted.Theme };
@@ -92,5 +98,5 @@ public sealed class BrandingHandler(IProjectBranding branding, IValidator<SetBra
     }
 
     private static BrandingResponse ToResponse(ProjectBranding branding) =>
-        new(branding.Name, branding.Logo, branding.Color, branding.Theme);
+        new(branding.Name, branding.Logo, branding.Color, branding.Theme, branding.ColorDark);
 }

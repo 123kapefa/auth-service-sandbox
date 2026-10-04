@@ -114,7 +114,7 @@ function LoginHistory() {
                   {attempt.success ? (
                     "успешно"
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 bg-primary px-2 py-0.5 text-[13px] text-primary-foreground">
+                    <span className="inline-flex items-center gap-1.5 bg-danger-muted px-2 py-0.5 text-[13px] text-danger">
                       <span className="font-mono font-bold" aria-hidden>
                         !
                       </span>
