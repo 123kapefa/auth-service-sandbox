@@ -10,8 +10,8 @@ public static class PipelineExtensions
         // Первым: всё, что дальше читает IP клиента или схему запроса, должно видеть настоящие значения.
         app.UseAuthServiceForwardedHeaders();
 
-        // Демо-страница для тестов входа (wwwroot/index.html на «/») и админка на /admin (wwwroot/admin).
-        app.UseAdminUiSecurityHeaders();
+        // Демо-страница для тестов входа (wwwroot/index.html на «/»), админка на /admin и кабинет на /account.
+        app.UseFrontendSecurityHeaders();
         app.UseDefaultFiles();
         app.UseStaticFiles();
 
@@ -20,7 +20,7 @@ public static class PipelineExtensions
 
         app.MapAuthServiceHealthEndpoints();
         app.MapEndpoints();
-        app.MapAdminUi();
+        app.MapFrontends();
 
         return app;
     }

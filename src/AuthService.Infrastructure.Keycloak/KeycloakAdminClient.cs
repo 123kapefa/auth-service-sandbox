@@ -677,7 +677,8 @@ internal sealed partial class KeycloakAdminClient(
                 : null,
             (user.Attributes ?? [])
                 .Where(attribute => attribute.Key.StartsWith(UserAttributes.APP_MODE_PREFIX, StringComparison.Ordinal) && attribute.Value.Length > 0)
-                .ToDictionary(attribute => attribute.Key[UserAttributes.APP_MODE_PREFIX.Length..], attribute => attribute.Value[0], StringComparer.Ordinal));
+                .ToDictionary(attribute => attribute.Key[UserAttributes.APP_MODE_PREFIX.Length..], attribute => attribute.Value[0], StringComparer.Ordinal),
+            user.EmailVerified);
 
     private static string? Attribute(UserRepresentation user, string name) =>
         user.Attributes is not null && user.Attributes.TryGetValue(name, out string[]? values) && values.Length > 0 ? values[0] : null;
@@ -730,6 +731,7 @@ internal sealed partial class KeycloakAdminClient(
         [property: JsonPropertyName("id")] Guid Id,
         [property: JsonPropertyName("username")] string Username,
         [property: JsonPropertyName("email")] string? Email,
+        [property: JsonPropertyName("emailVerified")] bool EmailVerified,
         [property: JsonPropertyName("enabled")] bool Enabled,
         [property: JsonPropertyName("createdTimestamp")] long CreatedTimestamp,
         [property: JsonPropertyName("attributes")] Dictionary<string, string[]>? Attributes);

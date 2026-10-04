@@ -4,14 +4,19 @@ using Xunit;
 
 namespace AuthService.IntegrationTests;
 
-/// <summary>Админка на /admin: строгая CSP для её страниц и файлов; демо-страница (встроенный скрипт) — без неё.</summary>
-public sealed class AdminUiTests(AuthServiceWebFactory factory) : IClassFixture<AuthServiceWebFactory>
+/// <summary>
+/// Админка на /admin и кабинет на /account: строгая CSP для их страниц и файлов; демо-страница (встроенный скрипт) — без неё.
+/// </summary>
+public sealed class FrontendTests(AuthServiceWebFactory factory) : IClassFixture<AuthServiceWebFactory>
 {
     [Theory]
     [InlineData("/admin/")]
     [InlineData("/admin/users")]
     [InlineData("/admin/assets/app.js")]
-    public async Task AdminPaths_StrictScriptPolicy(string path)
+    [InlineData("/account/")]
+    [InlineData("/account/security")]
+    [InlineData("/account/assets/app.js")]
+    public async Task FrontendPaths_StrictScriptPolicy(string path)
     {
         using HttpClient client = factory.CreateClient();
 
@@ -24,7 +29,7 @@ public sealed class AdminUiTests(AuthServiceWebFactory factory) : IClassFixture<
     }
 
     [Fact]
-    public async Task DemoPage_NoAdminPolicy()
+    public async Task DemoPage_NoFrontendPolicy()
     {
         using HttpClient client = factory.CreateClient();
 

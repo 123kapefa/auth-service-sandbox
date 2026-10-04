@@ -52,6 +52,47 @@ public sealed class LoginFlowTests : IClassFixture<AuthServiceWebFactory>
         Assert.Equal("login", QueryHelpers.ParseQuery(reauth.Headers.Location!.Query)["prompt"]);
     }
 
+    [Theory]
+    [InlineData("update-password", AccountAction.UpdatePassword)]
+    [InlineData("update-email", AccountAction.UpdateEmail)]
+    public async Task Login_WithAccountAction_AsksLoginPageForAction(string action, AccountAction expected)
+    {
+        using HttpClient browser = _factory.CreateBrowserClient();
+
+        HttpResponseMessage response = await browser.GetAsync(new Uri($"/auth/login?return_to=/account/&action={action}", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(expected, _keycloak.LastAction);
+    }
+
+    [Fact]
+    public async Task Login_UnknownAccountAction_Rejected_NoLoginStarted()
+    {
+        using HttpClient browser = _factory.CreateBrowserClient();
+
+        HttpResponseMessage response = await browser.GetAsync(new Uri("/auth/login?return_to=/account/&action=delete_account", UriKind.Relative));
+
+        await AssertErrorAsync(response, HttpStatusCode.BadRequest, "auth.action.unknown");
+        Assert.Null(_keycloak.LastAuthorization);
+    }
+
+    [Theory]
+    [InlineData("/account/", "success", "/account/?action_status=success")]
+    [InlineData("/account/?tab=profile", "cancelled", "/account/?tab=profile&action_status=cancelled")]
+    [InlineData("/account/#email", "error", "/account/?action_status=error#email")]
+    [InlineData("/account/", "evil<script>", "/account/")]
+    [InlineData("/account/?action=update-password&action_status=success", "cancelled", "/account/?action=update-password&action_status=cancelled")]
+    [InlineData("/account/?action_status=success", "evil", "/account/")]
+    public async Task Callback_AccountActionStatus_PassedToReturnTo(string returnTo, string status, string expected)
+    {
+        (HttpClient browser, string loginCookie) = await StartLoginAsync(returnTo);
+
+        HttpResponseMessage response = await Callback(
+            browser, loginCookie, $"code=c&state={_keycloak.LastAuthorization!.State}&kc_action_status={Uri.EscapeDataString(status)}");
+
+        Assert.Equal(expected, response.Headers.Location!.ToString());
+    }
+
     [Fact]
     public async Task Callback_ExchangesCodeWithVerifier_SetsCookies_AndReturnsToApp()
     {

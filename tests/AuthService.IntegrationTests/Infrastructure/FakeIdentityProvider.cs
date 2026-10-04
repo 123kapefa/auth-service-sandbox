@@ -28,9 +28,13 @@ public sealed class FakeIdentityProvider : IIdentityProvider
     public static TokenSet Tokens(string access, string refresh) =>
         new(access, AccessExpires, refresh, DateTimeOffset.UtcNow.AddDays(30));
 
+    /// <summary>Действие с учётной записью из последнего начала входа.</summary>
+    public AccountAction? LastAction { get; private set; }
+
     public void Reset()
     {
         LastAuthorization = null;
+        LastAction = null;
         Exchanges.Clear();
         Refreshes.Clear();
         Logouts.Clear();
@@ -42,8 +46,10 @@ public sealed class FakeIdentityProvider : IIdentityProvider
     public Task<Result<AuthorizationRequest, Error>> CreateAuthorizationRequestAsync(
         Uri redirectUri,
         bool forceLogin,
+        AccountAction? action,
         CancellationToken cancellationToken)
     {
+        LastAction = action;
         string state = Guid.NewGuid().ToString("N");
         string prompt = forceLogin ? "&prompt=login" : string.Empty;
         LastAuthorization = new AuthorizationRequest(

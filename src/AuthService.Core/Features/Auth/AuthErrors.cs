@@ -20,6 +20,9 @@ public static class AuthErrors
     public static Error ModeNotAvailable() =>
         Error.Authorization("auth.mode.not_available", "Этот режим вам недоступен.");
 
+    public static Error UnknownAccountAction(string action) =>
+        Error.Validation("auth.action.unknown", $"Неизвестное действие с учётной записью: «{action}».");
+
     public static Error UserBlocked() =>
         Error.Authentication("auth.user.blocked", "Учётная запись заблокирована.");
 }

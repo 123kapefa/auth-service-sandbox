@@ -29,7 +29,7 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
     [Fact]
     public async Task AuthorizationRequest_PointsBrowserToExternalLoginPageWithPkce()
     {
-        AuthorizationRequest request = (await CreateProvider().CreateAuthorizationRequestAsync(_callback, forceLogin: false, default)).Value;
+        AuthorizationRequest request = (await CreateProvider().CreateAuthorizationRequestAsync(_callback, forceLogin: false, action: null, default)).Value;
 
         Assert.StartsWith($"{EXTERNAL}/auth?", request.Url.ToString(), StringComparison.Ordinal);
         Dictionary<string, StringValues> query = QueryHelpers.ParseQuery(request.Url.Query);
@@ -42,14 +42,27 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
         Assert.Equal(Challenge(request.CodeVerifier), query["code_challenge"]);
         Assert.False(query.ContainsKey("code_verifier"));
         Assert.False(query.ContainsKey("prompt"));
+        Assert.False(query.ContainsKey("kc_action"));
     }
 
     [Fact]
     public async Task ForceLogin_AsksKeycloakToLoginAgain()
     {
-        AuthorizationRequest request = (await CreateProvider().CreateAuthorizationRequestAsync(_callback, forceLogin: true, default)).Value;
+        AuthorizationRequest request = (await CreateProvider().CreateAuthorizationRequestAsync(_callback, forceLogin: true, action: null, default)).Value;
 
         Assert.Equal("login", QueryHelpers.ParseQuery(request.Url.Query)["prompt"]);
+    }
+
+    [Theory]
+    [InlineData(AccountAction.UpdatePassword, "UPDATE_PASSWORD")]
+    [InlineData(AccountAction.UpdateEmail, "UPDATE_EMAIL")]
+    public async Task AccountAction_AsksKeycloakForRequiredAction(AccountAction action, string kcAction)
+    {
+        AuthorizationRequest request = (await CreateProvider().CreateAuthorizationRequestAsync(_callback, forceLogin: false, action, default)).Value;
+
+        Dictionary<string, StringValues> query = QueryHelpers.ParseQuery(request.Url.Query);
+        Assert.Equal(kcAction, query["kc_action"]);
+        Assert.False(query.ContainsKey("prompt"));
     }
 
     [Fact]
@@ -57,8 +70,8 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
     {
         IIdentityProvider provider = CreateProvider();
 
-        AuthorizationRequest first = (await provider.CreateAuthorizationRequestAsync(_callback, forceLogin: false, default)).Value;
-        AuthorizationRequest second = (await provider.CreateAuthorizationRequestAsync(_callback, forceLogin: false, default)).Value;
+        AuthorizationRequest first = (await provider.CreateAuthorizationRequestAsync(_callback, forceLogin: false, action: null, default)).Value;
+        AuthorizationRequest second = (await provider.CreateAuthorizationRequestAsync(_callback, forceLogin: false, action: null, default)).Value;
 
         Assert.NotEqual(first.State, second.State);
         Assert.NotEqual(first.CodeVerifier, second.CodeVerifier);

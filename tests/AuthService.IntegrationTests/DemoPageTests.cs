@@ -22,15 +22,26 @@ public sealed class DemoPageTests(AuthServiceWebFactory factory) : IClassFixture
     }
 
     [Fact]
-    public async Task AccountSettings_RedirectsToKeycloakAccountSigningIn()
+    public async Task AccountSecurity_RedirectsToKeycloakSigningIn_UntilOwnSection()
+    {
+        using HttpClient browser = factory.CreateBrowserClient();
+
+        HttpResponseMessage response = await browser.GetAsync(new Uri("/auth/account/security", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(
+            new Uri($"{AuthServiceWebFactory.ISSUER}/account/account-security/signing-in"),
+            response.Headers.Location);
+    }
+
+    [Fact]
+    public async Task AccountSettings_RedirectsToOwnAccount()
     {
         using HttpClient browser = factory.CreateBrowserClient();
 
         HttpResponseMessage response = await browser.GetAsync(new Uri("/auth/account", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Equal(
-            new Uri($"{AuthServiceWebFactory.ISSUER}/account/account-security/signing-in"),
-            response.Headers.Location);
+        Assert.Equal(new Uri("/account/", UriKind.Relative), response.Headers.Location);
     }
 }

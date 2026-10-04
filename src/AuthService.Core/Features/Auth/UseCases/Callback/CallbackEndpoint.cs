@@ -11,7 +11,10 @@ using IResult = Microsoft.AspNetCore.Http.IResult;
 
 namespace AuthService.Core.Features.Auth.UseCases.Callback;
 
-/// <summary>GET /auth/callback?code&amp;state — возврат со страницы входа: cookie с токенами и редирект на return_to.</summary>
+/// <summary>
+/// GET /auth/callback?code&amp;state — возврат со страницы входа: cookie с токенами и редирект на return_to.
+/// kc_action_status — итог действия с учётной записью (смена пароля, почты): уходит в return_to как action_status.
+/// </summary>
 public sealed class CallbackEndpoint : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app) => app.MapGet(CallbackUrl.PATH, Handle);
@@ -21,6 +24,7 @@ public sealed class CallbackEndpoint : IEndpoint
         [FromQuery] string? state,
         [FromQuery] string? error,
         [FromQuery(Name = "error_description")] string? errorDescription,
+        [FromQuery(Name = "kc_action_status")] string? actionStatus,
         HttpContext httpContext,
         [FromServices] CallbackHandler handler,
         [FromServices] LoginStateStore loginState,
@@ -32,6 +36,7 @@ public sealed class CallbackEndpoint : IEndpoint
         Result<LoginCompleted, Error> completed = await handler.Handle(
             new CallbackRequest(code, state, error, errorDescription),
             saved,
+            actionStatus,
             CallbackUrl.For(httpContext.Request),
             cancellationToken);
         if (completed.IsFailure)

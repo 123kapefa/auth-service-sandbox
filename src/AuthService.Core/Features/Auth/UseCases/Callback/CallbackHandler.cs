@@ -17,9 +17,12 @@ public sealed record LoginCompleted(TokenSet Tokens, string ReturnTo);
 /// <summary>Возврат со страницы входа: проверка state, обмен кода на токены с PKCE verifier.</summary>
 public sealed class CallbackHandler(IIdentityProvider identityProvider, IValidator<CallbackRequest> validator)
 {
+    private const string ACTION_STATUS = "action_status";
+
     public async Task<Result<LoginCompleted, Error>> Handle(
         CallbackRequest request,
         LoginState? savedState,
+        string? actionStatus,
         Uri callbackUrl,
         CancellationToken cancellationToken)
     {
@@ -56,6 +59,29 @@ public sealed class CallbackHandler(IIdentityProvider identityProvider, IValidat
             callbackUrl,
             cancellationToken);
 
-        return tokens.IsSuccess ? new LoginCompleted(tokens.Value, savedState.ReturnTo) : tokens.Error;
+        return tokens.IsSuccess ? new LoginCompleted(tokens.Value, WithActionStatus(savedState.ReturnTo, actionStatus)) : tokens.Error;
+    }
+
+    // Итог действия — параметром адреса возврата (перед #фрагментом); неизвестные значения не передаём. Свой
+    // action_status в return_to (подложенный в ссылку) убираем всегда: итог сообщает только сервер входа.
+    private static string WithActionStatus(string returnTo, string? actionStatus)
+    {
+        int hash = returnTo.IndexOf('#', StringComparison.Ordinal);
+        string beforeHash = hash < 0 ? returnTo : returnTo[..hash];
+        string fragment = hash < 0 ? string.Empty : returnTo[hash..];
+        int question = beforeHash.IndexOf('?', StringComparison.Ordinal);
+        string path = question < 0 ? beforeHash : beforeHash[..question];
+        List<string> parameters = question < 0
+            ? []
+            : [.. beforeHash[(question + 1)..]
+                .Split('&', StringSplitOptions.RemoveEmptyEntries)
+                .Where(parameter => !string.Equals(parameter.Split('=')[0], ACTION_STATUS, StringComparison.Ordinal))];
+
+        if (actionStatus is not null && AccountActions.Statuses.Contains(actionStatus))
+        {
+            parameters.Add($"{ACTION_STATUS}={actionStatus}");
+        }
+
+        return parameters.Count == 0 ? path + fragment : $"{path}?{string.Join('&', parameters)}{fragment}";
     }
 }

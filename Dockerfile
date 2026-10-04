@@ -1,4 +1,5 @@
-# Админка доступа (frontend/): собирается отдельно, в образ сервиса попадает готовая статика (wwwroot/admin).
+# Интерфейсы (frontend/): админка и личный кабинет собираются отдельно, в образ сервиса попадает готовая статика
+# (wwwroot/admin, wwwroot/account).
 FROM node:22-alpine AS admin
 WORKDIR /admin
 COPY frontend/package.json frontend/package-lock.json ./
@@ -35,7 +36,8 @@ RUN /root/.dotnet/tools/dotnet-ef migrations bundle \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS api
 WORKDIR /app
 COPY --from=build /out/api .
-COPY --from=admin /admin/dist ./wwwroot/admin
+COPY --from=admin /admin/dist/admin ./wwwroot/admin
+COPY --from=admin /admin/dist/account ./wwwroot/account
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
 # Не root: встроенный пользователь образа aspnet (app, uid 1654). Сертификат DataProtection должен быть ему доступен.

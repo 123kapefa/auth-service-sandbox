@@ -55,11 +55,18 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     public Collection<(string? Search, int First, int Max)> Searches { get; } = [];
 
     /// <summary>Пользователь в «Keycloak»: роли клиента sandbox-api (без customer — он по умолчанию у всех).</summary>
-    public void Add(TestUser user, IReadOnlyList<string>? clientRoles = null, bool enabled = true, bool hasPassword = true)
+    public void Add(
+        TestUser user,
+        IReadOnlyList<string>? clientRoles = null,
+        bool enabled = true,
+        bool hasPassword = true,
+        string? email = null,
+        bool emailVerified = false)
     {
         ArgumentNullException.ThrowIfNull(user);
         _accounts[user.Id] = new Account(
-            new IdentityUser(user.Id, user.Phone.TrimStart('+'), null, user.Phone, user.ActiveMode, enabled, DateTimeOffset.UtcNow),
+            new IdentityUser(user.Id, user.Phone.TrimStart('+'), email, user.Phone, user.ActiveMode, enabled, DateTimeOffset.UtcNow,
+                EmailVerified: emailVerified),
             clientRoles ?? user.Roles,
             hasPassword,
             []);

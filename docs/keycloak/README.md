@@ -70,6 +70,7 @@ scripts/keycloak/check-stand.sh
 | 5 | Спайк: вход по коду — SMS и почта (Java-плагин) | ✅ | [05-code-login.md](05-code-login.md) |
 | 6 | Спайк: миграция пользователей с BCrypt | ✅ | [06-bcrypt-migration.md](06-bcrypt-migration.md) |
 | 6а | Сервис входа как компонент: ключи сервисов, новый проект, поставка | 🔄 | [06a-embedding.md](06a-embedding.md) |
+| 6б | Личный кабинет и оформление под проект | 🔄 | [06b-account-branding.md](06b-account-branding.md) |
 | 7 | Документация | идёт по ходу | — |
 | 8 | Выводы и ADR | ⬜ | — |
 

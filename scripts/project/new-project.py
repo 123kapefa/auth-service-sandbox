@@ -130,6 +130,8 @@ def main():
     bff = next(c for c in realm["clients"] if c["clientId"] == "auth-bff")
     bff["secret"] = secret
     bff["redirectUris"] = [f"{service}/auth/callback"]
+    # «Вернуться в приложение» на страницах Keycloak (например, после смены почты) — в личный кабинет.
+    bff["baseUrl"] = f"{service}/auth/account"
     bff["webOrigins"] = ["+"]
     bff["attributes"]["post.logout.redirect.uris"] = f"{service}/*"
     bff["attributes"]["backchannel.logout.url"] = f"{backchannel}/auth/backchannel-logout"
@@ -146,7 +148,7 @@ def main():
         realm["smtpServer"] = smtp
     else:
         realm.pop("smtpServer", None)
-        print("Внимание: почта не задана (--smtp-host) — письма (сброс пароля, код на почту) не отправятся", file=sys.stderr)
+        print("Внимание: почта не задана (--smtp-host) — письма (сброс пароля, код на почту, смена почты) не отправятся", file=sys.stderr)
 
     leftovers = sorted(set(re.findall(r"[\w.-]*sandbox[\w.-]*", json.dumps(realm, ensure_ascii=False), re.IGNORECASE)))
     if leftovers:

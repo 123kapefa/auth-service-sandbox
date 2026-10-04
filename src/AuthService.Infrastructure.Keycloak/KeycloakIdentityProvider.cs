@@ -33,6 +33,7 @@ internal sealed partial class KeycloakIdentityProvider(
     public async Task<Result<AuthorizationRequest, Error>> CreateAuthorizationRequestAsync(
         Uri redirectUri,
         bool forceLogin,
+        AccountAction? action,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(redirectUri);
@@ -60,6 +61,17 @@ internal sealed partial class KeycloakIdentityProvider(
         {
             // OIDC prompt=login: Keycloak заново спрашивает вход (пароль, 2FA — если включена), auth_time обновляется.
             parameters["prompt"] = "login";
+        }
+
+        if (action is { } requested)
+        {
+            // Application Initiated Action: Keycloak показывает страницу действия, итог — kc_action_status в callback.
+            parameters["kc_action"] = requested switch
+            {
+                AccountAction.UpdatePassword => "UPDATE_PASSWORD",
+                AccountAction.UpdateEmail => "UPDATE_EMAIL",
+                _ => throw new ArgumentOutOfRangeException(nameof(action), requested, "Unknown account action"),
+            };
         }
 
         string url = QueryHelpers.AddQueryString(configuration.Value.AuthorizationEndpoint, parameters);

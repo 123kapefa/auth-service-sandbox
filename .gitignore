@@ -10,6 +10,7 @@ obj/
 frontend/node_modules/
 frontend/dist/
 src/AuthService.Api/wwwroot/admin/
+src/AuthService.Api/wwwroot/account/
 
 # Тема входа: зависимости и сборка
 login-theme/node_modules/

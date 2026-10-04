@@ -1,8 +1,13 @@
-# Админка доступа (frontend)
+# Интерфейсы сервиса входа (frontend)
 
-SPA на `/admin` сервиса входа: пользователи, роли и права приложений, журнал. Работает только через API сервиса
-(`/auth/admin/*`), токены — в httpOnly-cookie сервиса (страница их не видит). Проверки в интерфейсе — только для
-удобства: доступ решает сервер.
+Два SPA одного проекта (общие `shared`, `entities`, сборка):
+
+- **админка доступа** на `/admin`: пользователи, роли и права приложений, журнал, сервисы и ключи (`/auth/admin/*`);
+- **личный кабинет** на `/account`: профиль, пароль и почта — любому вошедшему (`/me/*`, `/security/*`). Пароль и
+  почта меняются на страницах сервера входа (`/auth/login?action=…`), кабинет их не видит.
+
+Работают только через API сервиса, токены — в httpOnly-cookie сервиса (страница их не видит). Проверки в интерфейсе —
+только для удобства: доступ решает сервер. Какое приложение — режим Vite (`--mode account`; иначе админка).
 
 ## Стек (не менять без ADR)
 
@@ -11,20 +16,22 @@ Zod · Tailwind CSS 4 + компоненты в стиле shadcn/ui · sonner (
 Prettier. React Compiler включён: без `useMemo`/`useCallback`/`memo`, данные не мутировать.
 
 Node 22 (`.nvmrc`), npm, `package-lock.json` в git. `sonner` закреплён точной версией: хэш его стилей прописан в CSP
-сервиса (`src/AuthService.Api/Configuration/AdminUiExtensions.cs`) — обновили sonner, обновите хэш (подскажет консоль).
+сервиса (`src/AuthService.Api/Configuration/FrontendExtensions.cs`) — обновили sonner, обновите хэш (подскажет консоль).
 
 ## Раскладка (Feature-Sliced Design)
 
 ```
-src/app        — провайдеры, роутер, проверка сессии, плашка «доступ изменился»
+src/app        — админка: провайдеры, роутер, проверка сессии, плашка «доступ изменился»;
+                 src/app/account — кабинет: провайдеры, роутер, проверка сессии
 src/pages      — обзор, пользователи и карточка, журнал, сервисы и ключи, раздел приложения (пользователи, роли, журнал),
-                 «нет доступа», 404
-src/widgets    — каркас с меню (app-shell), раздел приложения с вкладками (app-section), журнал действий (audit-log)
+                 «нет доступа», 404; кабинет — account-profile
+src/widgets    — каркас с меню (app-shell), раздел приложения с вкладками (app-section), журнал действий (audit-log);
+                 каркас кабинета (account-shell)
 src/features   — действия: блокировка, доступ к приложению, «выйти везде», пароль и 2FA, роли пользователя,
                  роль (создать/изменить), удалить роль, своё право (создать/удалить), ключ сервиса (выдать; права,
-                 перевыпуск, отзыв)
+                 перевыпуск, отзыв); кабинет — действие на странице сервера входа (account-action)
 src/entities   — данные: admin-session («кто я»), user, app-user, app-catalog (роли и права), journal, service-key
-                 (сервисы проекта и окно с ключом — секрет показывается один раз)
+                 (сервисы проекта и окно с ключом — секрет показывается один раз), account-profile (профиль кабинета)
 src/shared     — api (клиент, Envelope, ошибки), config, lib, ui
 ```
 
@@ -49,12 +56,13 @@ refresh не принят — переход на `/auth/login?return_to=…`. �
 ```bash
 npm ci
 npm run dev          # http://localhost:5173/admin/, API — прокси на сервис (AUTH_API, по умолчанию :8080)
+npm run dev:account  # http://localhost:5174/account/
 npm run lint         # ESLint, 0 предупреждений
 npm run type-check
 npm test
-npm run build        # dist/ — в образе сервиса копируется в wwwroot/admin
+npm run build        # dist/admin и dist/account — в образе сервиса копируются в wwwroot/admin и wwwroot/account
 npm run format
 ```
 
-Вход в dev: сервис должен пускать возврат на `http://localhost:5173` (`ReturnUrls:AllowedOrigins` — уже есть в
-Development и Docker).
+Вход в dev: сервис должен пускать возврат на `http://localhost:5173` и `:5174` (`ReturnUrls:AllowedOrigins` — уже есть
+в Development и Docker).

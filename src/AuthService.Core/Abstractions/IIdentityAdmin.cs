@@ -149,6 +149,7 @@ public sealed record UserChanges(bool? Enabled, IReadOnlyDictionary<string, stri
 /// <param name="RestrictionReason">Причина блокировки, если указана.</param>
 /// <param name="RestrictedAt">Когда заблокирован.</param>
 /// <param name="AppModes">Активные режимы в других приложениях: clientId → режим (атрибуты active_mode.{clientId}).</param>
+/// <param name="EmailVerified">Почта подтверждена (письмом со ссылкой).</param>
 public sealed record IdentityUser(
     Guid Id,
     string Username,
@@ -159,7 +160,8 @@ public sealed record IdentityUser(
     DateTimeOffset CreatedAt,
     string? RestrictionReason = null,
     DateTimeOffset? RestrictedAt = null,
-    IReadOnlyDictionary<string, string>? AppModes = null);
+    IReadOnlyDictionary<string, string>? AppModes = null,
+    bool EmailVerified = false);
 
 /// <summary>Сессия пользователя на сервере входа.</summary>
 /// <param name="Id">Id сессии (claim sid в токенах этой сессии).</param>
