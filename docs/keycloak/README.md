@@ -29,8 +29,13 @@ scripts/keycloak/check-stand.sh
 
 Ожидается `Итого: 43 ✓, 0 ✗`. Остальные проверки (сервис поднят: `docker compose up -d --build --wait`):
 `check-api.sh` 48, `check-login.sh` 16, `check-login-methods.sh` 22, `check-code-login.sh` 31, `check-admin.sh` 109,
-`check-roles.sh` 71, `check-admin-ui.sh` 25, `check-migration.sh` 26 (нужен .NET SDK); .NET-тестов — 338; тестов админки (Vitest) — 34,
-темы входа (Vitest) — 23.
+`check-roles.sh` 71, `check-admin-ui.sh` 28, `check-migration.sh` 26 (нужен .NET SDK), `check-service-keys.sh` 34 (нужно
+разрешение на регистрацию: `scripts/keycloak/registration-token.sh --write-env`, затем `docker compose up -d --wait`),
+весь этап 6б — `check-6b.sh` 138 (кабинет, устройства, оформление, новый проект). Тестов: .NET — 524, плагина Keycloak
+(Java, в сборке образа) — 83, админки и кабинета (Vitest) — 83, темы входа (Vitest) — 30.
+
+Стенд, поднятый до этапа 6б, после `git pull` и `docker compose up -d --build --wait` — `scripts/project/upgrade-6b.py
+sandbox` (realm импортируется только в пустую базу; подробнее — [06b](06b-account-branding.md#проекты-созданные-до-6б)).
 
 | Что | Адрес | Доступ |
 |---|---|---|---|
@@ -71,7 +76,7 @@ scripts/keycloak/check-stand.sh
 | 5 | Спайк: вход по коду — SMS и почта (Java-плагин) | ✅ | [05-code-login.md](05-code-login.md) |
 | 6 | Спайк: миграция пользователей с BCrypt | ✅ | [06-bcrypt-migration.md](06-bcrypt-migration.md) |
 | 6а | Сервис входа как компонент: ключи сервисов, новый проект, поставка | 🔄 | [06a-embedding.md](06a-embedding.md) |
-| 6б | Личный кабинет и оформление под проект | 🔄 | [06b-account-branding.md](06b-account-branding.md) |
+| 6б | Личный кабинет и оформление под проект | ✅ | [06b-account-branding.md](06b-account-branding.md) |
 | 7 | Документация | идёт по ходу | — |
 | 8 | Выводы и ADR | ⬜ | — |
 
@@ -91,9 +96,10 @@ Keycloak; проекты друг друга не видят. **Приложен
 | `compose.yaml` → `redis`, `auth-migrator` | отметки мгновенного отзыва токенов; миграции базы сервиса (`efbundle`) до старта сервиса |
 | `infra/keycloak/realm/sandbox-realm.json` | весь realm как код |
 | `infra/keycloak/providers/code-login` | плагин Keycloak (Java): форма входа с нормализацией номера, вход по коду, проверка BCrypt-паролей из боевого сервиса; собирается в `infra/keycloak/Dockerfile` |
-| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал, пароль и 2FA; `check-roles.sh` — роли и права приложений, роли пользователей, умный рефреш, «Менеджер 1С» (этап 4а); `check-admin-ui.sh` — своя админка: раздача, CSP, путь админов (этап 4б); `check-migration.sh` — перенос пользователей с BCrypt-паролями (этап 6); `lib.sh` — общие помощники, `master-token.sh` — токен мастер-админки изнутри контейнера |
+| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал, пароль и 2FA; `check-roles.sh` — роли и права приложений, роли пользователей, умный рефреш, «Менеджер 1С» (этап 4а); `check-admin-ui.sh` — своя админка: раздача, CSP, путь админов (этап 4б); `check-migration.sh` — перенос пользователей с BCrypt-паролями (этап 6); `check-service-keys.sh`, `check-new-project.sh`, `check-deploy.sh` — ключи сервисов, проект с нуля, поставка (этап 6а); `check-account.sh`, `check-devices.sh`, `check-branding.sh`, `check-app-branding.sh` — кабинет, устройства, оформление проекта и приложения, `check-6b.sh` — весь этап 6б (этап 6б); `lib.sh` — общие помощники, `master-token.sh` — токен мастер-админки изнутри контейнера |
 | `login-theme/` | страницы входа Keycloak на React (Keycloakify) и письма (`src/email/`, FreeMarker) — тема `platform`, см. `login-theme/CLAUDE.md`; jar собирается в образе Keycloak |
-| `frontend/` | админка доступа на `/admin` (React, FSD) — см. `frontend/CLAUDE.md`; в образ сервиса попадает сборка |
+| `frontend/` | админка доступа на `/admin` и личный кабинет на `/account` (React, FSD) — см. `frontend/CLAUDE.md`; в образ сервиса попадает сборка |
+| `scripts/project/` | новый проект и его обслуживание: `create-project.sh`, `add-admin.py`, `add-app.py`; `upgrade-6b.py` — кабинет и оформление в проекте, созданном до 6б |
 | `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права из токена, хук мгновенного отзыва и умного рефреша (`access_changed`) — переиспользуемая библиотека |
 | `src/Shared/Authentication.Redis` | отметки отзыва и версии доступа в Redis, кэш проверки, `AddPlatformTokenRevocation` |
 | `src/AuthService.Core/Authorization` | константы прав сервиса (сам состав ролей — в Keycloak, с этапа 4а) |

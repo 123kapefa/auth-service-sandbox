@@ -22,12 +22,8 @@ def first_client(admin, *client_ids):
     raise SystemExit(f"В realm {admin.realm} нет клиента {' или '.join(client_ids)}")
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Оформление проекта в проекте, созданном до 6б.4")
-    parser.add_argument("realm")
-    args = parser.parse_args()
-    admin = Admin(args.realm)
-
+def enable(admin):
+    """Роль manage-branding у служебной учётки и право branding.manage в роли admin. Возвращает (учётка, клиент API)."""
     admin.call("POST", "/roles", {"name": ROLE, "description": "Служебная: менять оформление проекта (плагин platform-branding) — у учётки сервиса входа"}, ok=(409,))
     role = admin.call("GET", f"/roles/{ROLE}")
     bff = first_client(admin, "auth-bff", "sandbox-bff")
@@ -40,10 +36,16 @@ def main():
         "attributes": {"kind": ["permission"], "source": ["code"]}}, ok=(409,))
     permission = admin.role(api["id"], PERMISSION)
     admin.call("POST", f"/clients/{api['id']}/roles/admin/composites", [permission])
+    return account["username"], api["clientId"]
 
-    print(f"Оформление в {args.realm}: роль {ROLE} у {account['username']}, право {PERMISSION} в роли admin ({api['clientId']}).")
+
+def main():
+    parser = argparse.ArgumentParser(description="Оформление проекта в проекте, созданном до 6б.4")
+    parser.add_argument("realm")
+    args = parser.parse_args()
+    account, api = enable(Admin(args.realm))
+    print(f"Оформление в {args.realm}: роль {ROLE} у {account}, право {PERMISSION} в роли admin ({api}).")
     print("Админам проекта — войти заново (новое право придёт с новым токеном).")
-
 
 if __name__ == "__main__":
     main()

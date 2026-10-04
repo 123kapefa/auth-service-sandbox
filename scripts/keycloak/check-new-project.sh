@@ -3,6 +3,8 @@
 # С нуля, теми же скриптами, что и в бою: проект «Демо-магазин» (realm demo-shop) — create-project.sh, первый админ —
 # add-admin.py, приложение «Заказы» — add-app.py; свой экземпляр сервиса из того же образа (infra/projects/demo-shop).
 # Проекты изолированы: пользователи и токены одного не действуют в другом.
+# Этап 6б (docs/keycloak/06b-account-branding.md): кабинет и оформление в новом проекте — из шаблона; проект, созданный
+# раньше, получает их скриптом upgrade-6b.py.
 # Запуск: стенд песочницы поднят (Keycloak, Postgres, Redis, сервис на 8080), затем
 #   scripts/keycloak/check-new-project.sh
 set -uo pipefail
@@ -101,5 +103,50 @@ check "пользователь песочницы в проекте не вхо
 check "покупателя проекта нет в песочнице" \
   "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $MASTER" "$KC/admin/realms/sandbox/users?username=$NEW&exact=true" ; curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/sandbox/users?username=$NEW&exact=true" | python3 -c 'import json,sys; print(" найден" if json.load(sys.stdin) else " нет")')" \
   "200 нет"
+
+
+echo "5. Кабинет и оформление (этап 6б) — из шаблона"
+# kc_get <путь Admin API> <python-выражение над r>
+kc_get() { curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM$1" | python3 -c "import json,sys; r=json.load(sys.stdin); print($2)"; }
+BFF_ID=$(kc_get "/clients?clientId=auth-bff" 'r[0]["id"]')
+API_ID=$(kc_get "/clients?clientId=auth-api" 'r[0]["id"]')
+SA_ID=$(kc_get "/clients/$BFF_ID/service-account-user" 'r["id"]')
+project_6b() {
+  echo "смена почты: $(kc_get /authentication/required-actions/UPDATE_EMAIL 'r["enabled"], r["config"].get("verifyEmail")')" \
+    "· возврат: $(kc_get "/clients/$BFF_ID" 'r.get("baseUrl")')" \
+    "· учётка сервиса: $(kc_get "/users/$SA_ID/role-mappings/realm" '"manage-branding" in [x["name"] for x in r]')" \
+    "· admin: $(kc_get "/clients/$API_ID/roles/admin/composites" '"branding.manage" in [x["name"] for x in r]')"
+}
+PROJECT_6B="смена почты: True true · возврат: $API/auth/account · учётка сервиса: True · admin: True"
+check "в realm: смена почты после подтверждения, «вернуться» — в кабинет, оформление — служебной учётке и admin" "$(project_6b)" "$PROJECT_6B"
+check "/auth/account — в кабинет проекта" "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$API/auth/account")" "302 $API/account/"
+check "кабинет покупателя: профиль" "$(json "$CUSTOMER" /me/profile 'r["phone"]')" "200 +$NEW"
+check "админ проекта сохранил оформление" \
+  "$(curl -s -o /dev/null -w '%{http_code}' -b "$ADMIN" -X PUT -H 'Content-Type: application/json' -d '{"name":"Демо-магазин","color":"#0A7D4F","theme":"system"}' "$API/auth/admin/branding")" 200
+check "оформление — на странице входа (плагин) и в кабинете покупателя" \
+  "$(curl -s "$KC/realms/$REALM/platform-branding" | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["name"], r["color"])') / $(json "$CUSTOMER" /me/branding 'r["name"] + " " + r["color"]')" \
+  "Демо-магазин #0a7d4f / 200 Демо-магазин #0a7d4f"
+
+echo "6. Проект, созданный до 6б: upgrade-6b.py"
+# Как в проекте из шаблона до 6б: смена почты сразу, без письма; «вернуться» — никуда; оформление менять некому.
+kc_put() { curl -s -o /dev/null -X "$1" -H "Authorization: Bearer $MASTER" -H 'Content-Type: application/json' -d "$3" "$KC/admin/realms/$REALM$2"; }
+kc_put PUT /authentication/required-actions/UPDATE_EMAIL \
+  "$(kc_get /authentication/required-actions/UPDATE_EMAIL 'json.dumps({**r, "enabled": False, "config": {}})')"
+kc_put PUT "/clients/$BFF_ID" "$(kc_get "/clients/$BFF_ID" 'json.dumps({**r, "baseUrl": ""})')"
+kc_put DELETE "/clients/$API_ID/roles/admin/composites" "[$(kc_get "/clients/$API_ID/roles/branding.manage" 'json.dumps(r)')]"
+kc_put DELETE /roles/manage-branding ""
+check "до обновления: ничего из 6б" "$(project_6b)" "смена почты: False None · возврат:  · учётка сервиса: False · admin: False"
+OLD="$WORK/old-admin"; : > "$OLD"
+login "$OLD" /admin/ "$ADMIN_PHONE" > /dev/null
+check "до обновления: оформление админу проекта не доступно" "$(curl -s -o /dev/null -w '%{http_code}' -b "$OLD" "$API/auth/admin/branding")" 403
+check "upgrade-6b.py" "$("$ROOT/scripts/project/upgrade-6b.py" "$REALM" | head -1 | cut -d: -f1)" "Этап 6б в $REALM"
+check "повторный запуск — без ошибок" "$("$ROOT/scripts/project/upgrade-6b.py" "$REALM" 2>&1 | head -1 | cut -d: -f1)" "Этап 6б в $REALM"
+check "после обновления — как из шаблона" "$(project_6b)" "$PROJECT_6B"
+UPGRADED="$WORK/upgraded-admin"; : > "$UPGRADED"
+login "$UPGRADED" /admin/ "$ADMIN_PHONE" > /dev/null
+check "админ вошёл заново — оформление доступно" "$(json "$UPGRADED" /auth/admin/branding 'r["name"]')" "200 Демо-магазин"
+# Плагин проверяет роль учётки в базе Keycloak, а не в токене: сервис сохраняет сразу, без перезапуска.
+check "и сохраняется — сервис не перезапускали" \
+  "$(curl -s -o /dev/null -w '%{http_code}' -b "$UPGRADED" -X PUT -H 'Content-Type: application/json' -d '{"name":"Демо-магазин","theme":"system"}' "$API/auth/admin/branding")" 200
 
 summary
