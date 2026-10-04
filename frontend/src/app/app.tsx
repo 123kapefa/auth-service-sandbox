@@ -1,8 +1,8 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Suspense } from "react";
 import { RouterProvider } from "react-router";
-import { Toaster } from "sonner";
 import { createQueryClient } from "@/shared/api";
+import { Toaster } from "@/shared/ui";
 import { listenAccessChanges } from "./access-changed-toast";
 import { router } from "./router";
 
@@ -12,10 +12,12 @@ listenAccessChanges(queryClient);
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">Загрузка…</p>}>
+      <Suspense
+        fallback={<p className="p-6 font-mono text-[13px] text-muted-foreground">Загрузка…</p>}
+      >
         <RouterProvider router={router} />
       </Suspense>
-      <Toaster richColors position="top-right" />
+      <Toaster />
     </QueryClientProvider>
   );
 }

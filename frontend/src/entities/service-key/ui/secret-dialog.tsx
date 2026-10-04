@@ -50,7 +50,10 @@ export function SecretDialog({
         </div>
         <div>
           <dt className="text-muted-foreground">Секрет</dt>
-          <dd className="break-all rounded-md bg-muted p-2 font-mono" data-testid="service-secret">
+          <dd
+            className="border border-dashed border-primary bg-hatch p-2 font-mono break-all"
+            data-testid="service-secret"
+          >
             {issued.clientSecret}
           </dd>
         </div>

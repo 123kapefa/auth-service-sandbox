@@ -13,7 +13,8 @@ interface Props {
   apps?: { clientId: string; name: string | null }[];
 }
 
-const selectClass = "h-9 rounded-md border border-border bg-card px-2 text-sm";
+const selectClass =
+  "h-10 border border-border bg-background px-2 text-sm focus-visible:border-primary focus-visible:shadow-hard focus-visible:outline-none";
 
 /** Действия сотрудников: кто, что, с кем, в каком режиме и что изменилось. Новые сверху. */
 export function AuditLog({ clientId, apps = [] }: Props) {
@@ -95,8 +96,8 @@ export function AuditLog({ clientId, apps = [] }: Props) {
           <EmptyState>Записей нет</EmptyState>
         ) : (
           <table className="w-full text-sm">
-            <thead className="text-left text-muted-foreground">
-              <tr className="border-b border-border">
+            <thead className="text-left font-mono text-[11px] tracking-[0.1em] text-muted-foreground uppercase">
+              <tr className="border-b-2 border-primary">
                 <th className="px-4 py-2 font-medium">Когда</th>
                 <th className="px-4 py-2 font-medium">Кто</th>
                 <th className="px-4 py-2 font-medium">Действие</th>

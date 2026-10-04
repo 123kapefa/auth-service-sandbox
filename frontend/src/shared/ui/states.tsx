@@ -8,13 +8,16 @@ export function ErrorState({ message }: { message: string }) {
   return (
     <p
       role="alert"
-      className="rounded-md border border-destructive/40 p-4 text-sm text-destructive"
+      className="flex items-center gap-3 bg-primary p-4 text-sm text-primary-foreground"
     >
+      <span className="font-mono font-bold" aria-hidden>
+        !
+      </span>
       {message}
     </p>
   );
 }
 
 export function Loading() {
-  return <p className="py-6 text-sm text-muted-foreground">Загрузка…</p>;
+  return <p className="py-6 font-mono text-[13px] text-muted-foreground">Загрузка…</p>;
 }

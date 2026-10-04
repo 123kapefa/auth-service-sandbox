@@ -19,7 +19,7 @@ export function UsersPage() {
 
   return (
     <div className="grid gap-4">
-      <h1 className="text-lg font-semibold">Пользователи</h1>
+      <h1 className="text-3xl font-bold tracking-tight">Пользователи</h1>
       <SearchBox
         value={search}
         label="Поиск пользователей"
@@ -37,8 +37,8 @@ export function UsersPage() {
           <EmptyState>Никого не нашли</EmptyState>
         ) : (
           <table className="w-full text-sm">
-            <thead className="text-left text-muted-foreground">
-              <tr className="border-b border-border">
+            <thead className="text-left font-mono text-[11px] tracking-[0.1em] text-muted-foreground uppercase">
+              <tr className="border-b-2 border-primary">
                 <th className="px-4 py-2 font-medium">Логин</th>
                 <th className="px-4 py-2 font-medium">Почта</th>
                 <th className="px-4 py-2 font-medium">Роль</th>
@@ -64,11 +64,7 @@ export function UsersPage() {
                   <td className="px-4 py-2">{user.role}</td>
                   <td className="px-4 py-2">{formatDateTime(user.createdAt)}</td>
                   <td className="px-4 py-2">
-                    {user.isRestricted ? (
-                      <Badge className="border-destructive text-destructive">заблокирован</Badge>
-                    ) : (
-                      "активен"
-                    )}
+                    {user.isRestricted ? <Badge variant="warning">заблокирован</Badge> : "активен"}
                   </td>
                 </tr>
               ))}

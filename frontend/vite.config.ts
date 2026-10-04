@@ -56,6 +56,8 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: `dist${app.base}`,
       emptyOutDir: true,
+      // Шрифты — только файлами: CSP сервиса не пускает data: (мелкие наборы символов Vite иначе встроил бы в CSS).
+      assetsInlineLimit: (file) => (/\.woff2?$/.test(file) ? false : undefined),
       rollupOptions: { input: path.resolve(import.meta.dirname, app.html) },
     },
     server: {

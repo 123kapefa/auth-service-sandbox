@@ -24,12 +24,7 @@ export function AccountActionLink({
   const returnTo = `${path}?${new URLSearchParams({ [ACTION_PARAM]: action }).toString()}`;
 
   return (
-    <Button
-      asChild
-      variant="outline"
-      size="sm"
-      className={destructive ? "text-destructive hover:text-destructive" : undefined}
-    >
+    <Button asChild variant={destructive ? "destructive" : "outline"} size="sm">
       <a href={accountActionUrl(action, returnTo, credential)}>{children}</a>
     </Button>
   );

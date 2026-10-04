@@ -17,8 +17,8 @@ export function AccountSecurityPage() {
   const hasApp = security.authenticators.length > 0;
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-lg font-semibold">Безопасность</h1>
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold tracking-tight">Безопасность</h1>
 
       <Section
         title="Пароль"
@@ -69,7 +69,7 @@ export function AccountSecurityPage() {
         }
       >
         {codes && !hasApp && (
-          <p role="alert" className="mb-2 text-sm text-destructive">
+          <p role="alert" className="mb-3 border border-dashed border-primary bg-hatch p-3 text-sm">
             Приложение не подключено, а коды остались: при входе их спрашивают вместо кода из
             приложения. Удалите коды или подключите приложение.
           </p>
@@ -120,7 +120,7 @@ function Section({
   return (
     <Card aria-label={title}>
       <div className="flex flex-wrap items-start gap-3">
-        <div>
+        <div className="min-w-0 flex-[1_1_16rem]">
           <CardTitle className="mb-1">{title}</CardTitle>
           <p className="text-sm text-muted-foreground">{hint}</p>
         </div>
