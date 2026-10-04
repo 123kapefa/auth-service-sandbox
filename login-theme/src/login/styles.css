@@ -114,6 +114,35 @@ body {
   #kc-content #kc-recovery-codes-list {
     @apply list-none pl-0;
   }
+  /*
+   * Настройка 2FA: на широком экране шаги с QR-кодом — слева, поля и «Подтвердить» — справа, чтобы страница
+   * помещалась в экран ноутбука без прокрутки. Сообщение Keycloak — над обеими колонками.
+   */
+  #kc-content #kc-totp-settings img {
+    @apply my-2 size-40;
+  }
+  /* Пустая строка Keycloak между QR-кодом и «Не удаётся выполнить сканирование?». */
+  #kc-totp-settings br {
+    @apply hidden;
+  }
+  @media (width >= 64rem) {
+    #kc-content:has(> #kc-totp-settings) {
+      @apply grid grid-cols-2 items-start gap-x-10;
+    }
+    #kc-content:has(> #kc-totp-settings) > :not(#kc-totp-settings, #kc-totp-settings-form) {
+      @apply col-span-2;
+    }
+    #kc-content > #kc-totp-settings {
+      @apply my-0 gap-2;
+    }
+    #kc-totp-settings p,
+    #kc-totp-settings ul {
+      @apply my-1;
+    }
+    #kc-content > #kc-totp-settings-form {
+      @apply sticky top-6;
+    }
+  }
   #kc-content ul:not([class]) {
     @apply my-2 list-disc pl-5;
   }
