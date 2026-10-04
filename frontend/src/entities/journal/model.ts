@@ -11,6 +11,7 @@ export const ACTION_LABELS: Record<string, string> = {
   RoleCreated: "Роль создана",
   RoleUpdated: "Роль изменена",
   RoleDeleted: "Роль удалена",
+  ProjectBrandingChanged: "Оформление проекта",
 };
 
 export const actionLabel = (action: string) => ACTION_LABELS[action] ?? action;

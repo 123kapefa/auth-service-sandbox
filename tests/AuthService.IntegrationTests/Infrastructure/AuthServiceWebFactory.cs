@@ -60,6 +60,9 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
     /// <summary>Устройства сессий в памяти вместо Postgres.</summary>
     public InMemoryLoginDevices LoginDevices { get; } = new();
 
+    /// <summary>Оформление проекта в памяти вместо плагина Keycloak.</summary>
+    public FakeProjectBranding Branding { get; } = new();
+
     /// <summary>Клиент как браузер без автоматических переходов и cookie: тест видит каждый 302 и Set-Cookie.</summary>
     public HttpClient CreateBrowserClient() =>
         CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
@@ -179,6 +182,8 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
             services.AddSingleton<IServiceKeyStore>(ServiceKeys);
             services.RemoveAll<ILoginDeviceStore>();
             services.AddSingleton<ILoginDeviceStore>(LoginDevices);
+            services.RemoveAll<IProjectBranding>();
+            services.AddSingleton<IProjectBranding>(Branding);
             // Ключи шифрования — в памяти: база в тестах недоступна.
             services.AddDataProtection().UseEphemeralDataProtectionProvider();
         });

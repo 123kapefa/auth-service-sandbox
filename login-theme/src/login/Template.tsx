@@ -3,6 +3,7 @@ import type { TemplateProps } from "keycloakify/login/TemplateProps";
 import { getKcClsx } from "keycloakify/login/lib/kcClsx";
 import { useInitialize } from "keycloakify/login/Template.useInitialize";
 import { useEffect } from "react";
+import { getBranding } from "./branding";
 import type { I18n } from "./i18n";
 import type { KcContext } from "./KcContext";
 
@@ -46,11 +47,13 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
   }
 
   const showUsername = auth !== undefined && auth.showUsername && !auth.showResetCredentials;
+  const logo = getBranding()?.logo;
   return (
     <div className={kcClsx("kcLoginClass")}>
       <div id="kc-header" className={kcClsx("kcHeaderClass")}>
         <div id="kc-header-wrapper" className={kcClsx("kcHeaderWrapperClass")}>
-          {realm.displayName || realm.name}
+          {logo && <img id="kc-logo" src={logo} alt="" className="h-9 max-w-40 object-contain" />}
+          <span>{realm.displayName || realm.name}</span>
         </div>
       </div>
       <div className={kcClsx("kcFormCardClass")}>

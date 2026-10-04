@@ -3,6 +3,7 @@ using AuthService.Core.Features.Admin.Catalog;
 using AuthService.Core.Features.Admin.UseCases.AppAccess;
 using AuthService.Core.Features.Admin.UseCases.AppUserRoles;
 using AuthService.Core.Features.Admin.UseCases.AppUsers;
+using AuthService.Core.Features.Admin.UseCases.BrandingSettings;
 using AuthService.Core.Features.Admin.UseCases.GetUser;
 using AuthService.Core.Features.Admin.UseCases.GetUsers;
 using AuthService.Core.Features.Admin.UseCases.Journal;
@@ -76,6 +77,7 @@ public static class Registration
         services.AddScoped<LoginHistoryHandler>();
         services.AddScoped<ServiceKeysHandler>();
         services.AddScoped<ServiceUsersHandler>();
+        services.AddScoped<BrandingHandler>();
 
         return services;
     }

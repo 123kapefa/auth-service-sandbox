@@ -15,7 +15,7 @@ export const classes = {
     "mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-6 px-4 py-10 lg:has-[#kc-totp-settings]:max-w-4xl lg:has-[#kc-totp-settings]:gap-4 lg:has-[#kc-totp-settings]:py-4",
   kcHeaderClass: "text-center",
   kcHeaderWrapperClass:
-    "inline-flex items-center gap-2.5 font-mono text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase before:size-3 before:bg-primary before:content-['']",
+    "inline-flex items-center gap-2.5 font-mono text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase before:size-3 before:bg-primary before:content-[''] has-[#kc-logo]:before:hidden",
   kcFormCardClass:
     "corner-mark border border-border bg-card p-6 sm:p-8 lg:has-[#kc-totp-settings]:py-6",
   kcFormHeaderClass: "mb-4 grid gap-2",

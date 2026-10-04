@@ -63,6 +63,7 @@
 
 Права учётки — минимальные: `view-users`, `manage-users`, `view-events`, `query-clients` и **точечные права
 (FGAP v2)** — `view` и `map-roles` только на клиенты приложений (`sandbox-api`, `sandbox-bff`, `account-console`).
+С 6б.4 — ещё роль realm `manage-branding`: оформление проекта через плагин `platform-branding`, без `manage-realm`.
 `view-clients` целиком не выдан: он открывает секреты всех клиентов (проверено). `check-stand.sh` проверяет: учётка
 видит только клиенты приложений, чужой клиент (`broker`) не находит, его секрет — 403, настройки realm не меняет.
 

@@ -8,7 +8,8 @@
 
 /*
  * Стиль — как у кабинета и админки (frontend/src/app/styles.css): только оттенки серого без чёрного, без скруглений,
- * жёсткие тени со сдвигом, опасное и предупреждения — пунктир и штриховка. Тёмная тема — по настройке системы.
+ * жёсткие тени со сдвигом, опасное и предупреждения — пунктир и штриховка. Цвет кнопок и отметок, логотип и тема —
+ * из оформления проекта (src/login/branding.ts), без него — серый стиль и тема по системе.
  */
 @theme {
   --font-sans: "Golos Text", system-ui, sans-serif;
@@ -29,9 +30,28 @@
   --color-shadow: #c4c4c4;
 }
 
+/*
+ * Тёмная тема — по системе или по оформлению проекта (data-theme на <html>, src/login/branding.ts): «светлая» и
+ * «тёмная» в админке закрепляют тему, «как в системе» — по настройке посетителя.
+ */
 @layer base {
+  :root[data-theme="dark"] {
+    --color-background: #1c1c1c;
+    --color-foreground: #dedede;
+    --color-card: #262626;
+    --color-muted: #303030;
+    --color-muted-foreground: #9a9a9a;
+    --color-border: #3d3d3d;
+    --color-primary: #cdcdcd;
+    --color-primary-foreground: #1c1c1c;
+    --color-destructive: #cdcdcd;
+    --color-success: #cdcdcd;
+    --color-warning: #cdcdcd;
+    --color-ring: #cdcdcd;
+    --color-shadow: #474747;
+  }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       --color-background: #1c1c1c;
       --color-foreground: #dedede;
       --color-card: #262626;
@@ -80,6 +100,12 @@
 :root {
   accent-color: var(--color-primary);
   color-scheme: light dark;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 body {

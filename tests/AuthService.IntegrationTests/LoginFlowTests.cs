@@ -188,7 +188,7 @@ public sealed class LoginFlowTests : IClassFixture<AuthServiceWebFactory>
 
         HttpResponseMessage response = await Callback(browser, loginCookie, $"code=c&state={_keycloak.LastAuthorization!.State}");
 
-        Assert.Equal("/", response.Headers.Location!.ToString());
+        Assert.Equal("/account/", response.Headers.Location!.ToString());
     }
 
     [Fact]
