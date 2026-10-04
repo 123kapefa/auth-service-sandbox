@@ -34,6 +34,10 @@
 | `GET /auth/admin/audit?objectId&actorId&action&from&to&page&pageSize` | `audit.view` | журнал действий сотрудников |
 | `GET /auth/admin/login-events?userId&page&pageSize` | `audit.view` | входы, ошибки входа, выходы (события Keycloak) |
 | `GET /auth/login?reauth=true` | — | войти заново (`prompt=login`): пароль и 2FA, если включена |
+| `GET /auth/login?app={clientId}` | — | вход в приложение: страницы входа и письма — в его оформлении (6б.5) |
+| `GET/PUT /auth/admin/branding` | `branding.manage` | оформление проекта (6б.4) |
+| `GET/PUT /auth/admin/apps/{clientId}/branding` | `branding.manage` | оформление приложения поверх проекта (6б.5) |
+| `GET /me/branding?app={clientId}` | вошёл | оформление для кабинета: проект, поверх — приложение (6б.5) |
 | `POST /auth/backchannel-logout` | подпись `logout_token` | Keycloak сообщает о сессиях, завершённых у него |
 
 Права по режимам (с этапа 4а — составные роли в Keycloak, в токене — claim `permissions`): менеджер — `users.view`, `users.block`; админ — всё, включая

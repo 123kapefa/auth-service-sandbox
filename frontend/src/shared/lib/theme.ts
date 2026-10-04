@@ -11,11 +11,30 @@ function stored(): Theme | null {
   }
 }
 
-/** Тема сейчас: выбор пользователя, иначе настройка системы. */
+/** Тема по умолчанию от проекта (оформление: «всегда светлая/тёмная»); null — как в системе. */
+let fallback: Theme | null = null;
+
+/** Тема сейчас: выбор пользователя, иначе тема проекта, иначе настройка системы. */
 export function currentTheme(): Theme {
   return (
-    stored() ?? (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+    stored() ??
+    fallback ??
+    (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light")
   );
+}
+
+/** Тема проекта — пока пользователь не выбрал свою переключателем. */
+export function setDefaultTheme(theme: Theme | null): void {
+  fallback = theme;
+  if (stored()) {
+    return;
+  }
+
+  if (theme) {
+    document.documentElement.dataset.theme = theme;
+  } else {
+    delete document.documentElement.dataset.theme;
+  }
 }
 
 /** Выбор пользователя — на <html data-theme>; без выбора тему берёт CSS из настройки системы. */

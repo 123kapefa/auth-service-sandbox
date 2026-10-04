@@ -29,7 +29,7 @@ export function FieldError({ id, message }: { id: string; message?: string }) {
     <p
       id={id}
       role="alert"
-      className="inline-flex items-center gap-2 self-start bg-primary px-2 py-1 text-[13px] text-primary-foreground"
+      className="inline-flex items-center gap-2 self-start bg-danger-muted px-2 py-1 text-[13px] text-danger"
     >
       <span className="font-mono font-bold" aria-hidden>
         !

@@ -52,6 +52,17 @@ public sealed class BrandingTests : IClassFixture<AuthServiceWebFactory>
     }
 
     [Fact]
+    public async Task Set_ColorDark_Lowercase_Audited()
+    {
+        JsonElement branding = await ResultAsync(await SendAsync(HttpMethod.Put, new { name = "Auth Sandbox", color = "#1f6feb", colorDark = "#7AA7FF", theme = "system" }));
+
+        Assert.Equal(new ProjectBranding("Auth Sandbox", null, "#1f6feb", "system", "#7aa7ff"), _factory.Branding.Current);
+        Assert.Equal("#7aa7ff", branding.GetProperty("colorDark").GetString());
+        using JsonDocument changes = JsonDocument.Parse(Assert.Single(_factory.AuditLog.Entries).Changes);
+        Assert.Equal("#7aa7ff", changes.RootElement.GetProperty("colorDark").GetProperty("new").GetString());
+    }
+
+    [Fact]
     public async Task Set_NullLogoAndColor_Removed()
     {
         _factory.Branding.Current = new ProjectBranding("Магазин", PNG, "#1f6feb", "dark");
@@ -76,6 +87,8 @@ public sealed class BrandingTests : IClassFixture<AuthServiceWebFactory>
         { "name", $$"""{ "name": "{{new string('x', 61)}}", "theme": "system" }""", "length.is.invalid" },
         { "color", """{ "name": "X", "color": "red", "theme": "system" }""", "invalid.format" },
         { "color", """{ "name": "X", "color": "#fff", "theme": "system" }""", "invalid.format" },
+        { "colorDark", """{ "name": "X", "color": "#1f6feb", "colorDark": "#fff", "theme": "system" }""", "invalid.format" },
+        { "colorDark", """{ "name": "X", "colorDark": "#7aa7ff", "theme": "system" }""", "branding.color_dark_without_color" },
         { "theme", """{ "name": "X", "theme": "blue" }""", "value.is.invalid" },
         { "theme", """{ "name": "X" }""", "value.is.invalid" },
         { "logo", """{ "name": "X", "logo": "https://evil.example/logo.png", "theme": "system" }""", "invalid.format" },

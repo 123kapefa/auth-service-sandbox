@@ -7,9 +7,10 @@ import { getBranding } from "./branding";
 import type { I18n } from "./i18n";
 import type { KcContext } from "./KcContext";
 
-// Без цвета: ошибка — залитый блок, предупреждение — пунктир и штриховка, успех — рамка, сведения — тонкая рамка.
+// Ошибка — бледно-красный блок с красной рамкой (не цвет проекта), предупреждение — пунктир и штриховка, успех — рамка, сведения —
+// тонкая рамка.
 const ALERT = {
-  error: "border-primary bg-primary text-primary-foreground",
+  error: "border-danger bg-danger-muted text-danger",
   warning: "border-dashed border-primary bg-hatch",
   success: "border-primary",
   info: "border-border",
@@ -36,10 +37,12 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
   const { kcClsx } = getKcClsx({ doUseDefaultCss, classes });
   const { msg, msgStr, currentLanguage, enabledLanguages } = i18n;
   const { realm, auth, url, message, isAppInitiatedAction } = kcContext;
+  // Название приложения (если у него своё) или проекта — из плагина; не загрузилось — displayName realm.
+  const brandName = getBranding()?.name || realm.displayName || realm.name;
 
   useEffect(() => {
-    document.title = documentTitle ?? msgStr("loginTitle", realm.displayName || realm.name);
-  }, [documentTitle, msgStr, realm.displayName, realm.name]);
+    document.title = documentTitle ?? msgStr("loginTitle", brandName);
+  }, [documentTitle, msgStr, brandName]);
 
   const { isReadyToRender } = useInitialize({ kcContext, doUseDefaultCss });
   if (!isReadyToRender) {
@@ -53,7 +56,7 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
       <div id="kc-header" className={kcClsx("kcHeaderClass")}>
         <div id="kc-header-wrapper" className={kcClsx("kcHeaderWrapperClass")}>
           {logo && <img id="kc-logo" src={logo} alt="" className="h-9 max-w-40 object-contain" />}
-          <span>{realm.displayName || realm.name}</span>
+          <span>{brandName}</span>
         </div>
       </div>
       <div className={kcClsx("kcFormCardClass")}>

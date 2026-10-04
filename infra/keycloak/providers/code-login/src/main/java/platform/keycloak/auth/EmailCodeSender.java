@@ -42,13 +42,15 @@ final class EmailCodeSender implements CodeSender {
             Locale locale = session.getContext().resolveLocale(null);
             Theme theme = session.theme().getTheme(Theme.Type.EMAIL);
             Properties messages = theme.getEnhancedMessages(realm, locale);
-            String realmName = realm.getDisplayName() == null || realm.getDisplayName().isBlank()
-                ? realm.getName()
-                : realm.getDisplayName();
+            // Оформление — как у остальных писем (BrandingEmailTemplateProvider): приложения, если вход в него.
+            Map<String, Object> branding =
+                BrandingResolver.forEmail(session, realm, BrandingResolver.app(context.getAuthenticationSession()));
+            String realmName = (String) branding.get("name");
 
             Map<String, Object> attributes = new HashMap<>();
             attributes.put("locale", locale);
             attributes.put("realmName", realmName);
+            attributes.put("branding", branding);
             attributes.put("msg", new MessageFormatterMethod(locale, messages));
             attributes.put("code", code);
             attributes.put("ttlMinutes", ttlMinutes);

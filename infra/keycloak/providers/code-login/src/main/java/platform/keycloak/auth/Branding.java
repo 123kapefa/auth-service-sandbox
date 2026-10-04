@@ -6,15 +6,22 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Оформление проекта: название (displayName realm), логотип, цвет и тема страниц входа. Логотип, цвет и тема —
+ * Оформление проекта: название (displayName realm), логотип, акцент (для светлой и тёмной темы) и тема страниц входа.
+ * Акцент красит только кнопки, активный пункт и фокус — линии и ошибки остаются своими. Логотип, цвет и тема —
  * атрибуты realm: их меняет админка проекта (через сервис входа) без пересборки темы, страница входа читает их
- * при открытии (GET /realms/{realm}/platform-branding). Здесь — только проверка значений, без Keycloak.
+ * при открытии (GET /realms/{realm}/platform-branding). Приложение может переопределить название, логотип и цвет —
+ * атрибуты его клиента (те же имена плюс platform.branding.name); тема — общая для проекта.
+ * Здесь — только значения и их проверка, без Keycloak.
  */
 public final class Branding {
 
     public static final String ATTRIBUTE_LOGO = "platform.branding.logo";
     public static final String ATTRIBUTE_COLOR = "platform.branding.color";
+    /** Акцент в тёмной теме; без него — тот же, что в светлой. Задаётся только вместе с основным. */
+    public static final String ATTRIBUTE_COLOR_DARK = "platform.branding.color-dark";
     public static final String ATTRIBUTE_THEME = "platform.branding.theme";
+    /** Название приложения на его страницах входа и в письмах (у проекта название — displayName realm). */
+    public static final String ATTRIBUTE_NAME = "platform.branding.name";
 
     /** Роль realm служебной учётки сервиса входа: менять оформление (и только его — не весь realm, manage-realm). */
     public static final String MANAGE_ROLE = "manage-branding";
@@ -23,6 +30,9 @@ public final class Branding {
     public static final Set<String> THEMES = Set.of(THEME_SYSTEM, "light", "dark");
 
     public static final int NAME_MAX_LENGTH = 60;
+
+    /** Без своего цвета — серый стиль (strong светлой темы). */
+    public static final String GRAY = "#3c3c3c";
 
     /** Логотип — до 100 КБ: он приходит на каждую страницу входа и хранится в realm. */
     public static final int LOGO_MAX_BYTES = 100 * 1024;
@@ -38,7 +48,16 @@ public final class Branding {
         public String name;
         public String logo;
         public String color;
+        public String colorDark;
         public String theme;
+    }
+
+    /** Своё у приложения: null — как у проекта. */
+    public static final class AppRepresentation {
+        public String name;
+        public String logo;
+        public String color;
+        public String colorDark;
     }
 
     /** Ошибка проверки по-русски или null — всё верно. */
@@ -52,19 +71,40 @@ public final class Branding {
         if (branding.name.trim().length() > NAME_MAX_LENGTH) {
             return "Название — не длиннее " + NAME_MAX_LENGTH + " символов.";
         }
-        if (branding.color != null && !COLOR.matcher(branding.color).matches()) {
-            return "Цвет — в виде #rrggbb (строчные).";
-        }
         if (branding.theme == null || !THEMES.contains(branding.theme)) {
             return "Тема — system, light или dark.";
         }
-        if (branding.logo != null) {
-            Matcher logo = LOGO.matcher(branding.logo);
-            if (!logo.matches()) {
+        return validateLook(branding.logo, branding.color, branding.colorDark);
+    }
+
+    /** Приложение: всё необязательно (null — как у проекта), но заданное — по тем же правилам. */
+    public static String validate(AppRepresentation branding) {
+        if (branding == null) {
+            return "Нет оформления.";
+        }
+        if (branding.name != null && (branding.name.isBlank() || branding.name.trim().length() > NAME_MAX_LENGTH)) {
+            return "Название — от 1 до " + NAME_MAX_LENGTH + " символов (или как у проекта).";
+        }
+        return validateLook(branding.logo, branding.color, branding.colorDark);
+    }
+
+    private static String validateLook(String logo, String color, String colorDark) {
+        if (color != null && !COLOR.matcher(color).matches()) {
+            return "Цвет — в виде #rrggbb (строчные).";
+        }
+        if (colorDark != null && !COLOR.matcher(colorDark).matches()) {
+            return "Цвет для тёмной темы — в виде #rrggbb (строчные).";
+        }
+        if (colorDark != null && color == null) {
+            return "Цвет для тёмной темы — только вместе с основным.";
+        }
+        if (logo != null) {
+            Matcher matcher = LOGO.matcher(logo);
+            if (!matcher.matches()) {
                 return "Логотип — PNG, JPEG, WebP или SVG (data:image/…;base64,…).";
             }
             try {
-                if (Base64.getDecoder().decode(logo.group(2)).length > LOGO_MAX_BYTES) {
+                if (Base64.getDecoder().decode(matcher.group(2)).length > LOGO_MAX_BYTES) {
                     return "Логотип — не больше 100 КБ.";
                 }
             } catch (IllegalArgumentException e) {
@@ -72,5 +112,39 @@ public final class Branding {
             }
         }
         return null;
+    }
+
+    /** Картинка логотипа: тип и байты из data URL (для писем — по ссылке); null — не картинка. */
+    public static Image decodeLogo(String logo) {
+        if (logo == null) {
+            return null;
+        }
+        Matcher matcher = LOGO.matcher(logo);
+        if (!matcher.matches()) {
+            return null;
+        }
+        try {
+            return new Image("image/" + matcher.group(1), Base64.getDecoder().decode(matcher.group(2)));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    public record Image(String contentType, byte[] bytes) {
+    }
+
+    /**
+     * Цвет текста на заливке цветом проекта: тёмный на светлом, светлый на тёмном (яркость WCAG) — как на страницах
+     * входа и в админке.
+     */
+    public static String textOn(String color) {
+        double luminance = 0.2126 * linear(color, 1) + 0.7152 * linear(color, 3) + 0.0722 * linear(color, 5);
+        // Контраст с #f7f7f7 и с #2e2e2e равен при яркости ≈ 0.22: выше — тёмный текст.
+        return luminance > 0.22 ? "#2e2e2e" : "#f7f7f7";
+    }
+
+    private static double linear(String color, int at) {
+        double channel = Integer.parseInt(color.substring(at, at + 2), 16) / 255.0;
+        return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
     }
 }

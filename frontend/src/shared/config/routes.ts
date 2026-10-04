@@ -1,3 +1,5 @@
+import { accountApp } from "@/shared/lib/account-app";
+
 /** Админка живёт на /admin сервиса входа (base в vite.config, basename роутера). */
 export const ADMIN_BASE = "/admin";
 
@@ -28,6 +30,12 @@ export function accountActionUrl(
   const params = new URLSearchParams({ return_to: returnTo, action });
   if (credential) {
     params.set("credential", credential);
+  }
+
+  // Кабинет открыт из приложения — и страница действия в его оформлении.
+  const app = accountApp();
+  if (app) {
+    params.set("app", app);
   }
 
   return `/auth/login?${params.toString()}`;

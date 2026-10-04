@@ -11,8 +11,8 @@ using SharedKernel;
 namespace AuthService.Infrastructure.Keycloak;
 
 /// <summary>
-/// Оформление проекта через плагин Keycloak platform-branding ({realm}/platform-branding): читать — без токена (его же
-/// читает страница входа), сохранять — токеном служебной учётки с ролью realm manage-branding. Право manage-realm
+/// Оформление проекта и приложений через плагин Keycloak platform-branding ({realm}/platform-branding, …/apps/{clientId}):
+/// читать — без токена (его же читает страница входа), сохранять — токеном служебной учётки с ролью realm manage-branding. Право manage-realm
 /// (менять весь realm) сервису входа для этого не нужно.
 /// </summary>
 internal sealed partial class KeycloakBranding(
@@ -21,8 +21,41 @@ internal sealed partial class KeycloakBranding(
     ILogger<KeycloakBranding> logger) : IProjectBranding
 {
     private const string PATH = "platform-branding";
+    private const string APP_NOT_FOUND = "app_not_found";
 
-    public async Task<Result<ProjectBranding, Error>> GetAsync(CancellationToken cancellationToken)
+    public Task<Result<ProjectBranding, Error>> GetAsync(CancellationToken cancellationToken) =>
+        GetEffectiveAsync(app: null, cancellationToken);
+
+    public async Task<Result<ProjectBranding, Error>> GetEffectiveAsync(string? app, CancellationToken cancellationToken)
+    {
+        string path = string.IsNullOrEmpty(app) ? PATH : $"{PATH}?app={Uri.EscapeDataString(app)}";
+        Result<BrandingRepresentation, Error> body = await GetJsonAsync<BrandingRepresentation>(path, cancellationToken);
+        return body.Map(branding =>
+            new ProjectBranding(branding.Name ?? string.Empty, branding.Logo, branding.Color, branding.Theme ?? BrandingRules.THEME_SYSTEM, branding.ColorDark));
+    }
+
+    public async Task<Result<AppBranding, Error>> GetAppAsync(string clientId, CancellationToken cancellationToken)
+    {
+        Result<AppBrandingRepresentation, Error> body = await GetJsonAsync<AppBrandingRepresentation>(AppPath(clientId), cancellationToken);
+        return body.Map(branding => new AppBranding(branding.Name, branding.Logo, branding.Color, branding.ColorDark));
+    }
+
+    public Task<UnitResult<Error>> SetAppAsync(string clientId, AppBranding branding, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(branding);
+        return PutAsync(AppPath(clientId), new AppBrandingRepresentation(branding.Name, branding.Logo, branding.Color, branding.ColorDark), cancellationToken);
+    }
+
+    public Task<UnitResult<Error>> SetAsync(ProjectBranding branding, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(branding);
+        return PutAsync(PATH, new BrandingRepresentation(branding.Name, branding.Logo, branding.Color, branding.Theme, branding.ColorDark), cancellationToken);
+    }
+
+    private static string AppPath(string clientId) => $"{PATH}/apps/{Uri.EscapeDataString(clientId)}";
+
+    private async Task<Result<T, Error>> GetJsonAsync<T>(string path, CancellationToken cancellationToken)
+        where T : class
     {
         Result<Uri, Error> realm = await serviceAccount.GetRealmBaseAsync(cancellationToken);
         if (realm.IsFailure)
@@ -30,7 +63,7 @@ internal sealed partial class KeycloakBranding(
             return realm.Error;
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(realm.Value, PATH));
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(realm.Value, path));
         Result<HttpResponseMessage, Error> response = await SendAsync(request, cancellationToken);
         if (response.IsFailure)
         {
@@ -45,10 +78,8 @@ internal sealed partial class KeycloakBranding(
 
         try
         {
-            BrandingRepresentation? body = await message.Content.ReadFromJsonAsync<BrandingRepresentation>(cancellationToken);
-            return body is null
-                ? IdentityProviderErrors.Unavailable()
-                : new ProjectBranding(body.Name ?? string.Empty, body.Logo, body.Color, body.Theme ?? BrandingRules.THEME_SYSTEM);
+            T? body = await message.Content.ReadFromJsonAsync<T>(cancellationToken);
+            return body is null ? IdentityProviderErrors.Unavailable() : body;
         }
         catch (JsonException exception)
         {
@@ -57,9 +88,8 @@ internal sealed partial class KeycloakBranding(
         }
     }
 
-    public async Task<UnitResult<Error>> SetAsync(ProjectBranding branding, CancellationToken cancellationToken)
+    private async Task<UnitResult<Error>> PutAsync<T>(string path, T body, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(branding);
         Result<Uri, Error> realm = await serviceAccount.GetRealmBaseAsync(cancellationToken);
         if (realm.IsFailure)
         {
@@ -72,9 +102,9 @@ internal sealed partial class KeycloakBranding(
             return token.Error;
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Put, new Uri(realm.Value, PATH))
+        using var request = new HttpRequestMessage(HttpMethod.Put, new Uri(realm.Value, path))
         {
-            Content = JsonContent.Create(new BrandingRepresentation(branding.Name, branding.Logo, branding.Color, branding.Theme)),
+            Content = JsonContent.Create(body),
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
         Result<HttpResponseMessage, Error> response = await SendAsync(request, cancellationToken);
@@ -108,6 +138,12 @@ internal sealed partial class KeycloakBranding(
                 LogNotPermitted(logger);
                 return BrandingErrors.NotPermitted();
             case HttpStatusCode.NotFound:
+                // У приложения — 404 с error=app_not_found; без тела — в Keycloak нет плагина.
+                if (string.Equals(await ReadErrorAsync(message, cancellationToken), APP_NOT_FOUND, StringComparison.Ordinal))
+                {
+                    return IdentityProviderErrors.AppNotFound();
+                }
+
                 LogNotInstalled(logger);
                 return BrandingErrors.NotInstalled();
             case HttpStatusCode.BadRequest:
@@ -125,7 +161,7 @@ internal sealed partial class KeycloakBranding(
             PluginError? error = await message.Content.ReadFromJsonAsync<PluginError>(cancellationToken);
             return string.IsNullOrWhiteSpace(error?.Error) ? null : error.Error;
         }
-        catch (JsonException)
+        catch (Exception exception) when (exception is JsonException or NotSupportedException)
         {
             return null;
         }
@@ -151,7 +187,14 @@ internal sealed partial class KeycloakBranding(
         [property: JsonPropertyName("name")] string? Name,
         [property: JsonPropertyName("logo")] string? Logo,
         [property: JsonPropertyName("color")] string? Color,
-        [property: JsonPropertyName("theme")] string? Theme);
+        [property: JsonPropertyName("theme")] string? Theme,
+        [property: JsonPropertyName("colorDark")] string? ColorDark);
+
+    private sealed record AppBrandingRepresentation(
+        [property: JsonPropertyName("name")] string? Name,
+        [property: JsonPropertyName("logo")] string? Logo,
+        [property: JsonPropertyName("color")] string? Color,
+        [property: JsonPropertyName("colorDark")] string? ColorDark);
 
     private sealed record PluginError([property: JsonPropertyName("error")] string? Error);
 }

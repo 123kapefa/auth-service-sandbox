@@ -75,8 +75,18 @@ check "в журнале — изменение оформления, без к�
 import json,sys; i=json.load(sys.stdin)["result"]["items"][0]; c=json.loads(i["changes"]) if isinstance(i["changes"], str) else i["changes"]
 print(i["action"], c["logo"]["new"], "base64" in json.dumps(c))')" "ProjectBrandingChanged True False"
 
+echo "3а. Акцент для тёмной темы — свой или тот же"
+check "сохранён (строчными), плагин отдаёт оба" \
+  "$(api "$ADMIN" PUT /auth/admin/branding "{\"name\":\"Магазин «Ромашка»\",\"logo\":\"$PNG\",\"color\":\"#1f6feb\",\"colorDark\":\"#7AA7FF\",\"theme\":\"dark\"}" | cut -d' ' -f1) $(plugin 'r["color"], r["colorDark"]')" \
+  "200 #1f6feb #7aa7ff"
+check "без своего тёмного — в ответе плагина его нет (тот же, что основной)" \
+  "$(api "$ADMIN" PUT /auth/admin/branding "{\"name\":\"Магазин «Ромашка»\",\"logo\":\"$PNG\",\"color\":\"#1f6feb\",\"theme\":\"dark\"}" | cut -d' ' -f1) $(plugin '"colorDark" in r')" \
+  "200 False"
+
 echo "4. Неверное — не сохраняется"
 check "цвет не #rrggbb" "$(api "$ADMIN" PUT /auth/admin/branding '{"name":"X","color":"red","theme":"dark"}')" "400 invalid.format"
+check "тёмный без основного" "$(api "$ADMIN" PUT /auth/admin/branding '{"name":"X","colorDark":"#7aa7ff","theme":"dark"}')" "400 branding.color_dark_without_color"
+check "тёмный не #rrggbb" "$(api "$ADMIN" PUT /auth/admin/branding '{"name":"X","color":"#1f6feb","colorDark":"blue","theme":"dark"}')" "400 invalid.format"
 check "логотип — не картинка" "$(api "$ADMIN" PUT /auth/admin/branding '{"name":"X","logo":"data:text/html;base64,PGI+","theme":"dark"}')" "400 invalid.format"
 printf '{"name":"X","logo":"data:image/png;base64,%s","theme":"dark"}' "$(head -c 102401 /dev/zero | base64 -w0)" > "$WORK/big.json"
 check "логотип больше 100 КБ" "$(api "$ADMIN" PUT /auth/admin/branding "@$WORK/big.json")" "400 branding.logo_too_large"
@@ -85,6 +95,6 @@ check "оформление не изменилось" "$(plugin 'r["name"]')" "
 
 echo "5. Убрать логотип и цвет"
 check "null — убрать" "$(api "$ADMIN" PUT /auth/admin/branding '{"name":"Магазин «Ромашка»","logo":null,"color":null,"theme":"system"}' | cut -d' ' -f1)" 200
-check "плагин: без логотипа и цвета, тема по системе" "$(plugin '"logo" in r, "color" in r, r["theme"]')" "False False system"
+check "плагин: без логотипа и цвета, тема по системе" "$(plugin '"logo" in r, "color" in r, "colorDark" in r, r["theme"]')" "False False False system"
 
 summary

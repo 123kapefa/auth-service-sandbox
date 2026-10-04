@@ -11,9 +11,13 @@ if (import.meta.env.DEV && window.kcContext === undefined) {
   window.kcContext = getKcContextMock({ pageId: pageId as "login.ftl", overrides: {} });
 }
 
-// Оформление проекта — до первого показа, чтобы страница не мигнула серой (не дождались — серая).
+// Оформление проекта (и приложения) — до первого показа, чтобы страница не мигнула серой (не дождались — серая).
 if (window.kcContext) {
-  const branding = await loadBranding(window.kcContext.realm.name);
+  const { realm, client, url } = window.kcContext;
+  const branding = await loadBranding(realm.name, {
+    clientId: client?.clientId,
+    loginAction: url?.loginAction,
+  });
   if (branding) {
     applyBranding(branding);
   }

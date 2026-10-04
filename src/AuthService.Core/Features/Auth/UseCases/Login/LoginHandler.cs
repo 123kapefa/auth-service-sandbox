@@ -17,6 +17,7 @@ public sealed class LoginHandler(IIdentityProvider identityProvider, ReturnUrlVa
         bool reauthenticate,
         string? action,
         string? credential,
+        string? app,
         Uri callbackUrl,
         CancellationToken cancellationToken)
     {
@@ -42,7 +43,7 @@ public sealed class LoginHandler(IIdentityProvider identityProvider, ReturnUrlVa
         }
 
         Result<AuthorizationRequest, Error> request =
-            await identityProvider.CreateAuthorizationRequestAsync(callbackUrl, reauthenticate, accountAction, cancellationToken);
+            await identityProvider.CreateAuthorizationRequestAsync(callbackUrl, reauthenticate, accountAction, BrandingApps.Normalize(app), cancellationToken);
         if (request.IsFailure)
         {
             return request.Error;

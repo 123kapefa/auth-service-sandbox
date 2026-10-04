@@ -55,6 +55,8 @@ check "повторный запуск: атрибуты админа сохра
 "${COMPOSE[@]}" exec -T postgres sh -c 'psql -q -U "$POSTGRES_USER" -d auth_demo_shop -c "DELETE FROM auth.service_keys"' > /dev/null 2>&1
 REGISTRATION=$(REALM=$REALM "$ROOT/scripts/keycloak/registration-token.sh")
 DEMO_SHOP_REGISTRATION_TOKEN=$REGISTRATION "${COMPOSE[@]}" up -d --force-recreate --wait auth-service-demo-shop > /dev/null 2>&1
+# --wait дожидается только запуска контейнера (без healthcheck): сервис ещё стартует — ждём готовности до 60 секунд.
+for _ in $(seq 30); do [ "$(curl -s -o /dev/null -w '%{http_code}' "$API/health/ready")" = 200 ] && break; sleep 2; done
 check "экземпляр сервиса проекта отвечает" "$(curl -s -o /dev/null -w '%{http_code}' "$API/health/ready")" 200
 
 echo "1. Вход в проект"

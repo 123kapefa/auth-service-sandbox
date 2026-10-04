@@ -8,7 +8,7 @@ using Validation;
 namespace AuthService.Core.Features.Admin.UseCases.BrandingSettings;
 
 /// <summary>
-/// Название — до 60 символов; цвет — #rrggbb; тема — system, light или dark; логотип — data URL PNG, JPEG, WebP или SVG
+/// Название — до 60 символов; акцент — #rrggbb (для тёмной темы — свой или тот же, только вместе с основным); тема — system, light или dark; логотип — data URL PNG, JPEG, WebP или SVG
 /// до 100 КБ. Те же правила проверяет плагин Keycloak.
 /// </summary>
 public sealed partial class SetBrandingRequestValidator : AbstractValidator<SetBrandingRequest>
@@ -22,21 +22,35 @@ public sealed partial class SetBrandingRequestValidator : AbstractValidator<SetB
             .Must(name => name is null || name.Trim().Length <= BrandingRules.NAME_MAX_LENGTH)
             .WithError(GeneralErrors.LengthIsInvalid("name", max: BrandingRules.NAME_MAX_LENGTH));
         RuleFor(request => request.Color)
-            .Must(color => color is null || ColorPattern().IsMatch(color))
+            .Must(color => color is null || IsColor(color))
             .WithError(GeneralErrors.InvalidFormat("color"));
+        RuleFor(request => request.ColorDark)
+            .Must(color => color is null || IsColor(color))
+            .WithError(GeneralErrors.InvalidFormat("colorDark"));
+        RuleFor(request => request.ColorDark)
+            .Must((request, color) => color is null || request.Color is not null)
+            .WithError(ColorDarkWithoutColor);
         RuleFor(request => request.Theme)
             .Must(theme => theme is not null && BrandingRules.Themes.Contains(theme, StringComparer.Ordinal))
             .WithError(GeneralErrors.ValueIsInvalid("theme"));
         RuleFor(request => request.Logo)
-            .Must(logo => logo is null || LogoPattern().IsMatch(logo))
+            .Must(logo => logo is null || IsLogo(logo))
             .WithError(GeneralErrors.InvalidFormat("logo"));
         RuleFor(request => request.Logo)
-            .Must(logo => logo is null || !LogoPattern().IsMatch(logo) || LogoSize(logo) <= BrandingRules.LOGO_MAX_BYTES)
+            .Must(logo => logo is null || !IsLogo(logo) || LogoSize(logo) <= BrandingRules.LOGO_MAX_BYTES)
             .WithError(Error.Validation("branding.logo_too_large", "Логотип — не больше 100 КБ.", "logo"));
     }
 
+    /// <summary>Акцент тёмной темы без основного — не задать: без основного страницы в сером стиле в обеих темах.</summary>
+    internal static Error ColorDarkWithoutColor { get; } =
+        Error.Validation("branding.color_dark_without_color", "Цвет для тёмной темы — только вместе с основным.", "colorDark");
+
+    internal static bool IsColor(string color) => ColorPattern().IsMatch(color);
+
+    internal static bool IsLogo(string logo) => LogoPattern().IsMatch(logo);
+
     // Размер картинки по длине base64 (без декодирования): 4 символа — 3 байта, минус «=» в конце.
-    private static long LogoSize(string logo)
+    internal static long LogoSize(string logo)
     {
         string data = LogoPattern().Match(logo).Groups["data"].Value;
         return (data.Length / 4 * 3L) - data.Count(symbol => symbol == '=');

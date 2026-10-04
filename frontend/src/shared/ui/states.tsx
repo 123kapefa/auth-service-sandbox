@@ -6,10 +6,7 @@ export function EmptyState({ children }: { children: ReactNode }) {
 
 export function ErrorState({ message }: { message: string }) {
   return (
-    <p
-      role="alert"
-      className="flex items-center gap-3 bg-primary p-4 text-sm text-primary-foreground"
-    >
+    <p role="alert" className="flex items-center gap-3 bg-danger-muted p-4 text-sm text-danger">
       <span className="font-mono font-bold" aria-hidden>
         !
       </span>
