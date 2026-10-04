@@ -12,8 +12,9 @@ using SharedKernel;
 namespace AuthService.Core.Features.Admin.UseCases.BrandingSettings;
 
 /// <summary>
-/// Оформление проекта — право branding.manage (админ проекта): GET /auth/admin/branding — какое сейчас,
-/// PUT /auth/admin/branding — сохранить (название, логотип, цвет, тема страниц входа).
+/// Оформление — право branding.manage (админ проекта): GET/PUT /auth/admin/branding — проекта (название, логотип, цвет,
+/// тема страниц входа); GET/PUT /auth/admin/apps/{clientId}/branding — приложения поверх проекта (название, логотип,
+/// цвет; null — как у проекта).
 /// </summary>
 public sealed class BrandingEndpoints : IEndpoint
 {
@@ -24,6 +25,26 @@ public sealed class BrandingEndpoints : IEndpoint
             .RequirePermissions(AuthServicePermissions.Branding.MANAGE);
         branding.MapGet(string.Empty, GetAsync);
         branding.MapPut(string.Empty, SetAsync);
+
+        RouteGroupBuilder appBranding = app.MapGroup("/auth/admin/apps/{clientId}/branding")
+            .RequireUser()
+            .RequirePermissions(AuthServicePermissions.Branding.MANAGE);
+        appBranding.MapGet(string.Empty, GetAppAsync);
+        appBranding.MapPut(string.Empty, SetAppAsync);
+    }
+
+    private static async Task<EndpointResult<AppBrandingResponse>> GetAppAsync(
+        string clientId, [FromServices] AppBrandingHandler handler, CancellationToken cancellationToken)
+    {
+        Result<AppBrandingResponse, Error> result = await handler.GetAsync(clientId, cancellationToken);
+        return result;
+    }
+
+    private static async Task<EndpointResult<AppBrandingResponse>> SetAppAsync(
+        string clientId, [FromBody] SetAppBrandingRequest request, [FromServices] AppBrandingHandler handler, CancellationToken cancellationToken)
+    {
+        Result<AppBrandingResponse, Error> result = await handler.SetAsync(clientId, request, cancellationToken);
+        return result;
     }
 
     private static async Task<EndpointResult<BrandingResponse>> GetAsync(

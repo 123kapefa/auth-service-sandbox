@@ -1,7 +1,8 @@
 /**
- * Оформление проекта на страницах входа: логотип, цвет и тема — из плагина Keycloak platform-branding
- * (GET /realms/{realm}/platform-branding, атрибуты realm), название — displayName realm (уже в kcContext). Меняется в
- * админке проекта без пересборки темы: страница читает его при открытии.
+ * Оформление на страницах входа: название, логотип, цвет и тема — из плагина Keycloak platform-branding
+ * (GET /realms/{realm}/platform-branding): проекта (атрибуты realm) и поверх него — приложения, в которое входят
+ * (название, логотип, цвет). Приложение плагин узнаёт по клиенту входа и сессии входа этой вкладки (client_id, tab_id
+ * и cookie сессии входа). Меняется в админке без пересборки темы: страница читает его при открытии.
  */
 export interface Branding {
   name: string;
@@ -18,20 +19,44 @@ let current: Branding | null = null;
 /** Оформление, загруженное перед первым показом страницы (null — не загрузилось или макет без Keycloak). */
 export const getBranding = () => current;
 
-/** Адрес плагина — рядом со страницей входа: Keycloak показывает её по адресу …/realms/{realm}/…. */
-export function brandingUrl(pathname: string, realm: string): string {
-  const base =
-    /^(.*?\/realms\/[^/]+\/)/.exec(pathname)?.[1] ?? `/realms/${encodeURIComponent(realm)}/`;
-  return `${base}platform-branding`;
+/** Чья страница входа: клиент входа и вкладка (tab_id — из адреса формы, kcContext.url.loginAction). */
+export interface BrandingTarget {
+  clientId?: string;
+  loginAction?: string;
 }
 
-export async function loadBranding(realm: string): Promise<Branding | null> {
+/**
+ * Адрес плагина — рядом со страницей входа: Keycloak показывает её по адресу …/realms/{realm}/…; client_id и tab_id —
+ * чтобы плагин нашёл приложение, в которое входят.
+ */
+export function brandingUrl(pathname: string, realm: string, target: BrandingTarget = {}): string {
+  const base =
+    /^(.*?\/realms\/[^/]+\/)/.exec(pathname)?.[1] ?? `/realms/${encodeURIComponent(realm)}/`;
+  const query = new URLSearchParams();
+  if (target.clientId) {
+    query.set("client_id", target.clientId);
+  }
+
+  const tabId = target.loginAction && /[?&]tab_id=([^&#]+)/.exec(target.loginAction)?.[1];
+  if (tabId) {
+    query.set("tab_id", decodeURIComponent(tabId));
+  }
+
+  const search = query.toString();
+  return `${base}platform-branding${search ? `?${search}` : ""}`;
+}
+
+export async function loadBranding(
+  realm: string,
+  target: BrandingTarget = {},
+): Promise<Branding | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch(brandingUrl(window.location.pathname, realm), {
+    // same-origin: cookie сессии входа — по ней плагин узнаёт приложение, если вход через сервис входа (?app=…).
+    const response = await fetch(brandingUrl(window.location.pathname, realm, target), {
       signal: controller.signal,
-      credentials: "omit",
+      credentials: "same-origin",
     });
     if (!response.ok) {
       return null;

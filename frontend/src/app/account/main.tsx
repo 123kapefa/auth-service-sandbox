@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AccountApp } from "./app";
+import { rememberAccountApp } from "@/shared/lib/account-app";
 import { applyStoredTheme } from "@/shared/lib/theme";
 import "sonner/dist/styles.css";
 import "../styles.css";
@@ -11,6 +12,7 @@ if (!root) {
 }
 
 applyStoredTheme();
+rememberAccountApp();
 createRoot(root).render(
   <StrictMode>
     <AccountApp />

@@ -3,11 +3,10 @@ import { type ChangeEvent, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import {
   type Branding,
-  BRANDING_LOGO_MAX_BYTES,
   BRANDING_LOGO_TYPES,
   BRANDING_THEMES,
   LoginPreview,
-  readAsDataUrl,
+  readLogo,
 } from "@/entities/branding";
 import { Button, FieldError, Input, Label } from "@/shared/ui";
 import { type BrandingForm as Form, brandingSchema, fromForm, toForm } from "../model/schemas";
@@ -41,18 +40,14 @@ export function BrandingEditor({ branding }: { branding: Branding }) {
       return;
     }
 
-    if (!BRANDING_LOGO_TYPES.includes(file.type)) {
-      setLogoError("Нужна картинка PNG, JPEG, WebP или SVG");
-      return;
-    }
-
-    if (file.size > BRANDING_LOGO_MAX_BYTES) {
-      setLogoError("Логотип — не больше 100 КБ");
+    const read = await readLogo(file);
+    if ("error" in read) {
+      setLogoError(read.error);
       return;
     }
 
     setLogoError(undefined);
-    form.setValue("logo", await readAsDataUrl(file), { shouldDirty: true });
+    form.setValue("logo", read.logo, { shouldDirty: true });
   };
 
   const submit = form.handleSubmit((form) =>

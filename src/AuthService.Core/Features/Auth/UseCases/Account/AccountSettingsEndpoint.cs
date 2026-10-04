@@ -1,7 +1,10 @@
+using AuthService.Core.Abstractions;
 using Framework.Endpoints;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace AuthService.Core.Features.Auth.UseCases.Account;
 
@@ -10,6 +13,7 @@ namespace AuthService.Core.Features.Auth.UseCases.Account;
 /// GET /auth/account — личный кабинет сервиса входа (/account/): профиль, пароль и почта;
 /// GET /auth/account/security — его раздел «Безопасность»: 2FA, коды восстановления, ключи доступа;
 /// GET /auth/account/devices — раздел «Устройства»: где вошли, выйти на устройстве или везде, история входов.
+/// ?app=clientId — кабинет открыт из приложения: он в оформлении приложения (название, логотип, цвет).
 /// </summary>
 public sealed class AccountSettingsEndpoint : IEndpoint
 {
@@ -19,8 +23,13 @@ public sealed class AccountSettingsEndpoint : IEndpoint
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapGet("/auth/account", () => Results.Redirect(ACCOUNT_PATH));
-        app.MapGet("/auth/account/security", () => Results.Redirect(SECURITY_PATH));
-        app.MapGet("/auth/account/devices", () => Results.Redirect(DEVICES_PATH));
+        app.MapGet("/auth/account", ([FromQuery(Name = "app")] string? from) => Redirect(ACCOUNT_PATH, from));
+        app.MapGet("/auth/account/security", ([FromQuery(Name = "app")] string? from) => Redirect(SECURITY_PATH, from));
+        app.MapGet("/auth/account/devices", ([FromQuery(Name = "app")] string? from) => Redirect(DEVICES_PATH, from));
     }
+
+    private static IResult Redirect(string path, string? app) =>
+        BrandingApps.Normalize(app) is { } valid
+            ? Results.Redirect(QueryHelpers.AddQueryString(path, "app", valid))
+            : Results.Redirect(path);
 }

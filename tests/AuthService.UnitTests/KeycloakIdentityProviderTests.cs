@@ -29,7 +29,7 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
     [Fact]
     public async Task AuthorizationRequest_PointsBrowserToExternalLoginPageWithPkce()
     {
-        AuthorizationRequest request = (await CreateProvider().CreateAuthorizationRequestAsync(_callback, forceLogin: false, action: null, default)).Value;
+        AuthorizationRequest request = (await CreateProvider().CreateAuthorizationRequestAsync(_callback, forceLogin: false, action: null, app: null, default)).Value;
 
         Assert.StartsWith($"{EXTERNAL}/auth?", request.Url.ToString(), StringComparison.Ordinal);
         Dictionary<string, StringValues> query = QueryHelpers.ParseQuery(request.Url.Query);
@@ -48,7 +48,7 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
     [Fact]
     public async Task ForceLogin_AsksKeycloakToLoginAgain()
     {
-        AuthorizationRequest request = (await CreateProvider().CreateAuthorizationRequestAsync(_callback, forceLogin: true, action: null, default)).Value;
+        AuthorizationRequest request = (await CreateProvider().CreateAuthorizationRequestAsync(_callback, forceLogin: true, action: null, app: null, default)).Value;
 
         Assert.Equal("login", QueryHelpers.ParseQuery(request.Url.Query)["prompt"]);
     }
@@ -63,7 +63,7 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
     public async Task AccountAction_AsksKeycloakForRequiredAction(AccountAction action, string? credential, string kcAction)
     {
         AuthorizationRequest request = (await CreateProvider()
-            .CreateAuthorizationRequestAsync(_callback, forceLogin: false, new AccountActionRequest(action, credential), default)).Value;
+            .CreateAuthorizationRequestAsync(_callback, forceLogin: false, new AccountActionRequest(action, credential), app: null, default)).Value;
 
         Dictionary<string, StringValues> query = QueryHelpers.ParseQuery(request.Url.Query);
         Assert.Equal(kcAction, query["kc_action"]);
@@ -75,8 +75,8 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
     {
         IIdentityProvider provider = CreateProvider();
 
-        AuthorizationRequest first = (await provider.CreateAuthorizationRequestAsync(_callback, forceLogin: false, action: null, default)).Value;
-        AuthorizationRequest second = (await provider.CreateAuthorizationRequestAsync(_callback, forceLogin: false, action: null, default)).Value;
+        AuthorizationRequest first = (await provider.CreateAuthorizationRequestAsync(_callback, forceLogin: false, action: null, app: null, default)).Value;
+        AuthorizationRequest second = (await provider.CreateAuthorizationRequestAsync(_callback, forceLogin: false, action: null, app: null, default)).Value;
 
         Assert.NotEqual(first.State, second.State);
         Assert.NotEqual(first.CodeVerifier, second.CodeVerifier);

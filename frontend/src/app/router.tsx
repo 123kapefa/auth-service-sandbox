@@ -1,4 +1,5 @@
 import { createBrowserRouter } from "react-router";
+import { AppBrandingPage } from "@/pages/app-branding";
 import { AppJournalPage } from "@/pages/app-journal";
 import { AppRolesPage } from "@/pages/app-roles";
 import { AppUserPage } from "@/pages/app-user";
@@ -34,6 +35,7 @@ export const router = createBrowserRouter(
             { path: "users/:userId", element: <AppUserPage /> },
             { path: "roles", element: <AppRolesPage /> },
             { path: "journal", element: <AppJournalPage /> },
+            { path: "branding", element: <AppBrandingPage /> },
           ],
         },
         { path: "*", element: <NotFoundPage /> },

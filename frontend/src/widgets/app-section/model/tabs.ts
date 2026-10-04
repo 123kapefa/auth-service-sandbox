@@ -20,5 +20,10 @@ export function appTabs(app: ManagedApp): AppTab[] {
     tabs.push({ to: "journal", label: "Журнал" });
   }
 
+  // Оформление приложения — только у админа проекта (право проекта branding.manage приходит в права приложения).
+  if (app.permissions.includes(Permissions.brandingManage)) {
+    tabs.push({ to: "branding", label: "Оформление" });
+  }
+
   return tabs;
 }

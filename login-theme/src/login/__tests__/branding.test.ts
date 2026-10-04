@@ -14,6 +14,19 @@ describe("оформление проекта на страницах входа
     expect(brandingUrl("/", "shop")).toBe("/realms/shop/platform-branding");
   });
 
+  it("плагину — клиент входа и вкладка: по ним он находит приложение", () => {
+    expect(
+      brandingUrl("/realms/shop/login-actions/authenticate", "shop", {
+        clientId: "orders-web",
+        loginAction:
+          "/realms/shop/login-actions/authenticate?session_code=x&execution=y&client_id=orders-web&tab_id=Ab_c-1",
+      }),
+    ).toBe("/realms/shop/platform-branding?client_id=orders-web&tab_id=Ab_c-1");
+    expect(brandingUrl("/realms/shop/x", "shop", { clientId: "auth-bff" })).toBe(
+      "/realms/shop/platform-branding?client_id=auth-bff",
+    );
+  });
+
   it("тема закрепляется на <html>, цвет — в токены primary и ring, текст на цвете — по яркости", () => {
     const root = document.createElement("html");
 

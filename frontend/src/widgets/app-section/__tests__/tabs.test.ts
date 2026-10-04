@@ -17,5 +17,9 @@ describe("appTabs", () => {
     expect(appTabs(app(["roles.manage"])).map((tab) => tab.to)).toEqual(["roles"]);
     expect(appTabs(app(["audit.view"])).map((tab) => tab.to)).toEqual(["journal"]);
     expect(appTabs(app(["users.block"]))).toEqual([]);
+    expect(appTabs(app(["audit.view", "branding.manage"])).map((tab) => tab.to)).toEqual([
+      "journal",
+      "branding",
+    ]);
   });
 });

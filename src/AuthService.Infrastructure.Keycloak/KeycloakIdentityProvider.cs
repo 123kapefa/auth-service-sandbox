@@ -34,6 +34,7 @@ internal sealed partial class KeycloakIdentityProvider(
         Uri redirectUri,
         bool forceLogin,
         AccountActionRequest? action,
+        string? app,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(redirectUri);
@@ -77,6 +78,13 @@ internal sealed partial class KeycloakIdentityProvider(
                 AccountAction.DeleteCredential => $"delete_credential:{requested.CredentialId}",
                 _ => throw new ArgumentOutOfRangeException(nameof(action), requested.Action, "Unknown account action"),
             };
+        }
+
+        if (!string.IsNullOrEmpty(app))
+        {
+            // Свой параметр запроса входа: Keycloak хранит его в сессии входа, плагин оформления берёт по нему
+            // название, логотип и цвет приложения (страницы входа и письма).
+            parameters["platform_app"] = app;
         }
 
         string url = QueryHelpers.AddQueryString(configuration.Value.AuthorizationEndpoint, parameters);

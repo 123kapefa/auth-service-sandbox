@@ -19,10 +19,16 @@ export function SidebarLayout({ sidebar, children }: { sidebar: ReactNode; child
 
 export function Sidebar({
   title,
+  subtitle,
+  logo,
   footer,
   children,
 }: {
   title: string;
+  /** Подпись под названием (в кабинете — «Личный кабинет» под названием проекта). */
+  subtitle?: string;
+  /** Логотип проекта вместо квадрата цветом. */
+  logo?: string | null;
   footer: ReactNode;
   children: ReactNode;
 }) {
@@ -31,9 +37,20 @@ export function Sidebar({
       aria-label="Меню"
       className="flex flex-col gap-6 border-b-2 border-primary bg-card px-3 py-5 md:w-64 md:shrink-0 md:overflow-y-auto md:overscroll-none md:border-r-2 md:border-b-0"
     >
-      <div className="flex items-center gap-2.5 px-3 text-[17px] font-bold tracking-tight">
-        <span className="size-3.5 shrink-0 bg-primary" aria-hidden />
-        {title}
+      <div className="flex items-center gap-2.5 px-3">
+        {logo ? (
+          <img src={logo} alt="" className="h-7 max-w-20 shrink-0 object-contain" />
+        ) : (
+          <span className="size-3.5 shrink-0 bg-primary" aria-hidden />
+        )}
+        <div className="grid min-w-0">
+          <span className="truncate text-[17px] font-bold tracking-tight">{title}</span>
+          {subtitle && (
+            <span className="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+              {subtitle}
+            </span>
+          )}
+        </div>
       </div>
       <nav aria-label="Разделы" className="flex flex-col gap-5">
         {children}

@@ -48,6 +48,51 @@ public sealed class KeycloakBrandingTests : IDisposable
         Assert.Equal("light", body.RootElement.GetProperty("theme").GetString());
     }
 
+    [Fact]
+    public async Task GetApp_OwnValues_NullAsProject()
+    {
+        _keycloak.Body = """{ "name": "Менеджер 1С", "logo": null, "color": "#aa3300" }""";
+
+        AppBranding branding = (await CreateBranding().GetAppAsync("manager-1c", default)).Value;
+
+        Assert.Equal(new AppBranding("Менеджер 1С", null, "#aa3300"), branding);
+        Assert.Equal(("GET", $"{BRANDING}/apps/manager-1c"), (_keycloak.Calls[0].Method, _keycloak.Calls[0].Url));
+    }
+
+    [Fact]
+    public async Task SetApp_ByServiceAccountToken_NullsSentExplicitly()
+    {
+        Assert.True((await CreateBranding().SetAppAsync("manager-1c", new AppBranding(null, null, "#aa3300"), default)).IsSuccess);
+
+        FakePlugin.Call put = _keycloak.Calls[1];
+        Assert.Equal(("PUT", $"{BRANDING}/apps/manager-1c", "service-account-token"), (put.Method, put.Url, put.Bearer));
+        using JsonDocument body = JsonDocument.Parse(put.Body);
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("name").ValueKind);
+        Assert.Equal("#aa3300", body.RootElement.GetProperty("color").GetString());
+    }
+
+    [Fact]
+    public async Task App_NoClient_AppNotFound_NotNotInstalled()
+    {
+        _keycloak.Status = HttpStatusCode.NotFound;
+        _keycloak.Body = """{ "error": "app_not_found" }""";
+
+        Error error = (await CreateBranding().GetAppAsync("nope", default)).Error;
+
+        Assert.Equal(IdentityProviderErrors.AppNotFound().Messages[0].Code, error.Messages[0].Code);
+    }
+
+    [Fact]
+    public async Task Effective_WithApp_AsQuery()
+    {
+        _keycloak.Body = """{ "name": "Менеджер 1С", "color": "#aa3300", "theme": "light" }""";
+
+        ProjectBranding branding = (await CreateBranding().GetEffectiveAsync("manager-1c", default)).Value;
+
+        Assert.Equal(new ProjectBranding("Менеджер 1С", null, "#aa3300", "light"), branding);
+        Assert.Equal($"{BRANDING}?app=manager-1c", _keycloak.Calls[0].Url);
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.Unauthorized, "branding.not_permitted")]
     [InlineData(HttpStatusCode.Forbidden, "branding.not_permitted")]

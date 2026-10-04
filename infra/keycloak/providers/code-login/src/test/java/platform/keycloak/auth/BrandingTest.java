@@ -57,4 +57,41 @@ class BrandingTest {
         assertEquals("Тема — system, light или dark.", Branding.validate(branding("Магазин", null, null, "blue")));
         assertEquals("Тема — system, light или dark.", Branding.validate(branding("Магазин", null, null, null)));
     }
+
+    private static Branding.AppRepresentation app(String name, String logo, String color) {
+        Branding.AppRepresentation branding = new Branding.AppRepresentation();
+        branding.name = name;
+        branding.logo = logo;
+        branding.color = color;
+        return branding;
+    }
+
+    @Test
+    void app_allAsProject_orOwn_valid() {
+        assertNull(Branding.validate(app(null, null, null)));
+        assertNull(Branding.validate(app("Заказы", png(10), "#1f6feb")));
+    }
+
+    @Test
+    void app_ownValues_checkedLikeProject() {
+        assertEquals("Название — от 1 до 60 символов (или как у проекта).", Branding.validate(app(" ", null, null)));
+        assertEquals("Название — от 1 до 60 символов (или как у проекта).", Branding.validate(app("x".repeat(61), null, null)));
+        assertEquals("Цвет — в виде #rrggbb (строчные).", Branding.validate(app(null, null, "#FFF")));
+        assertEquals("Логотип — не больше 100 КБ.", Branding.validate(app(null, png(Branding.LOGO_MAX_BYTES + 1), null)));
+    }
+
+    @Test
+    void decodeLogo_typeAndBytes_orNull() {
+        Branding.Image image = Branding.decodeLogo("data:image/svg+xml;base64," + Base64.getEncoder().encodeToString(new byte[] {1, 2}));
+        assertEquals("image/svg+xml", image.contentType());
+        assertEquals(2, image.bytes().length);
+        assertNull(Branding.decodeLogo("data:text/html;base64,AAAA"));
+        assertNull(Branding.decodeLogo(null));
+    }
+
+    @Test
+    void textOn_darkOnLight_lightOnDark() {
+        assertEquals("#2e2e2e", Branding.textOn("#ffd400"));
+        assertEquals("#f7f7f7", Branding.textOn("#1f3fb0"));
+    }
 }

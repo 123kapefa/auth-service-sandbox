@@ -43,6 +43,20 @@ public sealed class DemoPageTests(AuthServiceWebFactory factory) : IClassFixture
         Assert.Equal(new Uri("/account/security", UriKind.Relative), response.Headers.Location);
     }
 
+    [Theory]
+    [InlineData("/auth/account?app=manager-1c", "/account/?app=manager-1c")]
+    [InlineData("/auth/account/security?app=manager-1c", "/account/security?app=manager-1c")]
+    [InlineData("/auth/account/devices?app=%3Cscript%3E", "/account/devices")]
+    public async Task Account_FromApp_KeepsAppForBranding(string link, string expected)
+    {
+        using HttpClient browser = factory.CreateBrowserClient();
+
+        HttpResponseMessage response = await browser.GetAsync(new Uri(link, UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(new Uri(expected, UriKind.Relative), response.Headers.Location);
+    }
+
     [Fact]
     public async Task AccountDevices_RedirectsToOwnDevicesSection()
     {

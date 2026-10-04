@@ -31,6 +31,9 @@ public sealed class FakeIdentityProvider : IIdentityProvider
     /// <summary>Действие с учётной записью из последнего начала входа.</summary>
     public AccountActionRequest? LastAction { get; private set; }
 
+    /// <summary>Приложение последнего входа (оформление страниц входа).</summary>
+    public string? LastApp { get; private set; }
+
     public void Reset()
     {
         LastAuthorization = null;
@@ -47,9 +50,11 @@ public sealed class FakeIdentityProvider : IIdentityProvider
         Uri redirectUri,
         bool forceLogin,
         AccountActionRequest? action,
+        string? app,
         CancellationToken cancellationToken)
     {
         LastAction = action;
+        LastApp = app;
         string state = Guid.NewGuid().ToString("N");
         string prompt = forceLogin ? "&prompt=login" : string.Empty;
         LastAuthorization = new AuthorizationRequest(

@@ -23,10 +23,12 @@ public static class AuditActions
     public const string SERVICE_KEY_PERMISSIONS_CHANGED = "ServiceKeyPermissionsChanged";
 
     public const string PROJECT_BRANDING_CHANGED = "ProjectBrandingChanged";
+    public const string APP_BRANDING_CHANGED = "AppBrandingChanged";
 
     public const string USER_OBJECT = "user";
     public const string ROLE_OBJECT = "role";
     public const string PERMISSION_OBJECT = "permission";
     public const string SERVICE_OBJECT = "service";
     public const string PROJECT_OBJECT = "project";
+    public const string APP_OBJECT = "app";
 }

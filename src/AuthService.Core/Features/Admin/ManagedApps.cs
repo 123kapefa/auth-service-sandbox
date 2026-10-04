@@ -33,7 +33,8 @@ public sealed class ManagedApps(IIdentityAdmin identityAdmin, AppCatalog catalog
             return clients.Error;
         }
 
-        string[] project = [.. AppPermissions.Where(caller.HasPermission)];
+        // Оформление приложения — только у админа проекта (право проекта), своих ролей для него у приложения нет.
+        string[] project = [.. AppPermissions.Append(AuthServicePermissions.Branding.MANAGE).Where(caller.HasPermission)];
         List<ManagedAppResponse> apps = [];
         foreach (ClientInfo client in clients.Value)
         {

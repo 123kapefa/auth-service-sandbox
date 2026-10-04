@@ -72,6 +72,22 @@ public sealed class LoginFlowTests : IClassFixture<AuthServiceWebFactory>
         Assert.Equal(new AccountActionRequest(expected), _keycloak.LastAction);
     }
 
+    [Theory]
+    [InlineData("manager-1c", "manager-1c")]
+    [InlineData("orders-web", "orders-web")]
+    [InlineData("evil/../x", null)]
+    [InlineData("", null)]
+    public async Task Login_WithApp_PassesAppForBranding_InvalidIgnored(string app, string? expected)
+    {
+        using HttpClient browser = _factory.CreateBrowserClient();
+
+        HttpResponseMessage response = await browser.GetAsync(
+            new Uri($"/auth/login?return_to=/account/&app={Uri.EscapeDataString(app)}", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(expected, _keycloak.LastApp);
+    }
+
     [Fact]
     public async Task Login_DeleteCredential_PassesCanonicalCredentialId()
     {

@@ -11,3 +11,16 @@ export interface Branding {
   color: string | null;
   theme: BrandingTheme;
 }
+
+/** Своё у приложения поверх проекта: null — как у проекта. */
+export interface AppBrandingOwn {
+  name: string | null;
+  logo: string | null;
+  color: string | null;
+}
+
+/** GET /auth/admin/apps/{clientId}/branding: своё у приложения и оформление проекта. */
+export interface AppBranding extends AppBrandingOwn {
+  clientId: string;
+  project: Branding;
+}
