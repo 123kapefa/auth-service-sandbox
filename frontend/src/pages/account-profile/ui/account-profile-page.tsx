@@ -1,11 +1,10 @@
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { accountProfileQueries } from "@/entities/account-profile";
 import { AccountActionLink, useActionStatus } from "@/features/account-action";
-import { ACCOUNT_SECURITY_URL } from "@/shared/config/routes";
 import { formatDateTime } from "@/shared/lib/format";
-import { Badge, Button, Card, CardTitle } from "@/shared/ui";
+import { Badge, Card, CardTitle } from "@/shared/ui";
 
-/** Профиль: телефон (логин), почта, пароль. Смена пароля и почты — на страницах сервера входа. */
+/** Профиль: телефон (логин) и почта. Смена почты — на странице сервера входа; пароль — в «Безопасности». */
 export function AccountProfilePage() {
   const queryClient = useQueryClient();
   const { data: profile } = useSuspenseQuery(accountProfileQueries.profile());
@@ -50,32 +49,6 @@ export function AccountProfilePage() {
           На почту приходят коды входа и ссылка для сброса пароля. Новая почта заменит прежнюю после
           перехода по ссылке из письма.
         </p>
-      </Card>
-
-      <Card>
-        <CardTitle>Пароль</CardTitle>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm text-muted-foreground">
-            Новый пароль вводится на странице входа — сервис его не видит.
-          </span>
-          <div className="ml-auto">
-            <AccountActionLink action="update-password">Сменить пароль</AccountActionLink>
-          </div>
-        </div>
-      </Card>
-
-      <Card>
-        <CardTitle>Безопасность</CardTitle>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm text-muted-foreground">
-            Вход с кодом из приложения (2FA), коды восстановления и ключи доступа (passkey).
-          </span>
-          <div className="ml-auto">
-            <Button asChild variant="outline" size="sm">
-              <a href={ACCOUNT_SECURITY_URL}>Настроить</a>
-            </Button>
-          </div>
-        </div>
       </Card>
 
       {createdAt !== "—" && (

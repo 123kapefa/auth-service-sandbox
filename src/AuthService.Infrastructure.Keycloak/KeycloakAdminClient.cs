@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using AuthService.Core.Abstractions;
@@ -479,6 +480,43 @@ internal sealed partial class KeycloakAdminClient(
             : credentials.Error;
     }
 
+    public async Task<Result<IReadOnlyList<UserCredential>, Error>> GetCredentialsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        Result<Credential[], Error> credentials = await GetJsonAsync<Credential[]>($"users/{userId}/credentials", cancellationToken);
+        return credentials.IsSuccess
+            ? Result.Success<IReadOnlyList<UserCredential>, Error>([.. credentials.Value.Select(ToUserCredential)])
+            : credentials.Error;
+    }
+
+    // credentialData — служебные параметры без секрета (у кодов восстановления — remainingCodes и totalCodes); секреты
+    // Admin API не отдаёт.
+    private static UserCredential ToUserCredential(Credential credential)
+    {
+        int? remaining = null;
+        int? total = null;
+        if (!string.IsNullOrEmpty(credential.CredentialData))
+        {
+            try
+            {
+                using JsonDocument data = JsonDocument.Parse(credential.CredentialData);
+                remaining = data.RootElement.TryGetProperty("remainingCodes", out JsonElement left) && left.TryGetInt32(out int l) ? l : null;
+                total = data.RootElement.TryGetProperty("totalCodes", out JsonElement all) && all.TryGetInt32(out int t) ? t : null;
+            }
+            catch (JsonException)
+            {
+                // Данные не того вида — без счётчиков.
+            }
+        }
+
+        return new UserCredential(
+            credential.Id ?? string.Empty,
+            credential.Type,
+            credential.UserLabel,
+            DateTimeOffset.FromUnixTimeMilliseconds(credential.CreatedDate),
+            remaining,
+            total);
+    }
+
     public async Task<Result<int, Error>> RemoveCredentialsAsync(
         Guid userId,
         IReadOnlyCollection<string> types,
@@ -724,7 +762,12 @@ internal sealed partial class KeycloakAdminClient(
         [property: JsonPropertyName("error")] string? Error,
         [property: JsonPropertyName("details")] Dictionary<string, string>? Details);
 
-    private sealed record Credential([property: JsonPropertyName("type")] string Type, [property: JsonPropertyName("id")] string? Id = null);
+    private sealed record Credential(
+        [property: JsonPropertyName("type")] string Type,
+        [property: JsonPropertyName("id")] string? Id = null,
+        [property: JsonPropertyName("userLabel")] string? UserLabel = null,
+        [property: JsonPropertyName("createdDate")] long CreatedDate = 0,
+        [property: JsonPropertyName("credentialData")] string? CredentialData = null);
 
     // Представление пользователя Admin API (UserRepresentation) — только нужные поля.
     private sealed record UserRepresentation(

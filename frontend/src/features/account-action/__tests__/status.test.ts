@@ -10,6 +10,17 @@ describe("actionNotice", () => {
     expect(actionNotice("update-email", "success")?.text).toContain("после перехода по ссылке");
   });
 
+  it("2FA, ключ, коды, удаление — свои сообщения", () => {
+    expect(actionNotice("configure-totp", "success")?.text).toBe(
+      "Приложение-аутентификатор подключено",
+    );
+    expect(actionNotice("register-passkey", "success")?.text).toBe("Ключ доступа добавлен");
+    expect(actionNotice("configure-recovery-codes", "success")?.text).toContain(
+      "Коды восстановления созданы",
+    );
+    expect(actionNotice("delete-credential", "success")?.text).toBe("Удалено");
+  });
+
   it("неизвестное действие при успехе — просто «Готово»", () => {
     expect(actionNotice(null, "success")).toEqual({ kind: "success", text: "Готово" });
   });

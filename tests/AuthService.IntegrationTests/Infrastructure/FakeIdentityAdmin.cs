@@ -42,6 +42,9 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     /// <summary>У кого включена 2FA (OTP и коды восстановления).</summary>
     private readonly ConcurrentDictionary<Guid, bool> _twoFactor = new();
 
+    /// <summary>Подробные учётные данные для кабинета (кроме пароля — он от hasPassword).</summary>
+    private readonly ConcurrentDictionary<Guid, List<UserCredential>> _credentials = new();
+
     /// <summary>Письма Keycloak с действиями: (пользователь, действия, срок ссылки).</summary>
     public Collection<(Guid UserId, string[] Actions, TimeSpan Lifespan)> ActionEmails { get; } = [];
 
@@ -94,6 +97,13 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         _twoFactor[user.Id] = true;
     }
 
+    /// <summary>Учётные данные пользователя для кабинета: приложение-аутентификатор, ключ доступа, коды.</summary>
+    public void AddCredential(TestUser user, UserCredential credential)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        _credentials.GetOrAdd(user.Id, _ => []).Add(credential);
+    }
+
     /// <summary>Почта пользователя.</summary>
     public void SetEmail(TestUser user, string email)
     {
@@ -105,6 +115,7 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     {
         _accounts.Clear();
         _twoFactor.Clear();
+        _credentials.Clear();
         ActionEmails.Clear();
         SeedAppRoles();
         AttributeChanges.Clear();
@@ -219,6 +230,20 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         }
 
         return Task.FromResult(Result.Success<IReadOnlyList<string>, Error>(types));
+    }
+
+    public Task<Result<IReadOnlyList<UserCredential>, Error>> GetCredentialsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        if (!_accounts.TryGetValue(userId, out Account? account))
+        {
+            return Task.FromResult(Result.Failure<IReadOnlyList<UserCredential>, Error>(IdentityProviderErrors.UserNotFound()));
+        }
+
+        List<UserCredential> credentials = account.HasPassword
+            ? [new UserCredential("password-" + userId, Credentials.PASSWORD, null, DateTimeOffset.UnixEpoch)]
+            : [];
+        credentials.AddRange(_credentials.TryGetValue(userId, out List<UserCredential>? added) ? added : []);
+        return Task.FromResult(Result.Success<IReadOnlyList<UserCredential>, Error>(credentials));
     }
 
     public Task<Result<int, Error>> RemoveCredentialsAsync(Guid userId, IReadOnlyCollection<string> types, CancellationToken cancellationToken)

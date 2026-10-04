@@ -9,12 +9,12 @@ public interface IIdentityProvider
     /// <summary>
     /// Куда отправить браузер на вход; state и code verifier нужно сохранить до возврата.
     /// forceLogin — войти заново даже при живой SSO-сессии (повторный вход перед опасным действием);
-    /// action — после входа показать страницу действия с учётной записью (смена пароля, почты).
+    /// action — после входа показать страницу действия с учётной записью (пароль, почта, 2FA, ключи доступа).
     /// </summary>
     Task<Result<AuthorizationRequest, Error>> CreateAuthorizationRequestAsync(
         Uri redirectUri,
         bool forceLogin,
-        AccountAction? action,
+        AccountActionRequest? action,
         CancellationToken cancellationToken);
 
     /// <summary>Обмен кода из callback на токены.</summary>

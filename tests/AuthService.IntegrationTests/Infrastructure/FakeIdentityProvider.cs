@@ -29,7 +29,7 @@ public sealed class FakeIdentityProvider : IIdentityProvider
         new(access, AccessExpires, refresh, DateTimeOffset.UtcNow.AddDays(30));
 
     /// <summary>Действие с учётной записью из последнего начала входа.</summary>
-    public AccountAction? LastAction { get; private set; }
+    public AccountActionRequest? LastAction { get; private set; }
 
     public void Reset()
     {
@@ -46,7 +46,7 @@ public sealed class FakeIdentityProvider : IIdentityProvider
     public Task<Result<AuthorizationRequest, Error>> CreateAuthorizationRequestAsync(
         Uri redirectUri,
         bool forceLogin,
-        AccountAction? action,
+        AccountActionRequest? action,
         CancellationToken cancellationToken)
     {
         LastAction = action;

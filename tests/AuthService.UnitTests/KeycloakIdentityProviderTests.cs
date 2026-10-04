@@ -54,11 +54,16 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
     }
 
     [Theory]
-    [InlineData(AccountAction.UpdatePassword, "UPDATE_PASSWORD")]
-    [InlineData(AccountAction.UpdateEmail, "UPDATE_EMAIL")]
-    public async Task AccountAction_AsksKeycloakForRequiredAction(AccountAction action, string kcAction)
+    [InlineData(AccountAction.UpdatePassword, null, "UPDATE_PASSWORD")]
+    [InlineData(AccountAction.UpdateEmail, null, "UPDATE_EMAIL")]
+    [InlineData(AccountAction.ConfigureTotp, null, "CONFIGURE_TOTP")]
+    [InlineData(AccountAction.RegisterPasskey, null, "webauthn-register-passwordless")]
+    [InlineData(AccountAction.ConfigureRecoveryCodes, null, "CONFIGURE_RECOVERY_AUTHN_CODES")]
+    [InlineData(AccountAction.DeleteCredential, "4b4f2c3e-8f1a-4d7e-9a51-0d6a1c2b3e4f", "delete_credential:4b4f2c3e-8f1a-4d7e-9a51-0d6a1c2b3e4f")]
+    public async Task AccountAction_AsksKeycloakForRequiredAction(AccountAction action, string? credential, string kcAction)
     {
-        AuthorizationRequest request = (await CreateProvider().CreateAuthorizationRequestAsync(_callback, forceLogin: false, action, default)).Value;
+        AuthorizationRequest request = (await CreateProvider()
+            .CreateAuthorizationRequestAsync(_callback, forceLogin: false, new AccountActionRequest(action, credential), default)).Value;
 
         Dictionary<string, StringValues> query = QueryHelpers.ParseQuery(request.Url.Query);
         Assert.Equal(kcAction, query["kc_action"]);

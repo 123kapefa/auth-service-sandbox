@@ -104,6 +104,9 @@ public interface IIdentityAdmin
     /// <summary>Типы учётных данных пользователя: password, otp, recovery-authn-codes, webauthn-passwordless…</summary>
     Task<Result<IReadOnlyList<string>, Error>> GetCredentialTypesAsync(Guid userId, CancellationToken cancellationToken);
 
+    /// <summary>Учётные данные пользователя без секретов: Id, тип, подпись, когда созданы (для кабинета).</summary>
+    Task<Result<IReadOnlyList<UserCredential>, Error>> GetCredentialsAsync(Guid userId, CancellationToken cancellationToken);
+
     /// <summary>Удалить учётные данные этих типов; вернуть, сколько удалено.</summary>
     Task<Result<int, Error>> RemoveCredentialsAsync(Guid userId, IReadOnlyCollection<string> types, CancellationToken cancellationToken);
 
@@ -235,12 +238,30 @@ public static class Credentials
     public const string OTP = "otp";
     public const string RECOVERY_CODES = "recovery-authn-codes";
 
+    /// <summary>Ключ доступа (passkey) — вход без пароля.</summary>
+    public const string PASSKEY = "webauthn-passwordless";
+
     /// <summary>Вторые факторы: OTP и коды восстановления (ключ доступа — способ входа, не 2FA).</summary>
     public static IReadOnlyList<string> TwoFactor { get; } = [OTP, RECOVERY_CODES];
 
     /// <summary>Действие из письма: задать новый пароль.</summary>
     public const string UPDATE_PASSWORD = "UPDATE_PASSWORD";
 }
+
+/// <summary>Учётные данные пользователя на сервере входа — без секретов.</summary>
+/// <param name="Id">Id учётных данных (для удаления).</param>
+/// <param name="Type">Тип: password, otp, recovery-authn-codes, webauthn-passwordless…</param>
+/// <param name="Label">Подпись, которую дал пользователь (название приложения или устройства).</param>
+/// <param name="CreatedAt">Когда созданы.</param>
+/// <param name="Remaining">Коды восстановления: сколько неиспользованных.</param>
+/// <param name="Total">Коды восстановления: сколько всего выдано.</param>
+public sealed record UserCredential(
+    string Id,
+    string Type,
+    string? Label,
+    DateTimeOffset CreatedAt,
+    int? Remaining = null,
+    int? Total = null);
 
 /// <summary>Клиент Keycloak: clientId и название.</summary>
 public sealed record ClientInfo(string ClientId, string? Name);

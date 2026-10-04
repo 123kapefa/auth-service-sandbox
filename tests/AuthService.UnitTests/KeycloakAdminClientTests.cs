@@ -80,6 +80,20 @@ public sealed class KeycloakAdminClientTests : IDisposable
         Assert.Empty(_keycloak.AdminRequests);
     }
 
+    [Fact]
+    public async Task Credentials_NoSecrets_LabelsDates_RecoveryCodeCounters()
+    {
+        IReadOnlyList<UserCredential> credentials = (await CreateClient().GetCredentialsAsync(_userId, default)).Value;
+
+        Assert.Equal($"{ADMIN}/users/{_userId}/credentials", _keycloak.AdminRequests.Single().Url);
+        Assert.Equal(["c-password", "c-otp", "c-codes", "c-broken"], credentials.Select(credential => credential.Id));
+        UserCredential otp = credentials[1];
+        Assert.Equal(("otp", "Телефон"), (otp.Type, otp.Label));
+        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1790000100000), otp.CreatedAt);
+        Assert.Equal((9, 12), (credentials[2].Remaining, credentials[2].Total));
+        Assert.Equal((null, null), (credentials[3].Remaining, credentials[3].Total));
+    }
+
     public void Dispose() => _keycloak.Dispose();
 
     private IIdentityAdmin CreateClient()
@@ -125,6 +139,16 @@ public sealed class KeycloakAdminClientTests : IDisposable
             }
             """;
 
+        // Как отдаёт Admin API: секретов нет, у кодов восстановления в credentialData — счётчики.
+        private const string CREDENTIALS = """
+            [
+              { "id": "c-password", "type": "password", "createdDate": 1790000000000, "credentialData": "{\"algorithm\":\"argon2\"}" },
+              { "id": "c-otp", "type": "otp", "userLabel": "Телефон", "createdDate": 1790000100000, "credentialData": "{\"subType\":\"totp\"}" },
+              { "id": "c-codes", "type": "recovery-authn-codes", "createdDate": 1790000200000, "credentialData": "{\"algorithm\":\"SHA-512\",\"totalCodes\":12,\"remainingCodes\":9}" },
+              { "id": "c-broken", "type": "webauthn-passwordless", "createdDate": 1790000300000, "credentialData": "not json" }
+            ]
+            """;
+
         public List<Request> TokenRequests { get; } = [];
 
         public List<(string Url, string? Bearer)> AdminRequests { get; } = [];
@@ -139,6 +163,11 @@ public sealed class KeycloakAdminClientTests : IDisposable
             if (url.Contains("/admin/realms/", StringComparison.Ordinal))
             {
                 AdminRequests.Add((url, request.Headers.Authorization?.Parameter));
+                if (url.EndsWith("/credentials", StringComparison.Ordinal))
+                {
+                    return Json(HttpStatusCode.OK, CREDENTIALS);
+                }
+
                 return Json(UserStatus, UserStatus == HttpStatusCode.OK ? USER : """{"error":"User not found"}""");
             }
 
