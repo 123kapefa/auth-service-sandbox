@@ -3,14 +3,14 @@ import { NavLink } from "react-router";
 import { cn } from "@/shared/lib/cn";
 
 /**
- * Каркас с боковым меню: меню слева во всю высоту экрана и закреплено — длинная страница прокручивается, меню на
- * месте (не тянется за содержимым); на узком экране — над содержимым.
+ * Каркас с боковым меню: каркас ровно в экран, прокручивается только содержимое (меню на месте и не тянется за
+ * длинной страницей, края не оттягиваются); на узком экране меню — над содержимым, прокручивается вся страница.
  */
 export function SidebarLayout({ sidebar, children }: { sidebar: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex min-h-dvh flex-col bg-background text-foreground md:flex-row">
+    <div className="flex min-h-dvh flex-col bg-background text-foreground md:h-dvh md:flex-row md:overflow-hidden">
       {sidebar}
-      <main className="min-w-0 flex-1 px-4 py-8 md:px-10 md:py-10">
+      <main className="min-w-0 flex-1 px-4 py-8 md:overflow-y-auto md:overscroll-none md:px-10 md:py-10">
         <div className="max-w-6xl">{children}</div>
       </main>
     </div>
@@ -29,7 +29,7 @@ export function Sidebar({
   return (
     <aside
       aria-label="Меню"
-      className="flex flex-col gap-6 border-b-2 border-primary bg-card px-3 py-5 md:sticky md:top-0 md:h-dvh md:w-64 md:shrink-0 md:self-start md:overflow-y-auto md:border-r-2 md:border-b-0"
+      className="flex flex-col gap-6 border-b-2 border-primary bg-card px-3 py-5 md:w-64 md:shrink-0 md:overflow-y-auto md:overscroll-none md:border-r-2 md:border-b-0"
     >
       <div className="flex items-center gap-2.5 px-3 text-[17px] font-bold tracking-tight">
         <span className="size-3.5 shrink-0 bg-primary" aria-hidden />
