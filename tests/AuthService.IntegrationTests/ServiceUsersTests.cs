@@ -72,6 +72,19 @@ public sealed class ServiceUsersTests : IClassFixture<AuthServiceWebFactory>
     }
 
     [Fact]
+    public async Task AccessCheck_NoModeYet_DefaultRole_LikeToken()
+    {
+        // Режим в приложении ещё не выбирали (атрибута нет) — роль по умолчанию, как у маппера токена.
+        TestUser newcomer = new("новичок", Guid.NewGuid(), "+79990000078", [], null!);
+        _keycloak.Add(newcomer, []);
+
+        JsonElement result = await CheckAsync(newcomer, "profile.view");
+
+        Assert.True(result.GetProperty("allowed").GetBoolean());
+        Assert.Equal("customer", result.GetProperty("activeMode").GetString());
+    }
+
+    [Fact]
     public async Task AccessCheck_BlockedUser_NotAllowed()
     {
         _keycloak.Add(TestUser.Customer, ["customer"], enabled: false);

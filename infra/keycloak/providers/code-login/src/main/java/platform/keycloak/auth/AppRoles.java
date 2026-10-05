@@ -56,6 +56,21 @@ final class AppRoles {
             .toList();
     }
 
+    /**
+     * Режим по умолчанию: роль приложения из ролей по умолчанию realm (у всех, например customer), если она есть у
+     * пользователя; таких несколько — первая по алфавиту, нет — null.
+     */
+    static String defaultModeOf(ClientModel client, UserModel user) {
+        return client.getRealm().getDefaultRole().getCompositesStream()
+            .filter(role -> role.isClientRole() && client.getId().equals(role.getContainerId()))
+            .filter(role -> !isPermission(role))
+            .filter(user::hasRole)
+            .map(RoleModel::getName)
+            .sorted()
+            .findFirst()
+            .orElse(null);
+    }
+
     /** Версия роли активного режима (атрибут version), если режим — роль пользователя; иначе null. */
     static String versionOf(ClientModel client, UserModel user, String activeMode) {
         RoleModel mode = activeMode == null ? null : client.getRole(activeMode);

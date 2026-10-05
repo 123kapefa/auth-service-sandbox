@@ -23,3 +23,6 @@ __pycache__/
 # Поставка: пакеты и образы (scripts/package)
 artifacts/
 .check-deploy/
+
+# Плагин Keycloak: сборка Maven на машине
+infra/keycloak/providers/*/target/

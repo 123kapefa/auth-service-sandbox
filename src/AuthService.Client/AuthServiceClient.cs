@@ -10,7 +10,8 @@ namespace AuthService.Client;
 
 /// <summary>
 /// API сервиса входа для сервисов проекта — по ключу доступа (токен сервиса ставит ServiceTokenHandler):
-/// карточка пользователя (право service.users.read) и есть ли у него право в приложении (service.access.check).
+/// карточка пользователя (право service.users.read), есть ли у него право в приложении (service.access.check) и
+/// объявление каталога своего приложения (service.catalog.declare).
 /// </summary>
 public interface IAuthServiceClient
 {
@@ -21,6 +22,12 @@ public interface IAuthServiceClient
 
     /// <summary>Есть ли у пользователя право сейчас; app — client_id приложения (по умолчанию — приложение сервиса входа).</summary>
     Task<Result<AccessCheckResponse, Error>> CheckAccessAsync(Guid userId, string permission, string? app, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Объявить каталог своего приложения — права и встроенные роли из кода (право ключа service.catalog.declare).
+    /// Обычно не вызывается напрямую: это делает AddAppCatalog при старте сервиса.
+    /// </summary>
+    Task<Result<DeclareCatalogResponse, Error>> DeclareCatalogAsync(DeclareCatalogRequest catalog, CancellationToken cancellationToken);
 }
 
 public sealed class AuthServiceClient(HttpClient http) : IAuthServiceClient
@@ -43,11 +50,19 @@ public sealed class AuthServiceClient(HttpClient http) : IAuthServiceClient
             + (string.IsNullOrWhiteSpace(app) ? string.Empty : $"&app={Uri.EscapeDataString(app)}"),
             cancellationToken);
 
-    private async Task<Result<T, Error>> GetAsync<T>(string path, CancellationToken cancellationToken)
+    public Task<Result<DeclareCatalogResponse, Error>> DeclareCatalogAsync(DeclareCatalogRequest catalog, CancellationToken cancellationToken) =>
+        SendAsync<DeclareCatalogResponse>(
+            () => http.PutAsJsonAsync(new Uri("auth/services/catalog", UriKind.Relative), catalog, _json, cancellationToken),
+            cancellationToken);
+
+    private Task<Result<T, Error>> GetAsync<T>(string path, CancellationToken cancellationToken) =>
+        SendAsync<T>(() => http.GetAsync(new Uri(path, UriKind.Relative), cancellationToken), cancellationToken);
+
+    private static async Task<Result<T, Error>> SendAsync<T>(Func<Task<HttpResponseMessage>> send, CancellationToken cancellationToken)
     {
         try
         {
-            using HttpResponseMessage response = await http.GetAsync(new Uri(path, UriKind.Relative), cancellationToken);
+            using HttpResponseMessage response = await send();
             using JsonDocument body = await ReadAsync(response, cancellationToken);
             if (response.IsSuccessStatusCode && body.RootElement.TryGetProperty("result", out JsonElement result))
             {

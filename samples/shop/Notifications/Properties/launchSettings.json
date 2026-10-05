@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Notifications": {
+      "commandName": "Project",
+      "applicationUrl": "http://localhost:5310",
+      "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" }
+    }
+  }
+}

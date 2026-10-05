@@ -1,0 +1,53 @@
+# Магазин проекта «Демо-магазин» (realm demo-shop): «Заказы» (страница и API, http://localhost:5300) и «Уведомления»
+# (внутренний, http://localhost:5310). Поверх стенда песочницы и сервиса входа проекта; всё вместе поднимает
+#   samples/shop/setup.sh
+# Ключи сервисов выдаёт админ проекта («Сервисы и ключи»), секреты — в .env (SHOP_ORDERS_KEY_SECRET,
+# SHOP_NOTIFICATIONS_KEY_SECRET). Образы собираются из пакетов artifacts/nuget (scripts/package/pack.sh).
+services:
+  shop-orders:
+    build:
+      context: .
+      dockerfile: samples/shop/Dockerfile
+      args:
+        SERVICE: Orders
+    image: shop-orders:local
+    init: true
+    ports:
+      - "5300:8080"
+    environment:
+      Shop__Name: Демо-магазин
+      # Токены пользователей «Заказов»: iss — внешний адрес Keycloak, ключи — по адресу внутри сети.
+      Authentication__Authority: http://localhost:8180/realms/demo-shop
+      Authentication__MetadataAddress: http://keycloak:8180/realms/demo-shop/.well-known/openid-configuration
+      ConnectionStrings__Redis: redis:6379
+      ServiceToken__TokenEndpoint: http://keycloak:8180/realms/demo-shop/protocol/openid-connect/token
+      ServiceToken__ClientSecret: ${SHOP_ORDERS_KEY_SECRET:?ключ «Заказов» не выдан — samples/shop/setup.sh}
+      Notifications__BaseUrl: http://shop-notifications:8080/
+      AuthService__BaseUrl: http://auth-service-demo-shop:8080/
+    depends_on:
+      redis:
+        condition: service_healthy
+      shop-notifications:
+        condition: service_started
+
+  shop-notifications:
+    build:
+      context: .
+      dockerfile: samples/shop/Dockerfile
+      args:
+        SERVICE: Notifications
+    image: shop-notifications:local
+    init: true
+    ports:
+      - "5310:8080"
+    environment:
+      Authentication__Authority: http://localhost:8180/realms/demo-shop
+      Authentication__MetadataAddress: http://keycloak:8180/realms/demo-shop/.well-known/openid-configuration
+      ConnectionStrings__Redis: redis:6379
+      Notifications__SmtpHost: mailpit
+      AuthService__BaseUrl: http://auth-service-demo-shop:8080/
+      ServiceToken__TokenEndpoint: http://keycloak:8180/realms/demo-shop/protocol/openid-connect/token
+      ServiceToken__ClientSecret: ${SHOP_NOTIFICATIONS_KEY_SECRET:?ключ «Уведомлений» не выдан — samples/shop/setup.sh}
+    depends_on:
+      redis:
+        condition: service_healthy
