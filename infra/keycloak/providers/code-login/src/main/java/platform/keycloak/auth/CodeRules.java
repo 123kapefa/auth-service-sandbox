@@ -57,6 +57,11 @@ public final class CodeRules {
     }
 
     public SendResult send(CodeState current) {
+        return send(current, policy.cooldown());
+    }
+
+    /** Как send(current), но пауза перед следующей отправкой — своя (растущая, CodeLimits). */
+    public SendResult send(CodeState current, Duration cooldown) {
         Instant now = clock.instant();
 
         if (isLocked(current, now)) {
@@ -69,7 +74,7 @@ public final class CodeRules {
 
         String code = generate();
         // Новый код сбрасывает неверные попытки — как в боевом сервисе.
-        return new SendResult.Sent(code, new CodeState(code, now.plus(policy.ttl()), now.plus(policy.cooldown()), 0, null));
+        return new SendResult.Sent(code, new CodeState(code, now.plus(policy.ttl()), now.plus(cooldown), 0, null));
     }
 
     public VerifyResult verify(CodeState current, String input) {

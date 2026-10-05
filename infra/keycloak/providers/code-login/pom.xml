@@ -47,6 +47,14 @@
       <scope>provided</scope>
     </dependency>
 
+    <!-- Метрики кодов: Micrometer — та же версия, что внутри Keycloak 26.4.7. -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-core</artifactId>
+      <version>1.14.7</version>
+      <scope>provided</scope>
+    </dependency>
+
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>

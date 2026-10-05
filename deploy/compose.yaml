@@ -45,6 +45,11 @@ services:
       # X-Forwarded-* принимаются только от прокси: по умолчанию — из сетей Docker и с самой машины.
       KC_PROXY_TRUSTED_ADDRESSES: ${AUTH_KEYCLOAK_PROXY_TRUSTED:-172.16.0.0/12,127.0.0.1}
       KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      # Капча перед отправкой кода (Яндекс SmartCaptcha, docs/keycloak/10-code-limits.md). Без ключа после 2 отправок
+      # за час с одного IP или на один номер код не уходит.
+      KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_SERVER_KEY: ${AUTH_SMARTCAPTCHA_SERVER_KEY:-}
+      KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_SITE_KEY: ${AUTH_SMARTCAPTCHA_SITE_KEY:-}
       KC_BOOTSTRAP_ADMIN_USERNAME: ${AUTH_KEYCLOAK_ADMIN:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${AUTH_KEYCLOAK_ADMIN_PASSWORD:?нужен AUTH_KEYCLOAK_ADMIN_PASSWORD}
     healthcheck:

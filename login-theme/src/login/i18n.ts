@@ -23,6 +23,10 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
       platformCodeExpired: "Код больше не действует — отправьте новый.",
       platformCodeTooEarly: "Код уже отправлен. Новый можно запросить через {0} с.",
       platformCodeSendFailed: "Не удалось отправить код. Попробуйте ещё раз позже.",
+      platformCodeLimit: "Слишком много запросов кода. Попробуйте через {0} мин.",
+      platformCodeCaptchaRequired: "Подтвердите, что вы не робот, и запросите код ещё раз.",
+      platformCodeCountryNotAllowed: "На номера этой страны коды не отправляем. Войдите по почте.",
+      platformCodeSmsUnavailable: "Сейчас не можем отправить SMS. Войдите по почте или с ключом доступа.",
       platformAppAccessDenied:
         "Доступ к этому приложению для вас закрыт. Обратитесь к администратору приложения.",
       emailInstruction:
@@ -126,6 +130,10 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
       platformCodeExpired: "The code is no longer valid — send a new one.",
       platformCodeTooEarly: "The code has already been sent. You can request a new one in {0} s.",
       platformCodeSendFailed: "Could not send the code. Please try again later.",
+      platformCodeLimit: "Too many code requests. Try again in {0} min.",
+      platformCodeCaptchaRequired: "Confirm you are not a robot and request the code again.",
+      platformCodeCountryNotAllowed: "We do not send codes to numbers in this country. Sign in with email.",
+      platformCodeSmsUnavailable: "We cannot send SMS right now. Sign in with email or a passkey.",
       platformAppAccessDenied:
         "Your access to this application is closed. Please contact the application administrator.",
       emailInstruction:
