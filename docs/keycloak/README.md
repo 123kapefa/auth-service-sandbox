@@ -79,7 +79,7 @@ sandbox` (realm импортируется только в пустую базу
 | 6а | Сервис входа как компонент: ключи сервисов, новый проект, поставка | 🔄 | [06a-embedding.md](06a-embedding.md), [как встроить](../embedding-guide.md) |
 | 6б | Личный кабинет и оформление под проект | ✅ | [06b-account-branding.md](06b-account-branding.md) |
 | 7 | Документация | идёт по ходу | — |
-| 8 | Выводы и ADR | ⬜ | — |
+| 8 | Выводы и ADR: брать ли Keycloak, чего стоит, что своё | ✅ (решения — «предложено») | [08-conclusions.md](08-conclusions.md), [ADR](../adr/README.md) |
 
 Каждый этап — отдельная ветка `stage-N/...`. План, шаги и статусы — в
 [задачах GitHub](https://github.com/123kapefa/auth-service-sandbox/issues) и на

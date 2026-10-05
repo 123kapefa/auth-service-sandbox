@@ -6,7 +6,7 @@ Keycloak отвечает за вход (пароль, почта, телефо�
 роли и режимы, операции админки через Admin API Keycloak, свои данные в PostgreSQL.
 
 > Исходная реализация на OpenIddict сохранена тегом `openiddict-baseline`.
-> Цели и этапы: [docs/keycloak/README.md](docs/keycloak/README.md).
+> Цели и этапы: [docs/keycloak/README.md](docs/keycloak/README.md). Итог — [выводы](docs/keycloak/08-conclusions.md) и [решения (ADR)](docs/adr/README.md).
 
 ## Состояние
 
