@@ -1,0 +1,2 @@
+platform.keycloak.auth.YandexIdentityProviderFactory
+platform.keycloak.auth.EsiaIdentityProviderFactory

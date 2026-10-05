@@ -11,7 +11,9 @@ Realm нового проекта для сервиса входа — из real
   - UUID клиентов — новые (UUID клиента уникален на весь Keycloak), точечные права (FGAP) — на новые UUID;
   - адреса сервиса (возврат после входа, выход, back-channel logout) и секрет auth-bff — из параметров;
   - для боя: https обязателен для внешних адресов (sslRequired=external), почта — только если задан --smtp-host;
-    --dev — стенд: http, Mailpit, клиент dev-cli.
+    --dev — стенд: http, Mailpit, клиент dev-cli;
+  - вход через Госуслуги и Яндекс ID — без провайдеров (ключи у каждого проекта свои): сценарии входа остаются,
+    провайдеры с ключами проекта — scripts/project/enable-external-login.py.
 
 Запуск:
   scripts/project/new-project.py --realm shop --name "Магазин" --service-url http://localhost:8081 \
@@ -98,6 +100,9 @@ def main():
 
     # Пользователи: только служебная учётка сервиса (её права на realm-management и клиентов приложений).
     realm["users"] = [u for u in realm["users"] if u["username"] == "service-account-sandbox-bff"]
+    # Госуслуги и Яндекс ID песочницы — с её ключами (заглушка): проекту — свои, enable-external-login.py.
+    realm.pop("identityProviders", None)
+    realm.pop("identityProviderMappers", None)
 
     realm = rename(realm)
     # Имена, в которых Keycloak держит имя realm: роль по умолчанию и адреса личного кабинета.

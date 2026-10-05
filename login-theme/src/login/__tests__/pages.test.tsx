@@ -67,6 +67,29 @@ describe("страница входа", () => {
   });
 });
 
+describe("внешний вход", () => {
+  it("«Или войдите через»: Госуслуги и Яндекс ID — ссылки на вход через провайдера", async () => {
+    render(<KcPage kcContext={getKcContextMock({ pageId: "login.ftl", overrides: {} })} />);
+
+    expect(await screen.findByText("Или войдите через")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Госуслуги" })).toHaveAttribute("href", "#esia");
+    expect(screen.getByRole("link", { name: "Яндекс ID" })).toHaveAttribute("href", "#yandex");
+  });
+
+  it("подтверждение пароля при привязке (логин известен) — только пароль: без кода и внешнего входа", async () => {
+    render(
+      <KcPage
+        kcContext={getKcContextMock({ pageId: "login.ftl", overrides: { usernameHidden: true } })}
+      />,
+    );
+
+    expect(await screen.findByLabelText("Пароль")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Телефон или почта")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Войти по коду" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Госуслуги" })).not.toBeInTheDocument();
+  });
+});
+
 describe("вход по коду", () => {
   afterEach(() => vi.useRealTimers());
 
