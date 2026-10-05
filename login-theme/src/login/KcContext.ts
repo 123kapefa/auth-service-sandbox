@@ -20,6 +20,10 @@ export type KcContextExtensionPerPage = {
     codeResendAfter: string;
     /** Сколько цифр в коде (политика плагина). */
     codeLength: string;
+    /** "true" — следующий код уйдёт только с капчей (поле smart-token в форме). Экран капчи — 10.8. */
+    captchaRequired?: string;
+    /** Ключ клиента Яндекс SmartCaptcha (нет — капча не настроена). */
+    captchaSiteKey?: string;
   };
 };
 

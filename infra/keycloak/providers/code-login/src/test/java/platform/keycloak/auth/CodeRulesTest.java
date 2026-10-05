@@ -42,6 +42,13 @@ class CodeRulesTest {
     }
 
     @Test
+    void send_withOwnCooldown_usesIt() {
+        CodeRules.SendResult.Sent sent =
+            assertInstanceOf(CodeRules.SendResult.Sent.class, rules.send(CodeState.EMPTY, Duration.ofMinutes(5)));
+        assertEquals(clock.instant().plusSeconds(300), sent.state().resendAllowedAt());
+    }
+
+    @Test
     void newCode_replacesOld() {
         CodeRules.SendResult.Sent first = sent(CodeState.EMPTY);
         clock.advance(Duration.ofSeconds(60));

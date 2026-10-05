@@ -4,23 +4,38 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
+import org.jboss.logging.Logger;
 import org.keycloak.Config;
 import org.keycloak.authentication.Authenticator;
 import org.keycloak.authentication.AuthenticatorFactory;
 import org.keycloak.models.AuthenticationExecutionModel.Requirement;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
+import org.keycloak.models.RealmModel;
 import org.keycloak.provider.ProviderConfigProperty;
 
 /**
  * Вход по одноразовому коду (см. CodeLoginAuthenticator). Параметры кода — как в боевом сервисе (CodePolicy.PRODUCTION).
+ *
+ * Защита от накрутки (CodeLimitPolicy): у каждого ключа значение берётся из атрибута realm «platform.codes.ключ»
+ * (настройки проекта, их пишет API админки — 10.7), иначе из настроек плагина Keycloak, иначе — по умолчанию.
+ * Настройки плагина — переменные KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__КЛЮЧ (например, …__IP_PER_HOUR=1000);
+ * там же капча: CAPTCHA_SERVER_KEY и CAPTCHA_SITE_KEY (Яндекс SmartCaptcha) или CAPTCHA_STUB=true (только стенд).
  */
 public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory {
 
     public static final String PROVIDER_ID = "platform-code-login";
 
     private static final Requirement[] REQUIREMENTS = {Requirement.REQUIRED, Requirement.DISABLED};
+    private static final Logger LOG = Logger.getLogger(CodeLoginAuthenticatorFactory.class);
+    private static final String SMART_CAPTCHA_URL = "https://smartcaptcha.yandexcloud.net/validate";
+
+    private Config.Scope config;
+    private CaptchaVerifier captcha = CaptchaVerifier.NONE;
+    private CodeMetrics metrics;
+    private String captchaSiteKey;
 
     @Override
     public String getId() {
@@ -68,12 +83,35 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
         Map<CodeTarget.Channel, CodeSender> senders = Map.of(
             CodeTarget.Channel.SMS, new SmsToLogSender(),
             CodeTarget.Channel.EMAIL, new EmailCodeSender(CodePolicy.PRODUCTION));
-        return new CodeLoginAuthenticator(new CodeRules(CodePolicy.PRODUCTION, clock, new SecureRandom()), senders, clock);
+        Function<RealmModel, CodeLimits> limits = realm -> new CodeLimits(CodeLimitPolicy.from(
+            key -> setting(realm, key), CodeLimitPolicy.DEFAULTS));
+        return new CodeLoginAuthenticator(new CodeRules(CodePolicy.PRODUCTION, clock, new SecureRandom()), limits,
+            captcha, captchaSiteKey, metrics, senders, clock);
+    }
+
+    private String setting(RealmModel realm, String key) {
+        // Пустой атрибут — «не задано в проекте»: так настройку проекта снимают (check-code-limits.sh).
+        String value = realm.getAttribute(CodeLimitPolicy.REALM_ATTRIBUTE_PREFIX + key);
+        return value != null && !value.isBlank() ? value : config.get(key);
     }
 
     @Override
     public void init(Config.Scope config) {
-        // настроек пока нет
+        this.config = config;
+        // Проверяем настройки при старте: с опечаткой в лимитах Keycloak не поднимется, а не пропустит коды.
+        CodeLimitPolicy.from(config::get, CodeLimitPolicy.DEFAULTS);
+        String serverKey = config.get("captcha-server-key");
+        if (serverKey != null && !serverKey.isBlank()) {
+            captcha = CaptchaVerifier.smartCaptcha(serverKey, config.get("captcha-url", SMART_CAPTCHA_URL));
+        } else if (config.getBoolean("captcha-stub", false)) {
+            captcha = CaptchaVerifier.STUB;
+            LOG.warn("Капча кодов — заглушка стенда (captcha-stub): в бою нужен captcha-server-key");
+        } else {
+            LOG.warn("Капча кодов не настроена (captcha-server-key): после порога коды не отправляются");
+        }
+        String siteKey = config.get("captcha-site-key");
+        captchaSiteKey = siteKey == null || siteKey.isBlank() ? null : siteKey;
+        metrics = CodeMetrics.global();
     }
 
     @Override

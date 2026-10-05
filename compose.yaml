@@ -125,6 +125,21 @@ services:
       YANDEX_AUTHORIZATION_URL: ${YANDEX_AUTHORIZATION_URL:-http://localhost:${IDP_STUB_PORT:-8190}/yandex/authorize}
       YANDEX_TOKEN_URL: ${YANDEX_TOKEN_URL:-http://idp-stub:8190/yandex/token}
       YANDEX_USER_INFO_URL: ${YANDEX_USER_INFO_URL:-http://idp-stub:8190/yandex/info?format=json}
+      # Защита от накрутки кодов (docs/keycloak/10-code-limits.md). Боевые лимиты — по умолчанию в плагине; на стенде
+      # они ослаблены: скрипты проверки шлют коды с одного IP на одни и те же номера. check-code-limits.sh включает
+      # боевые значения на время проверки (атрибутами realm). Капча — заглушка: проходит токен sandbox-captcha-ok.
+      KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__COOLDOWNS: "60"
+      KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__TARGET_PER_HOUR: "1000"
+      KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__TARGET_PER_DAY: "1000"
+      KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__IP_PER_HOUR: "1000"
+      KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__RANGE_PER_HOUR: "1000"
+      KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_AFTER: "1000"
+      KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__DAILY_BUDGET: "0"
+      KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_STUB: "true"
+      # IP человека — из X-Forwarded-For, как за прокси в бою: check-code-limits.sh проверяет лимиты «с IP» с разных адресов.
+      KC_PROXY_HEADERS: xforwarded
+      # Метрики Prometheus (/metrics на порту управления 9000): отправки кодов, расход, отказы.
+      KC_METRICS_ENABLED: "true"
     volumes:
       - ./infra/keycloak/realm:/opt/keycloak/data/import:ro
       # Тема входа — в образе (jar из login-theme/). Правки страниц без Keycloak — npm run dev в login-theme/.
