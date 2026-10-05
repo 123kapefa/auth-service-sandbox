@@ -21,7 +21,9 @@ namespace AuthService.Core.Features.Admin.UseCases.ServiceKeys;
 /// Сервисы проекта и их ключи доступа. Ключ — клиент Keycloak: сервис входа регистрирует его по разрешению техника
 /// и показывает секрет один раз. Перевыпуск и отзыв сразу отзывают и уже выданные сервису токены (отметка по его учётке).
 /// Права сервиса в сервисе входа (service.*) — роли клиента приложения сервиса входа у учётки сервиса; в его токене —
-/// в permissions (маппер плагина). Права сужены — старые токены отзываются, сервис возьмёт новый.
+/// в permissions (маппер плагина). Права в других приложениях проекта («notifications:notifications.send») — роли-права
+/// клиента приложения у той же учётки: в токене они в app_permissions, а приложение — в aud (ServiceKeyPermissions).
+/// Права сужены — старые токены отзываются, сервис возьмёт новый.
 /// Частичные сбои: Keycloak изменён, а база нет (или наоборот) — порядок шагов такой, чтобы ключ не остался «ничьим»
 /// и выданные токены не жили дольше, чем надо; что не удалось исправить — в лог (для техника).
 /// </summary>
@@ -80,6 +82,12 @@ public sealed partial class ServiceKeysHandler(
             return ServiceKeyErrors.Exists(code);
         }
 
+        UnitResult<Error> known = await CheckAppPermissionsAsync(Normalize(request.Permissions), cancellationToken);
+        if (known.IsFailure)
+        {
+            return known.Error;
+        }
+
         Result<RegisteredService, Error> registered = await registry.RegisterAsync(ServiceKey.ClientIdOf(code), name, cancellationToken);
         if (registered.IsFailure)
         {
@@ -90,8 +98,7 @@ public sealed partial class ServiceKeysHandler(
         IReadOnlyList<string> permissions = Normalize(request.Permissions);
         if (permissions.Count > 0)
         {
-            UnitResult<Error> granted = await identityAdmin.SetClientRolesAsync(
-                registered.Value.ServiceAccountId, AppClientId, permissions, [], cancellationToken);
+            UnitResult<Error> granted = await ApplyAsync(registered.Value.ServiceAccountId, permissions, [], cancellationToken);
             if (granted.IsFailure)
             {
                 // Без прав ключ выдавать не будем: клиент в Keycloak убираем, чтобы не остался «ничей».
@@ -123,7 +130,12 @@ public sealed partial class ServiceKeysHandler(
         return new IssuedServiceKeyResponse(ToResponse(key, permissions), registered.Value.ClientSecret);
     }
 
-    public async Task<Result<IssuedServiceKeyResponse, Error>> RotateAsync(string code, CancellationToken cancellationToken)
+    /// <summary>
+    /// Новый секрет. Старый Keycloak сразу перестаёт принимать. Выданные по старому токены — по умолчанию тоже сразу
+    /// (ключ мог утечь); keepTokens — плановая смена: они доживают свой срок (минуты), и сервис, который читает секрет
+    /// из файла (ServiceToken:ClientSecretFile), подхватывает новый без остановки и без перезапуска.
+    /// </summary>
+    public async Task<Result<IssuedServiceKeyResponse, Error>> RotateAsync(string code, bool keepTokens, CancellationToken cancellationToken)
     {
         ServiceKey? key = await store.FindAsync(code, cancellationToken);
         if (key is null)
@@ -156,9 +168,13 @@ public sealed partial class ServiceKeysHandler(
             LogStoreFailed(logger, key.ClientId, exception);
         }
 
-        // Ключ перевыпускают, когда старый мог утечь: выданные по нему токены — тоже недействительны.
-        await RevokeTokensAsync(key, now, CancellationToken.None);
-        await RecordAsync(AuditActions.SERVICE_KEY_ROTATED, key, new { }, CancellationToken.None);
+        // Старый ключ мог утечь: выданные по нему токены — тоже недействительны. Плановая смена — пусть доживут.
+        if (!keepTokens)
+        {
+            await RevokeTokensAsync(key, now, CancellationToken.None);
+        }
+
+        await RecordAsync(AuditActions.SERVICE_KEY_ROTATED, key, new { keepTokens }, CancellationToken.None);
         Result<IReadOnlyList<string>, Error> permissions = await PermissionsOfAsync(key, CancellationToken.None);
         return new IssuedServiceKeyResponse(ToResponse(key, permissions.IsSuccess ? permissions.Value : null), rotated.Value.ClientSecret);
     }
@@ -190,9 +206,15 @@ public sealed partial class ServiceKeysHandler(
         IReadOnlyList<string> wanted = Normalize(request.Permissions);
         string[] grant = [.. wanted.Except(current.Value, StringComparer.Ordinal)];
         string[] revoke = [.. current.Value.Except(wanted, StringComparer.Ordinal)];
+        UnitResult<Error> known = await CheckAppPermissionsAsync(grant, cancellationToken);
+        if (known.IsFailure)
+        {
+            return known.Error;
+        }
+
         if (grant.Length > 0 || revoke.Length > 0)
         {
-            UnitResult<Error> changed = await identityAdmin.SetClientRolesAsync(key.ServiceAccountId, AppClientId, grant, revoke, cancellationToken);
+            UnitResult<Error> changed = await ApplyAsync(key.ServiceAccountId, grant, revoke, cancellationToken);
             if (changed.IsFailure)
             {
                 return changed.Error;
@@ -279,17 +301,132 @@ public sealed partial class ServiceKeysHandler(
     /// <summary>Клиент приложения сервиса входа: на нём права сервисов (service.*).</summary>
     private string AppClientId => authentication.Value.Audience;
 
+    /// <summary>
+    /// Права, которые можно выдать ключу в приложениях проекта: права (kind=permission) каждого приложения, кроме сервиса
+    /// входа (там — только service.*). Приложения без прав не попадают.
+    /// </summary>
+    public async Task<Result<IReadOnlyList<GrantableAppPermissionsResponse>, Error>> GrantableAsync(CancellationToken cancellationToken)
+    {
+        Result<IReadOnlyList<ProjectApp>, Error> apps = await ProjectAppsAsync(cancellationToken);
+        return apps.IsFailure
+            ? apps.Error
+            : Result.Success<IReadOnlyList<GrantableAppPermissionsResponse>, Error>(
+            [
+                .. apps.Value.Select(app => new GrantableAppPermissionsResponse(
+                    app.ClientId,
+                    app.Name,
+                    [.. app.Permissions.Select(permission => new GrantablePermissionResponse(
+                        ServiceKeyPermissions.Qualify(app.ClientId, permission.Name), permission.Name, permission.Description))])),
+            ]);
+    }
+
     private async Task<Result<IReadOnlyList<string>, Error>> PermissionsOfAsync(ServiceKey key, CancellationToken cancellationToken)
     {
         Result<IReadOnlyList<string>, Error> roles = await identityAdmin.GetClientRolesAsync(key.ServiceAccountId, AppClientId, cancellationToken);
-        return roles.IsSuccess ? Result.Success<IReadOnlyList<string>, Error>(Normalize(roles.Value)) : roles.Error;
+        if (roles.IsFailure)
+        {
+            return roles.Error;
+        }
+
+        Result<IReadOnlyList<ProjectApp>, Error> apps = await ProjectAppsAsync(cancellationToken);
+        if (apps.IsFailure)
+        {
+            return apps.Error;
+        }
+
+        List<string> permissions = [.. roles.Value];
+        foreach (ProjectApp app in apps.Value)
+        {
+            Result<IReadOnlyList<string>, Error> granted = await identityAdmin.GetClientRolesAsync(key.ServiceAccountId, app.ClientId, cancellationToken);
+            if (granted.IsFailure)
+            {
+                return granted.Error;
+            }
+
+            permissions.AddRange(granted.Value
+                .Where(name => app.Permissions.Any(permission => string.Equals(permission.Name, name, StringComparison.Ordinal)))
+                .Select(name => ServiceKeyPermissions.Qualify(app.ClientId, name)));
+        }
+
+        return Result.Success<IReadOnlyList<string>, Error>(Normalize(permissions));
     }
 
-    // Только права сервисов, без повторов, по алфавиту.
+    // Выдать и снять права: service.* — в клиенте сервиса входа, «приложение:право» — в клиенте приложения.
+    private async Task<UnitResult<Error>> ApplyAsync(Guid serviceAccountId, IReadOnlyCollection<string> grant, IReadOnlyCollection<string> revoke, CancellationToken cancellationToken)
+    {
+        foreach (string app in grant.Concat(revoke).Select(AppOf).Distinct(StringComparer.Ordinal))
+        {
+            UnitResult<Error> changed = await identityAdmin.SetClientRolesAsync(
+                serviceAccountId,
+                app,
+                [.. grant.Where(permission => string.Equals(AppOf(permission), app, StringComparison.Ordinal)).Select(NameOf)],
+                [.. revoke.Where(permission => string.Equals(AppOf(permission), app, StringComparison.Ordinal)).Select(NameOf)],
+                cancellationToken);
+            if (changed.IsFailure)
+            {
+                return changed;
+            }
+        }
+
+        return UnitResult.Success<Error>();
+    }
+
+    // Права в приложениях — только существующие права (kind=permission) подключённых приложений.
+    private async Task<UnitResult<Error>> CheckAppPermissionsAsync(IReadOnlyCollection<string> permissions, CancellationToken cancellationToken)
+    {
+        if (!permissions.Any(ServiceKeyPermissions.IsAppPermission))
+        {
+            return UnitResult.Success<Error>();
+        }
+
+        Result<IReadOnlyList<ProjectApp>, Error> apps = await ProjectAppsAsync(cancellationToken);
+        if (apps.IsFailure)
+        {
+            return apps.Error;
+        }
+
+        HashSet<string> known = [.. apps.Value.SelectMany(app => app.Permissions.Select(permission => ServiceKeyPermissions.Qualify(app.ClientId, permission.Name)))];
+        string[] unknown = [.. permissions.Where(ServiceKeyPermissions.IsAppPermission).Where(permission => !known.Contains(permission))];
+        return unknown.Length == 0 ? UnitResult.Success<Error>() : ServiceKeyErrors.UnknownPermissions(unknown);
+    }
+
+    // Приложения проекта с правами (кроме сервиса входа): клиенты, видимые сервису входа, у которых есть роли-права.
+    private async Task<Result<IReadOnlyList<ProjectApp>, Error>> ProjectAppsAsync(CancellationToken cancellationToken)
+    {
+        Result<IReadOnlyList<ClientInfo>, Error> clients = await identityAdmin.GetClientsAsync(cancellationToken);
+        if (clients.IsFailure)
+        {
+            return clients.Error;
+        }
+
+        List<ProjectApp> apps = [];
+        foreach (ClientInfo client in clients.Value.Where(client => !string.Equals(client.ClientId, AppClientId, StringComparison.Ordinal)))
+        {
+            Result<IReadOnlyList<AppRole>, Error> roles = await identityAdmin.GetAppRolesAsync(client.ClientId, cancellationToken);
+            AppRole[] permissions = roles.IsSuccess ? [.. roles.Value.Where(AppCatalog.IsPermission).OrderBy(role => role.Name, StringComparer.Ordinal)] : [];
+            if (permissions.Length > 0)
+            {
+                apps.Add(new ProjectApp(client.ClientId, client.Name, permissions));
+            }
+        }
+
+        return apps.OrderBy(app => app.ClientId, StringComparer.Ordinal).ToList();
+    }
+
+    private string AppOf(string permission) =>
+        ServiceKeyPermissions.TryParse(permission, out string app, out _) ? app : AppClientId;
+
+    private static string NameOf(string permission) =>
+        ServiceKeyPermissions.TryParse(permission, out _, out string name) ? name : permission;
+
+    // Только права сервисов и права в приложениях, без повторов, по алфавиту.
     private static IReadOnlyList<string> Normalize(IEnumerable<string>? permissions) =>
-        [.. (permissions ?? []).Where(permission => AuthServicePermissions.ServiceAccess.All.Contains(permission, StringComparer.Ordinal))
+        [.. (permissions ?? []).Where(permission => AuthServicePermissions.ServiceAccess.All.Contains(permission, StringComparer.Ordinal)
+                                                    || ServiceKeyPermissions.IsAppPermission(permission))
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)];
+
+    private sealed record ProjectApp(string ClientId, string? Name, IReadOnlyList<AppRole> Permissions);
 
     private static ServiceKeyResponse ToResponse(ServiceKey key, IReadOnlyList<string>? permissions) =>
         new(key.Code, key.ClientId, key.Name, key.IssuedAt, key.RotatedAt, permissions);
@@ -310,6 +447,33 @@ public sealed partial class ServiceKeysHandler(
     private static partial void LogUnreadable(ILogger logger, string clientId, Exception exception);
 }
 
+/// <summary>
+/// Права ключа: service.* — в сервисе входа, «приложение:право» — в приложении проекта (notifications:notifications.send).
+/// Имя права уникально только внутри приложения, поэтому право в приложении — всегда с его кодом.
+/// </summary>
+public static class ServiceKeyPermissions
+{
+    public const char SEPARATOR = ':';
+
+    public static string Qualify(string app, string permission) => app + SEPARATOR + permission;
+
+    public static bool TryParse(string permission, out string app, out string name)
+    {
+        ArgumentNullException.ThrowIfNull(permission);
+        int separator = permission.IndexOf(SEPARATOR, StringComparison.Ordinal);
+        app = separator > 0 ? permission[..separator] : string.Empty;
+        name = separator > 0 ? permission[(separator + 1)..] : string.Empty;
+        return separator > 0 && name.Length > 0 && !name.Contains(SEPARATOR, StringComparison.Ordinal)
+            && System.Text.RegularExpressions.Regex.IsMatch(app, IssueServiceKeyRequestValidator.CODE_PATTERN);
+    }
+
+    public static bool IsAppPermission(string permission) => TryParse(permission, out _, out _);
+
+    /// <summary>Право, которое можно выдать ключу: service.* или право в приложении.</summary>
+    public static bool IsValid(string? permission) =>
+        permission is not null && (AuthServicePermissions.ServiceAccess.All.Contains(permission, StringComparer.Ordinal) || IsAppPermission(permission));
+}
+
 public static class ServiceKeyErrors
 {
     public static Error Exists(string code) =>
@@ -324,6 +488,10 @@ public static class ServiceKeyErrors
     /// <summary>Токен управления ключом не расшифровать (сменились ключи DataProtection).</summary>
     public static Error Unreadable(string code) =>
         Error.Conflict("services.management_unreadable", $"Ключом сервиса «{code}» не управлять: токен управления не расшифровать. Отзовите ключ и выдайте новый.");
+
+    /// <summary>Таких прав в приложениях проекта нет (опечатка, приложение не подключено или право не объявлено).</summary>
+    public static Error UnknownPermissions(IReadOnlyList<string> permissions) =>
+        Error.Validation("services.unknown_permissions", $"Таких прав в приложениях проекта нет: {string.Join(", ", permissions)}.", "permissions");
 
     /// <summary>Ключом больше не управлять через Keycloak (токен управления не принят или не прочитан).</summary>
     public static bool IsManagementLost(Error error) =>

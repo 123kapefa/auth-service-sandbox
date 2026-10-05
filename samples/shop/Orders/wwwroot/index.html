@@ -44,7 +44,7 @@
   </section>
   <section id="me" hidden>
     <h2>Мой доступ в «Заказах»</h2>
-    <p>Режим: <b id="mode"></b></p>
+    <p>Режим: <b id="mode"></b> · <a id="account" target="_blank" rel="noopener">сменить в личном кабинете</a></p>
     <div class="tags" id="permissions"></div>
   </section>
   <section id="mine" hidden>
@@ -61,68 +61,23 @@
   </section>
 </main>
 <script>
-// Вход — OAuth 2.0 Authorization Code + PKCE, клиент «Заказов» (orders-web) в realm проекта. Токены — в памяти
-// вкладки (sessionStorage), в API «Заказов» — заголовком Authorization.
+// Вход — готовый модуль сервиса входа проекта (/sdk/platform-login.js): Authorization Code + PKCE, клиент «Заказов»
+// (orders-web). Токены — в sessionStorage вкладки, в API «Заказов» — заголовком Authorization.
 const $ = (id) => document.getElementById(id);
-const store = sessionStorage;
-let config;
+let config, auth;
 
-const b64url = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-const random = () => b64url(crypto.getRandomValues(new Uint8Array(32)));
-const oidc = (path) => `${config.authority}/protocol/openid-connect/${path}`;
-const redirectUri = () => location.origin + '/';
-
-async function login() {
-  const verifier = random(), state = random();
-  store.setItem('pkce', JSON.stringify({ verifier, state }));
-  const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
-  location.href = oidc('auth') + '?' + new URLSearchParams({
-    client_id: config.clientId, response_type: 'code', scope: 'openid', redirect_uri: redirectUri(), state,
-    code_challenge: challenge, code_challenge_method: 'S256',
-    platform_app: config.app, // оформление приложения на страницах входа
-  });
-}
-
-async function token(params) {
-  const response = await fetch(oidc('token'), { method: 'POST', body: new URLSearchParams({ client_id: config.clientId, ...params }) });
-  if (!response.ok) throw new Error('Сервис входа не выдал токен: ' + response.status);
-  const tokens = await response.json();
-  store.setItem('tokens', JSON.stringify(tokens));
-  return tokens;
-}
-
-// Возврат со страницы входа: код → токены.
-async function finishLogin() {
-  const query = new URLSearchParams(location.search);
-  if (!query.has('code') && !query.has('error')) return;
-  history.replaceState(null, '', '/');
-  const pkce = JSON.parse(store.getItem('pkce') || '{}');
-  store.removeItem('pkce');
-  if (query.has('error')) throw new Error(query.get('error_description') || query.get('error'));
-  if (query.get('state') !== pkce.state) throw new Error('Вход начат не здесь — войдите ещё раз');
-  await token({ grant_type: 'authorization_code', code: query.get('code'), code_verifier: pkce.verifier, redirect_uri: redirectUri() });
-}
-
-function logout() {
-  const tokens = JSON.parse(store.getItem('tokens') || '{}');
-  store.removeItem('tokens');
-  location.href = oidc('logout') + '?' + new URLSearchParams({ id_token_hint: tokens.id_token || '', post_logout_redirect_uri: redirectUri() });
-}
-
-// Запрос к «Заказам». 401 — токен истёк или доступ изменился (access_changed): обновить и повторить один раз.
-async function api(path, options = {}, retry = true) {
-  const tokens = JSON.parse(store.getItem('tokens') || 'null');
-  if (!tokens) return null;
-  const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tokens.access_token } });
-  if (response.status === 401 && retry && tokens.refresh_token) {
-    try { await token({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token }); } catch { store.removeItem('tokens'); return null; }
-    return api(path, options, false);
-  }
-  if (response.status === 401) { store.removeItem('tokens'); return null; }
+// Запрос к «Заказам»: 401 (токен истёк, роли или режим изменились) модуль лечит сам — обновляет токен и повторяет.
+async function api(path, options = {}) {
+  if (!auth.isLoggedIn()) return null;
+  const response = await auth.fetch(path, { ...options, headers: { 'Content-Type': 'application/json' } });
+  if (response.status === 401) return null;
   if (response.status === 403) return { forbidden: true };
   if (!response.ok) throw new Error(`«Заказы» ответили ${response.status}`);
   return response.json();
 }
+
+const loadScript = (src) => new Promise((resolve, reject) =>
+  document.head.append(Object.assign(document.createElement('script'), { src, onload: resolve, onerror: () => reject(new Error('Сервис входа недоступен: ' + src)) })));
 
 const cell = (text) => { const td = document.createElement('td'); td.textContent = text ?? '—'; return td; };
 
@@ -172,8 +127,8 @@ async function run(action) {
   try { await action(); await render(); } catch (error) { $('error').textContent = error.message; $('error').hidden = false; }
 }
 
-$('login').onclick = () => run(login);
-$('logout').onclick = logout;
+$('login').onclick = () => run(() => auth.login());
+$('logout').onclick = () => auth.logout();
 $('create').onsubmit = (event) => {
   event.preventDefault();
   run(async () => { await api('/api/orders', { method: 'POST', body: JSON.stringify({ item: $('item').value }) }); $('item').value = ''; });
@@ -182,7 +137,10 @@ $('create').onsubmit = (event) => {
 run(async () => {
   config = await (await fetch('/config')).json();
   $('project').textContent = `${config.project} · Заказы`;
-  await finishLogin();
+  $('account').href = config.authService + '/account/';
+  await loadScript(config.authService + '/sdk/platform-login.js');
+  auth = PlatformLogin.create({ authority: config.authority, clientId: config.clientId, app: config.app });
+  await auth.handleRedirect();
 });
 </script>
 </body>

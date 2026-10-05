@@ -18,12 +18,12 @@
   </PropertyGroup>
 
   <!--
-    Поставка сервиса входа как компонента: версия — одна на пакеты и образы (scripts/package/pack.sh,
-    scripts/package/build-images.sh). Пакетами становятся только библиотеки для сервисов проекта (IsPackable=true в
+    Поставка сервиса входа как компонента: версия (VersionPrefix) — одна на пакеты и образы (scripts/package/pack.sh,
+    scripts/package/build-images.sh); пакетам локального фида pack.sh добавляет суффикс сборки (0.1.0-dev.…). Пакетами становятся только библиотеки для сервисов проекта (IsPackable=true в
     их csproj); сам сервис — Docker-образ.
   -->
   <PropertyGroup>
-    <Version>0.1.0</Version>
+    <VersionPrefix>0.1.0</VersionPrefix>
     <IsPackable>false</IsPackable>
     <Authors>Platform Auth</Authors>
     <PackageProjectUrl>https://github.com/123kapefa/auth-service-sandbox</PackageProjectUrl>

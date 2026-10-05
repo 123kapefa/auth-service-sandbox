@@ -5,7 +5,8 @@ import { notifyDone, notifyError } from "@/shared/lib/notify";
 export function useRotateServiceKey() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (code: string) => serviceKeyApi.rotate(code),
+    mutationFn: ({ code, keepTokens }: { code: string; keepTokens: boolean }) =>
+      serviceKeyApi.rotate(code, keepTokens),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: serviceKeyQueries.all() });
     },

@@ -2,10 +2,18 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
+  <!--
+    Пакеты сервиса входа: локальный фид (scripts/package/pack.sh → artifacts/nuget), см. nuget.config. Версия — из фида:
+    у каждой локальной сборки своя (0.1.0-dev.…), поэтому кэш NuGet не подсовывает старый пакет. В своём проекте —
+    просто номер версии из фида компании.
+  -->
+  <Import Project="../../artifacts/nuget/platform-version.props" Condition="Exists('../../artifacts/nuget/platform-version.props')" />
+  <PropertyGroup>
+    <PlatformVersion Condition="'$(PlatformVersion)' == ''">0.1.0</PlatformVersion>
+  </PropertyGroup>
   <ItemGroup>
-    <!-- Пакеты сервиса входа: локальный фид (scripts/package/pack.sh → artifacts/nuget), см. nuget.config. -->
-    <PackageVersion Include="Platform.Authentication" Version="0.1.0" />
-    <PackageVersion Include="Platform.Authentication.Redis" Version="0.1.0" />
-    <PackageVersion Include="Platform.AuthService.Client" Version="0.1.0" />
+    <PackageVersion Include="Platform.Authentication" Version="$(PlatformVersion)" />
+    <PackageVersion Include="Platform.Authentication.Redis" Version="$(PlatformVersion)" />
+    <PackageVersion Include="Platform.AuthService.Client" Version="$(PlatformVersion)" />
   </ItemGroup>
 </Project>

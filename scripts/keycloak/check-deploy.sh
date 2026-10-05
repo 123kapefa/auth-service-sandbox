@@ -15,7 +15,7 @@ ADMIN_PHONE=79995550101
 API="https://localhost:18444"
 KC_PUBLIC="https://localhost:18443"
 KC="http://localhost:18180"
-VERSION=$(sed -n 's#.*<Version>\(.*\)</Version>.*#\1#p' "$ROOT/Directory.Build.props" | head -1)
+VERSION=$(sed -n 's#.*<VersionPrefix>\(.*\)</VersionPrefix>.*#\1#p' "$ROOT/Directory.Build.props" | head -1)
 
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"

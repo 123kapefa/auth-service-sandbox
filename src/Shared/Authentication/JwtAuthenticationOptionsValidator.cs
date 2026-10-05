@@ -14,6 +14,7 @@ public sealed class JwtAuthenticationOptionsValidator : IValidateOptions<JwtAuth
         List<string> failures = [];
 
         CheckUrl(failures, $"{SECTION}:Authority", options.Authority, isRequired: true, options.RequireHttpsMetadata);
+        CheckUrl(failures, $"{SECTION}:InternalAuthority", options.InternalAuthority, isRequired: false, options.RequireHttpsMetadata);
         CheckUrl(failures, $"{SECTION}:MetadataAddress", options.MetadataAddress, isRequired: false, options.RequireHttpsMetadata);
         CheckUrl(failures, $"{SECTION}:ValidIssuer", options.ValidIssuer, isRequired: false, requireHttps: false);
 

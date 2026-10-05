@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type AccountProfile, accountProfileQueries } from "@/entities/account-profile";
+import { appModeQueries } from "@/entities/app-mode";
 import { renderWithProviders } from "@/test/render";
 import { AccountProfilePage } from "../ui/account-profile-page";
 
@@ -31,6 +32,7 @@ function linkUrl(name: string): URL {
 function renderPage(data: AccountProfile, route = "/") {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   queryClient.setQueryData(accountProfileQueries.profile().queryKey, data);
+  queryClient.setQueryData(appModeQueries.list().queryKey, []);
   return renderWithProviders(
     <Suspense>
       <AccountProfilePage />

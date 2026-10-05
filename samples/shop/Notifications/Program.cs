@@ -1,11 +1,13 @@
 using AuthService.Client;
+using AuthService.Client.AppCatalog;
 using Notifications;
 using PlatformAuth;
 using PlatformAuth.Redis;
 
 // «Уведомления» магазина: внутренний сервис, людям сюда хода нет. Присылать уведомления может только сервис проекта
-// по своему ключу и только из списка Notifications:AllowedServices («Заказы»). Кому и куда писать — узнаёт у сервиса
-// входа своим ключом (право service.users.read): телефон и почта получателя.
+// по своему ключу, если админ выдал его ключу право «Уведомлений» notifications.send («Сервисы и ключи» → «Права»).
+// Токен такого ключа адресован и «Уведомлениям» (aud=notifications), права в нём — по приложениям: здесь видны только
+// права в «Уведомлениях». Кому и куда писать — узнаёт у сервиса входа своим ключом (service.users.read).
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddPlatformJwtAuthentication(builder.Configuration);
@@ -14,6 +16,10 @@ builder.Services.AddPlatformPermissions();
 // Отозванный ключ перестаёт действовать сразу: сервис входа гасит его токены отметкой в Redis.
 builder.Services.AddPlatformTokenRevocation(builder.Configuration);
 builder.Services.AddAuthServiceClient(builder.Configuration);
+// Свои права — из кода: их выдают ключам других сервисов. Ролей для людей у «Уведомлений» нет.
+builder.Services.AddAppCatalog(builder.Configuration, catalog => catalog
+    .Permission(NotificationPermissions.SEND, "Присылать уведомления")
+    .Permission(NotificationPermissions.READ, "Читать журнал уведомлений"));
 
 builder.Services.Configure<NotificationOptions>(builder.Configuration.GetSection(NotificationOptions.SECTION_NAME));
 builder.Services.AddSingleton<NotificationLog>();
@@ -26,14 +32,7 @@ app.UseAuthorization();
 
 app.MapGet("/health/live", () => Results.Ok());
 
-// Свой список сервисов: право «присылать уведомления» в ключе не выдать — права ключа есть только в сервисе входа.
-RouteGroupBuilder api = app.MapGroup("/api/notifications")
-    .RequireService()
-    .RequireAuthorization(policy => policy.RequireClaim(
-        AuthClaims.CLIENT_ID,
-        app.Configuration.GetSection("Notifications:AllowedServices").Get<string[]>() ?? []));
-
-api.MapPost(string.Empty, async (NewNotification request, CurrentUser caller, IAuthServiceClient authService, Delivery delivery,
+app.MapPost("/api/notifications", async (NewNotification request, CurrentUser caller, IAuthServiceClient authService, Delivery delivery,
     NotificationLog log, CancellationToken cancellationToken) =>
 {
     if (request.UserId == Guid.Empty || string.IsNullOrWhiteSpace(request.Text))
@@ -56,11 +55,18 @@ api.MapPost(string.Empty, async (NewNotification request, CurrentUser caller, IA
     Notification sent = await delivery.SendAsync(user.Value, request.Text.Trim(), caller.ServiceClientId!, cancellationToken);
     log.Add(sent);
     return Results.Ok(sent);
-});
+}).RequireService(NotificationPermissions.SEND);
 
 // Журнал: что и кому отправлено (для проверки и отладки).
-api.MapGet(string.Empty, (Guid? userId, NotificationLog log) => log.Of(userId));
+app.MapGet("/api/notifications", (Guid? userId, NotificationLog log) => log.Of(userId))
+    .RequireService(NotificationPermissions.READ);
 
 app.Run();
 
 internal sealed record NewNotification(Guid UserId, string? Text);
+
+internal static class NotificationPermissions
+{
+    public const string SEND = "notifications.send";
+    public const string READ = "notifications.read";
+}

@@ -11,9 +11,21 @@ public static class ServiceTokenExtensions
     {
         services.AddOptions<ServiceTokenOptions>()
             .Bind(configuration.GetSection(ServiceTokenOptions.SECTION_NAME))
-            .Validate(options => !string.IsNullOrWhiteSpace(options.ClientId) && !string.IsNullOrWhiteSpace(options.ClientSecret)
+            .PostConfigure(options =>
+            {
+                // Адрес сервера входа — тот же, что для проверки токенов: второй раз его не задают.
+                if (string.IsNullOrWhiteSpace(options.Authority))
+                {
+                    IConfigurationSection authentication = configuration.GetSection(JwtAuthenticationOptions.SECTION_NAME);
+                    options.Authority = authentication[nameof(JwtAuthenticationOptions.InternalAuthority)] is { Length: > 0 } inside
+                        ? inside
+                        : authentication[nameof(JwtAuthenticationOptions.Authority)] ?? string.Empty;
+                }
+            })
+            .Validate(options => !string.IsNullOrWhiteSpace(options.ClientId)
+                                 && (!string.IsNullOrWhiteSpace(options.ClientSecret) || !string.IsNullOrWhiteSpace(options.ClientSecretFile))
                                  && (!string.IsNullOrWhiteSpace(options.Authority) || !string.IsNullOrWhiteSpace(options.TokenEndpoint)),
-                "ServiceToken: нужны ClientId, ClientSecret и Authority (или TokenEndpoint).")
+                "ServiceToken: нужны ClientId, ClientSecret (или ClientSecretFile) и адрес сервера входа (Authentication:Authority).")
             .ValidateOnStart();
         services.TryAddSingleton(TimeProvider.System);
         services.AddHttpClient(ServiceTokenProvider.HTTP_CLIENT);

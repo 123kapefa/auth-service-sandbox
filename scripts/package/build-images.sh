@@ -6,7 +6,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-VERSION=$(sed -n 's#.*<Version>\(.*\)</Version>.*#\1#p' "$ROOT/Directory.Build.props" | head -1)
+VERSION=$(sed -n 's#.*<VersionPrefix>\(.*\)</VersionPrefix>.*#\1#p' "$ROOT/Directory.Build.props" | head -1)
 PREFIX="${REGISTRY:+$REGISTRY/}"
 
 build() {

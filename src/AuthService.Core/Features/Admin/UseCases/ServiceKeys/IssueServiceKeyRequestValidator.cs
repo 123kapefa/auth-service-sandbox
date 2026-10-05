@@ -1,5 +1,4 @@
 using AuthService.Contracts.Admin;
-using AuthService.Core.Authorization;
 using AuthService.Domain.ServiceKeys;
 using FluentValidation;
 using SharedKernel;
@@ -31,16 +30,16 @@ public sealed class IssueServiceKeyRequestValidator : AbstractValidator<IssueSer
             .MaximumLength(ServiceKey.MAX_NAME_LENGTH)
             .WithError(GeneralErrors.LengthIsInvalid("name", max: ServiceKey.MAX_NAME_LENGTH));
         RuleForEach(request => request.Permissions)
-            .Must(permission => AuthServicePermissions.ServiceAccess.All.Contains(permission, StringComparer.Ordinal))
+            .Must(ServiceKeyPermissions.IsValid)
             .WithError(GeneralErrors.ValueIsInvalid("permissions"));
     }
 }
 
-/// <summary>Права сервиса — только из списка прав сервисов (service.*).</summary>
+/// <summary>Права сервиса — service.* или права в приложениях проекта («приложение:право»).</summary>
 public sealed class SetServicePermissionsRequestValidator : AbstractValidator<SetServicePermissionsRequest>
 {
     public SetServicePermissionsRequestValidator() =>
         RuleForEach(request => request.Permissions)
-            .Must(permission => AuthServicePermissions.ServiceAccess.All.Contains(permission, StringComparer.Ordinal))
+            .Must(ServiceKeyPermissions.IsValid)
             .WithError(GeneralErrors.ValueIsInvalid("permissions"));
 }
