@@ -32,8 +32,8 @@ scripts/keycloak/check-stand.sh
 `check-roles.sh` 71, `check-admin-ui.sh` 28, `check-migration.sh` 26 (нужен .NET SDK), `check-service-keys.sh` 34 (нужно
 разрешение на регистрацию: `scripts/keycloak/registration-token.sh --write-env`, затем `docker compose up -d --wait`),
 весь этап 6б — `check-6b.sh` 138 (кабинет, устройства, оформление, новый проект), магазин из двух сервисов (этап 6а.4) —
-`check-shop.sh` 45. Тестов: .NET — 548, плагина Keycloak
-(Java, в сборке образа) — 83, админки и кабинета (Vitest) — 83, темы входа (Vitest) — 30.
+`check-shop.sh` 61. Тестов: .NET — 556, плагина Keycloak
+(Java, в сборке образа) — 83, админки и кабинета (Vitest) — 87, темы входа (Vitest) — 30.
 
 Стенд, поднятый до этапа 6б, после `git pull` и `docker compose up -d --build --wait` — `scripts/project/upgrade-6b.py
 sandbox` (realm импортируется только в пустую базу; подробнее — [06b](06b-account-branding.md#проекты-созданные-до-6б)).
@@ -76,7 +76,7 @@ sandbox` (realm импортируется только в пустую базу
 | 4в | Свой интерфейс входа (Keycloakify): страницы входа и письма | ✅ | [04v-login-ui.md](04v-login-ui.md) |
 | 5 | Спайк: вход по коду — SMS и почта (Java-плагин) | ✅ | [05-code-login.md](05-code-login.md) |
 | 6 | Спайк: миграция пользователей с BCrypt | ✅ | [06-bcrypt-migration.md](06-bcrypt-migration.md) |
-| 6а | Сервис входа как компонент: ключи сервисов, новый проект, поставка | 🔄 | [06a-embedding.md](06a-embedding.md) |
+| 6а | Сервис входа как компонент: ключи сервисов, новый проект, поставка | 🔄 | [06a-embedding.md](06a-embedding.md), [как встроить](../embedding-guide.md) |
 | 6б | Личный кабинет и оформление под проект | ✅ | [06b-account-branding.md](06b-account-branding.md) |
 | 7 | Документация | идёт по ходу | — |
 | 8 | Выводы и ADR | ⬜ | — |

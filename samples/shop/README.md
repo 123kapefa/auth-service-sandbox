@@ -11,8 +11,10 @@ scripts/keycloak/check-shop.sh        # проверка целиком
 Магазин — http://localhost:5300: покупатель `79995550003`, сотрудник `79995550002` (пароль `Test1234!`), новый
 покупатель — «Войти по коду». Письма — http://localhost:8025.
 
-Права и роли «Заказов» руками не заводятся: сервис объявляет их сам при старте — `AddAppCatalog` в
-`Orders/Program.cs` (как и зачем — в комментариях к `AppCatalogBuilder` в пакете `Platform.AuthService.Client`).
+Права и роли «Заказов» и «Уведомлений» руками не заводятся: сервисы объявляют их сами при старте — `AddAppCatalog` в
+`Program.cs` (как и зачем — в комментариях к `AppCatalogBuilder` в пакете `Platform.AuthService.Client`). Право
+«Заказов» слать уведомления — право ключа в приложении «Уведомления»; секреты ключей — файлами в `.secrets/`.
+Сотрудник работает в режиме «Сотрудник» — выбран в кабинете (http://localhost:8082/account).
 
-Подробно — [docs/keycloak/06a-embedding.md](../../docs/keycloak/06a-embedding.md#магазин-заказы-и-уведомления),
+Как встроить так же в свой проект — [руководство](../../docs/embedding-guide.md). Подробно — [docs/keycloak/06a-embedding.md](../../docs/keycloak/06a-embedding.md#магазин-заказы-и-уведомления),
 что мешало — [журнал трений](../../docs/keycloak/06a-friction.md).
