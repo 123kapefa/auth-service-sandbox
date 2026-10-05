@@ -5,7 +5,10 @@ export interface ServiceKey {
   name: string;
   issuedAt: string;
   rotatedAt: string | null;
-  /** Что сервису можно в сервисе входа: service.users.read, service.access.check, service.catalog.declare; null — не удалось прочитать. */
+  /**
+   * Что сервису можно: в сервисе входа — service.users.read, service.access.check, service.catalog.declare; в приложениях
+   * проекта — «приложение:право» (notifications:notifications.send). null — не удалось прочитать.
+   */
   permissions: string[] | null;
 }
 
@@ -13,6 +16,18 @@ export interface ServiceKey {
 export interface IssuedServiceKey {
   service: ServiceKey;
   clientSecret: string;
+}
+
+/** Права приложения проекта, которые можно выдать ключу (GET /auth/admin/services/grantable). */
+export interface GrantableApp {
+  app: string;
+  name: string | null;
+  permissions: {
+    /** Как выдать ключу: notifications:notifications.send. */
+    key: string;
+    name: string;
+    description: string | null;
+  }[];
 }
 
 export interface ServiceKeyDraft {

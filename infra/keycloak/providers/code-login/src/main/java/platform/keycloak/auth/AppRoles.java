@@ -1,8 +1,12 @@
 package platform.keycloak.auth;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.RoleModel;
@@ -54,6 +58,26 @@ final class AppRoles {
             .map(RoleModel::getName)
             .sorted()
             .toList();
+    }
+
+    /**
+     * Права служебной учётки в других приложениях проекта: клиент приложения → права, выданные учётке прямо (роли
+     * клиента с kind=permission). Приложение own (носитель permissions токена) не входит. Порядок — по приложению.
+     */
+    static Map<String, List<String>> serviceAppPermissionsOf(ClientModel own, UserModel serviceAccount) {
+        Map<String, List<String>> apps = new TreeMap<>();
+        serviceAccount.getRoleMappingsStream()
+            .filter(RoleModel::isClientRole)
+            .filter(AppRoles::isPermission)
+            .filter(role -> !own.getId().equals(role.getContainerId()))
+            .forEach(role -> {
+                ClientModel app = own.getRealm().getClientById(role.getContainerId());
+                if (app != null) {
+                    apps.computeIfAbsent(app.getClientId(), key -> new ArrayList<>()).add(role.getName());
+                }
+            });
+        apps.values().forEach(Collections::sort);
+        return apps;
     }
 
     /**

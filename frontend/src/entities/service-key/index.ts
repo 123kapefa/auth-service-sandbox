@@ -1,5 +1,6 @@
 export { serviceKeyApi, serviceKeyQueries } from "./api";
 export {
+  type GrantableApp,
   type IssuedServiceKey,
   SERVICE_PERMISSIONS,
   type ServiceKey,

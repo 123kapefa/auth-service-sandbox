@@ -72,7 +72,7 @@ public sealed class ServiceTokenProvider(
         {
             ["grant_type"] = "client_credentials",
             ["client_id"] = settings.ClientId,
-            ["client_secret"] = settings.ClientSecret,
+            ["client_secret"] = settings.ResolveClientSecret(),
         });
         using HttpClient client = httpClientFactory.CreateClient(HTTP_CLIENT);
         using HttpResponseMessage response = await client.PostAsync(settings.ResolveTokenEndpoint(), form, cancellationToken);

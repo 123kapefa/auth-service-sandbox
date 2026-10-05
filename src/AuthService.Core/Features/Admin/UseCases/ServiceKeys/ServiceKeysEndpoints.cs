@@ -5,6 +5,7 @@ using Framework.Endpoints;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Routing;
 using PlatformAuth;
 using SharedKernel;
@@ -13,7 +14,8 @@ namespace AuthService.Core.Features.Admin.UseCases.ServiceKeys;
 
 /// <summary>
 /// Сервисы проекта и ключи доступа — право services.manage (админ проекта): GET/POST /auth/admin/services,
-/// POST /auth/admin/services/{code}/rotate — перевыпустить, PUT /auth/admin/services/{code}/permissions — права сервиса,
+/// GET /auth/admin/services/grantable — права в приложениях проекта, которые можно выдать ключу,
+/// POST /auth/admin/services/{code}/rotate { keepTokens } — перевыпустить (keepTokens — плановая смена без остановки), PUT /auth/admin/services/{code}/permissions — права сервиса,
 /// DELETE /auth/admin/services/{code} — отозвать.
 /// Секрет — только в ответе на выдачу и перевыпуск.
 /// </summary>
@@ -26,6 +28,7 @@ public sealed class ServiceKeysEndpoints : IEndpoint
             .RequireUser()
             .RequirePermissions(AuthServicePermissions.ProjectServices.MANAGE);
         services.MapGet(string.Empty, ListAsync);
+        services.MapGet("/grantable", GrantableAsync);
         services.MapPost(string.Empty, IssueAsync);
         services.MapPost("/{code}/rotate", RotateAsync);
         services.MapPut("/{code}/permissions", SetPermissionsAsync);
@@ -39,6 +42,13 @@ public sealed class ServiceKeysEndpoints : IEndpoint
         return result;
     }
 
+    private static async Task<EndpointResult<IReadOnlyList<GrantableAppPermissionsResponse>>> GrantableAsync(
+        [FromServices] ServiceKeysHandler handler, CancellationToken cancellationToken)
+    {
+        Result<IReadOnlyList<GrantableAppPermissionsResponse>, Error> result = await handler.GrantableAsync(cancellationToken);
+        return result;
+    }
+
     private static async Task<EndpointResult<IssuedServiceKeyResponse>> IssueAsync(
         [FromBody] IssueServiceKeyRequest request, [FromServices] ServiceKeysHandler handler, CancellationToken cancellationToken)
     {
@@ -47,9 +57,12 @@ public sealed class ServiceKeysEndpoints : IEndpoint
     }
 
     private static async Task<EndpointResult<IssuedServiceKeyResponse>> RotateAsync(
-        string code, [FromServices] ServiceKeysHandler handler, CancellationToken cancellationToken)
+        string code,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] RotateServiceKeyRequest? request,
+        [FromServices] ServiceKeysHandler handler,
+        CancellationToken cancellationToken)
     {
-        Result<IssuedServiceKeyResponse, Error> result = await handler.RotateAsync(code, cancellationToken);
+        Result<IssuedServiceKeyResponse, Error> result = await handler.RotateAsync(code, request?.KeepTokens == true, cancellationToken);
         return result;
     }
 

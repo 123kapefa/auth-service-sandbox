@@ -9,6 +9,7 @@ public static class PermissionExtensions
     /// <summary>Права из токена (claim permissions — по активному режиму) и CurrentUser («кто вызвал») для эндпоинтов.</summary>
     public static IServiceCollection AddPlatformPermissions(this IServiceCollection services)
     {
+        services.AddOptions();
         services.AddSingleton<IPermissionResolver, TokenPermissionResolver>();
         services.AddSingleton<IAuthorizationHandler, PermissionRequirementHandler>();
         services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();

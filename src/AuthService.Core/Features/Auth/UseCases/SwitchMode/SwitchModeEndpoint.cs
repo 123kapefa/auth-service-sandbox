@@ -12,13 +12,26 @@ using SharedKernel;
 namespace AuthService.Core.Features.Auth.UseCases.SwitchMode;
 
 /// <summary>
-/// POST /auth/mode { activeMode } — переключить активный режим. Режим недоступен → 403.
-/// С refresh-cookie (BFF) — сразу новые токены в cookie; без неё клиент обновит токен сам.
+/// POST /auth/mode { activeMode, app } — переключить активный режим (app — в другом приложении проекта). Режим
+/// недоступен → 403. С refresh-cookie (BFF) — сразу новые токены в cookie; без неё клиент обновит токен сам.
+/// GET /auth/modes — режимы пользователя во всех приложениях проекта (переключатель в личном кабинете).
 /// </summary>
 public sealed class SwitchModeEndpoint : IEndpoint
 {
-    public void MapEndpoint(IEndpointRouteBuilder app) =>
+    public void MapEndpoint(IEndpointRouteBuilder app)
+    {
         app.MapPost("/auth/mode", Handle).RequireUser();
+        app.MapGet("/auth/modes", ListAsync).RequireUser();
+    }
+
+    private static async Task<EndpointResult<IReadOnlyList<AppModeResponse>>> ListAsync(
+        [FromServices] CurrentUser user,
+        [FromServices] SwitchModeHandler handler,
+        CancellationToken cancellationToken)
+    {
+        Result<IReadOnlyList<AppModeResponse>, Error> modes = await handler.ListAsync(user.Id, cancellationToken);
+        return modes;
+    }
 
     private static async Task<EndpointResult<SwitchModeResponse>> Handle(
         [FromBody] SwitchModeRequest request,

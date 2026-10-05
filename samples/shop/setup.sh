@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Магазин на сервисе входа (этап 6а.4, docs/keycloak/06a-embedding.md#магазин-заказы-и-уведомления) — всё, что сделал
-# бы новый проект, по шагам и теми же средствами: проект и его сервис входа, приложение «Заказы», ключи «Заказов» и
-# «Уведомлений», запуск обоих сервисов (права и роли «Заказы» объявляют сами, из кода), сотрудник и покупатель.
+# бы новый проект, по шагам и теми же средствами (руководство — docs/embedding-guide.md): проект и его сервис входа,
+# приложения «Заказы» и «Уведомления», ключи обоих, запуск сервисов (права и роли каждый объявляет сам, из кода), право
+# «Уведомлений» ключу «Заказов», сотрудник и покупатель.
 # Запуск: стенд песочницы поднят (docker compose up -d --build --wait), затем
 #   samples/shop/setup.sh
-# Повторный запуск — без ошибок: сделанное пропускается, ключи выдаются заново (секреты — в .env).
+# Повторный запуск — без ошибок: сделанное пропускается, ключи выдаются заново (секреты — samples/shop/.secrets).
 # SKIP_BUILD=1 — образы магазина уже собраны (не собирать пакеты и образы).
 set -euo pipefail
 
@@ -39,6 +40,8 @@ if [ "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $MASTER
 fi
 scripts/project/add-admin.py "$REALM" "$ADMIN_PHONE" --email admin@demo-shop.test --password "$PASSWORD" | cut -d' ' -f1-4
 scripts/project/add-app.py "$REALM" orders "Заказы" --default-role customer --web http://localhost:5300 | cut -d: -f1
+# «Уведомления» — приложение без людей: только права, которые выдают ключам других сервисов.
+scripts/project/add-app.py "$REALM" notifications "Уведомления" | cut -d: -f1
 # Ключи сервисам выдаёт сервис входа проекта — ему нужно разрешение на регистрацию клиентов.
 DEMO_SHOP_REGISTRATION_TOKEN=$(REALM=$REALM scripts/keycloak/registration-token.sh) \
   "${PROJECT[@]}" up -d --force-recreate --wait auth-service-demo-shop > /dev/null 2>&1
@@ -57,25 +60,18 @@ issue_key() {
   expect "$r" 200 "ключ $1"
   python3 -c 'import json,sys; print(json.loads(sys.argv[1].split(" ",1)[1])["result"]["clientSecret"])' "$r"
 }
-# set_env <имя> <значение> — в .env стенда (секрет ключа — только в окружении сервиса)
-set_env() {
-  python3 - "$ROOT/.env" "$1" "$2" <<'PY'
-import re, sys
-path, name, value = sys.argv[1:]
-text = open(path).read()
-line = f"{name}={value}"
-text = re.sub(rf"(?m)^{name}=.*$", line, text) if re.search(rf"(?m)^{name}=", text) else text.rstrip("\n") + "\n" + line + "\n"
-open(path, "w").write(text)
-PY
-}
-# «Заказам» — право объявлять права и роли своего приложения: их каталог — в коде (AddAppCatalog в Program.cs).
-ORDERS_SECRET=$(issue_key orders "Заказы" '["service.catalog.declare"]')
-NOTIFICATIONS_SECRET=$(issue_key notifications "Уведомления" '["service.users.read"]')
-set_env SHOP_ORDERS_KEY_SECRET "$ORDERS_SECRET"
-set_env SHOP_NOTIFICATIONS_KEY_SECRET "$NOTIFICATIONS_SECRET"
-echo "service-orders — service.catalog.declare; service-notifications — service.users.read; секреты — в .env"
+# Секрет ключа — файлом (секрет compose): сервис перечитывает его, когда берёт новый токен. Файл пишется на месте (тот
+# же inode) — контейнер видит новый секрет без перезапуска.
+SECRETS="$ROOT/samples/shop/.secrets"
+mkdir -p "$SECRETS"
+save_secret() { printf '%s' "$2" > "$SECRETS/$1.key"; chmod 644 "$SECRETS/$1.key"; }
+# Обоим — право объявлять права и роли своего приложения: их каталог — в коде (AddAppCatalog в Program.cs).
+save_secret orders "$(issue_key orders "Заказы" '["service.catalog.declare"]')"
+save_secret notifications "$(issue_key notifications "Уведомления" '["service.users.read","service.catalog.declare"]')"
+echo "service-orders — service.catalog.declare; service-notifications — service.users.read, service.catalog.declare;"
+echo "секреты — samples/shop/.secrets"
 
-echo "3. «Заказы» и «Уведомления» — «Заказы» при старте объявляют свои права и роли"
+echo "3. «Заказы» и «Уведомления» — при старте каждый объявляет свои права (и роли)"
 if [ -z "${SKIP_BUILD:-}" ]; then
   scripts/package/pack.sh > /dev/null
   "${SHOP[@]}" build shop-orders shop-notifications > /dev/null
@@ -84,11 +80,20 @@ fi
 for port in 5300 5310; do
   for _ in $(seq 30); do [ "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$port/health/live")" = 200 ] && break; sleep 1; done
 done
-# Права и роли «Заказов» руками не заводим — ждём, пока сервис объявит их сам.
+# Права и роли руками не заводим — ждём, пока сервисы объявят их сами.
 for _ in $(seq 60); do
   case "$(admin_api GET /auth/admin/apps/orders/roles)" in 200*'"manager"'*) break ;; esac
   sleep 1
 done
+for _ in $(seq 60); do
+  case "$(admin_api GET /auth/admin/services/grantable)" in 200*'notifications:notifications.send'*) break ;; esac
+  sleep 1
+done
+# «Заказам» — право «Уведомлений» присылать уведомления (и читать журнал): их токен по ключу станет адресован и
+# «Уведомлениям». Следующий токен «Заказы» возьмут уже с ним.
+expect "$(admin_api PUT /auth/admin/services/orders/permissions \
+  '{"permissions":["service.catalog.declare","notifications:notifications.send","notifications:notifications.read"]}')" 200 "право «Уведомлений» ключу «Заказов»"
+echo "service-orders — права «Уведомлений»: notifications.send, notifications.read"
 expect "$(admin_api GET /auth/admin/apps/orders/roles)" 200 "роли «Заказов»"
 admin_api GET /auth/admin/apps/orders/roles | python3 -c 'import json,sys
 for r in json.loads(sys.stdin.read().split(" ",1)[1])["result"]:
@@ -113,11 +118,11 @@ PY
 MANAGER_ID=$(user_id "$MANAGER_PHONE" manager@demo-shop.test)
 user_id "$BUYER_PHONE" buyer@demo-shop.test > /dev/null
 expect "$(admin_api PUT "/auth/admin/apps/orders/users/$MANAGER_ID/roles" '{"roles":["manager"]}')" 200 "роль manager сотруднику"
-# Режим в «Заказах» человеку самому не переключить (журнал трений) — ставим сразу: сотрудник работает как manager.
-curl -s -o /dev/null -X PUT -H "Authorization: Bearer $(master_token)" -H 'Content-Type: application/json' \
-  -d "$(curl -s -H "Authorization: Bearer $(master_token)" "$KC/admin/realms/$REALM/users/$MANAGER_ID" |
-    python3 -c 'import json,sys; u=json.load(sys.stdin); a=u.get("attributes") or {}; a["active_mode.orders"]=["manager"]; print(json.dumps({**u,"attributes":a}))')" \
-  "$KC/admin/realms/$REALM/users/$MANAGER_ID"
+# Режим в «Заказах» сотрудник выбирает сам — в личном кабинете (как кнопкой «Режим в приложениях»).
+MANAGER_JAR="$WORK/manager"; : > "$MANAGER_JAR"
+expect "$(login "$MANAGER_JAR" /account/ "$MANAGER_PHONE")" /account/ "вход сотрудника в кабинет"
+expect "$(curl -s -o /dev/null -w '%{http_code}' -b "$MANAGER_JAR" -c "$MANAGER_JAR" -H 'Content-Type: application/json' \
+  -d '{"app":"orders","activeMode":"manager"}' "$API/auth/mode")" 200 "режим manager в «Заказах»"
 echo "сотрудник +$MANAGER_PHONE (manager@demo-shop.test) — режим manager; покупатель +$BUYER_PHONE (buyer@demo-shop.test)"
 
 cat <<INFO

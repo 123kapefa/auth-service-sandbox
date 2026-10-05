@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using PlatformAuth.ServiceTokens;
 using Xunit;
 
@@ -93,15 +94,67 @@ public sealed class ServiceTokensTests
         Assert.Contains("service-orders", error.Message, StringComparison.Ordinal);
     }
 
-    private static ServiceProvider Services(StubHandler keycloak)
+    [Fact]
+    public async Task SecretFile_IsReread_ForEachNewToken()
     {
-        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        // Плановый перевыпуск: новый секрет положили в файл — следующий токен берётся уже с ним, без перезапуска.
+        string file = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllTextAsync(file, "old-secret\n");
+            StubHandler keycloak = new(_ => Token("t"));
+            using ServiceProvider services = Services(keycloak, new()
+            {
+                ["ServiceToken:ClientSecret"] = null,
+                ["ServiceToken:ClientSecretFile"] = file,
+            });
+            IServiceTokenProvider tokens = services.GetRequiredService<IServiceTokenProvider>();
+
+            tokens.Invalidate(await tokens.GetTokenAsync(default));
+            await File.WriteAllTextAsync(file, "new-secret");
+            await tokens.GetTokenAsync(default);
+
+            Assert.Contains("client_secret=old-secret", keycloak.Bodies[0], StringComparison.Ordinal);
+            Assert.Contains("client_secret=new-secret", keycloak.Bodies[1], StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Theory]
+    [InlineData("http://keycloak:8180/realms/shop", "http://keycloak:8180/realms/shop/protocol/openid-connect/token")]
+    [InlineData(null, "http://localhost:8180/realms/shop/protocol/openid-connect/token")]
+    public void Authority_ComesFromAuthenticationSection(string? internalAuthority, string expected)
+    {
+        // Адрес сервера входа задают один раз (Authentication), ServiceToken — только ключ.
+        using ServiceProvider services = Services(new StubHandler(_ => Token("t")), new()
+        {
+            ["ServiceToken:Authority"] = null,
+            ["ServiceToken:TokenEndpoint"] = null,
+            ["Authentication:Authority"] = "http://localhost:8180/realms/shop",
+            ["Authentication:InternalAuthority"] = internalAuthority,
+        });
+
+        Assert.Equal(expected, services.GetRequiredService<IOptions<ServiceTokenOptions>>().Value.ResolveTokenEndpoint().ToString());
+    }
+
+    private static ServiceProvider Services(StubHandler keycloak, Dictionary<string, string?>? overrides = null)
+    {
+        Dictionary<string, string?> settings = new()
         {
             ["ServiceToken:Authority"] = "http://localhost:8180/realms/shop",
             ["ServiceToken:TokenEndpoint"] = TOKEN_URL,
             ["ServiceToken:ClientId"] = "service-orders",
             ["ServiceToken:ClientSecret"] = "secret",
-        }).Build();
+        };
+        foreach ((string key, string? value) in overrides ?? [])
+        {
+            settings[key] = value;
+        }
+
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         ServiceCollection services = new();
         services.AddPlatformServiceToken(configuration);
         services.AddHttpClient(ServiceTokenProvider.HTTP_CLIENT).ConfigurePrimaryHttpMessageHandler(() => keycloak);

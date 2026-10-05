@@ -2,6 +2,7 @@ package platform.keycloak.auth;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.ClientSessionContext;
@@ -25,8 +26,10 @@ import org.keycloak.representations.IDToken;
  * access_version и mode_version — версии доступа пользователя и роли активного режима: по ним сервисы узнают, что
  * доступ изменился, и просят клиента обновить токен (умный рефреш).
  * Токен служебной учётки (сервис проекта по ключу) — без ролей пользователя (у сервиса нет режимов, роли по умолчанию
- * realm ему не нужны), permissions — выданные сервису права, client_id — какой сервис: по нему сервисы отличают
- * сервис от человека.
+ * realm ему не нужны), permissions — выданные сервису права в этом приложении, client_id — какой сервис: по нему
+ * сервисы отличают сервис от человека. Права сервиса в других приложениях проекта (orders → notifications.send) —
+ * в app_permissions по приложениям, а сами приложения — в aud: токен по ключу адресован только тем сервисам, куда
+ * сервису можно, и каждый видит только свои права.
  */
 public final class AppRolesMapper extends AbstractOIDCProtocolMapper
     implements OIDCAccessTokenMapper, UserInfoTokenMapper, TokenIntrospectionTokenMapper {
@@ -39,6 +42,7 @@ public final class AppRolesMapper extends AbstractOIDCProtocolMapper
     static final String MODE_VERSION = "mode_version";
     static final String SERVICE_CLIENT = "client_id";
     static final String ACTIVE_MODE = "active_mode";
+    static final String APP_PERMISSIONS = "app_permissions";
 
     private static final List<ProviderConfigProperty> CONFIG = new ArrayList<>();
 
@@ -99,6 +103,11 @@ public final class AppRolesMapper extends AbstractOIDCProtocolMapper
             token.getOtherClaims().put("available_roles", List.of());
             token.getOtherClaims().put("permissions", AppRoles.servicePermissionsOf(client, user));
             token.getOtherClaims().put(SERVICE_CLIENT, service == null ? user.getServiceAccountClientLink() : service.getClientId());
+            Map<String, List<String>> apps = AppRoles.serviceAppPermissionsOf(client, user);
+            if (!apps.isEmpty()) {
+                token.getOtherClaims().put(APP_PERMISSIONS, apps);
+                apps.keySet().forEach(token::addAudience);
+            }
             return;
         }
 

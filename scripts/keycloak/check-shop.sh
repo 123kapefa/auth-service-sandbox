@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Проверка этапа 6а.4 (docs/keycloak/06a-embedding.md#магазин-заказы-и-уведомления): новый проект на сервисе входа —
 # магазин из двух мини-сервисов (samples/shop). Покупатель входит через сервис входа проекта и приходит в «Заказы» со
-# своими правами; «Заказы» зовут «Уведомления» по своему ключу, «Уведомления» узнают у сервиса входа, куда писать;
-# чужие запросы отклоняются; перевыпущенный и отозванный ключ перестаёт действовать сразу; права и роли «Заказы»
-# объявляют из своего кода.
+# своими правами; «Заказы» зовут «Уведомления» по своему ключу с правом «Уведомлений», «Уведомления» узнают у сервиса
+# входа, куда писать; чужие запросы отклоняются; перевыпущенный ключ подхватывается из файла без перезапуска, отозванный
+# перестаёт действовать сразу; права и роли сервисы объявляют из своего кода; режим в «Заказах» человек меняет сам в
+# личном кабинете (6а.6).
 # Запуск: стенд песочницы поднят (docker compose up -d --build --wait), затем
 #   scripts/keycloak/check-shop.sh
 # Сначала поднимает магазин с нуля (samples/shop/setup.sh; SKIP_SETUP=1 — магазин уже поднят, SKIP_BUILD=1 — образы
@@ -30,7 +31,8 @@ if [ -z "${SKIP_SETUP:-}" ]; then
   samples/shop/setup.sh > "$WORK/setup.log" 2>&1
   check "магазин поднят" "$? $(tail -2 "$WORK/setup.log" | head -1 | cut -d' ' -f1-4)" "0 Готово: магазин — http://localhost:5300"
 fi
-env_value() { grep "^$1=" "$ROOT/.env" | tail -1 | cut -d= -f2-; }
+SECRETS="$ROOT/samples/shop/.secrets"
+key_secret() { cat "$SECRETS/$1.key"; }
 
 # --- Вход в «Заказы»: как страница магазина — Authorization Code + PKCE, клиент orders-web ---------------------------
 # shop_login_page <jar> — страница входа сервиса входа проекта для «Заказов»; verifier — в $WORK/verifier
@@ -114,8 +116,11 @@ check "заказ принят, уведомление — SMS покупате�
   "201 ('принят', 'SMS на +$NEW')"
 check "«SMS» ушла (лог «Уведомлений»)" \
   "$("${SHOP_COMPOSE[@]}" logs shop-notifications --since 2m 2>/dev/null | grep -c "\[DEV SMS\] +$NEW: Заказ №$NUMBER принят: Кофе")" 1
-ORDERS_KEY=$(service_token service-orders "$(env_value SHOP_ORDERS_KEY_SECRET)")
+ORDERS_KEY=$(service_token service-orders "$(key_secret orders)")
 CUSTOMER_ID=$(claims "$CUSTOMER" 'c["sub"]')
+check "токен ключа «Заказов» адресован сервису входа и «Уведомлениям», права — по приложениям" \
+  "$(claims "$ORDERS_KEY" 'sorted(c["aud"]), c["permissions"], c["app_permissions"]')" \
+  "(['auth-api', 'notifications'], ['service.catalog.declare'], {'notifications': ['notifications.read', 'notifications.send']})"
 check "в журнале «Уведомлений»: прислали «Заказы» по ключу service-orders" \
   "$(get "$(call "$ORDERS_KEY" GET "$NOTIFY/api/notifications?userId=$CUSTOMER_ID")" 'len(r), r[0]["sender"], r[0]["text"]')" \
   "200 (1, 'service-orders', 'Заказ №$NUMBER принят: Кофе')"
@@ -146,17 +151,18 @@ PROJECT_USER=$(curl -s -d grant_type=password -d client_id=dev-cli -d username=7
   python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
 SANDBOX_USER=$(curl -s -d grant_type=password -d client_id=dev-cli -d username=79990000001 -d "password=$PASSWORD" \
   "$KC/realms/sandbox/protocol/openid-connect/token" | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
-NOTIFICATIONS_KEY=$(service_token service-notifications "$(env_value SHOP_NOTIFICATIONS_KEY_SECRET)")
+NOTIFICATIONS_KEY=$(service_token service-notifications "$(key_secret notifications)")
 check "«Заказы» без токена — 401" "$(code "$(call "" GET "$SHOP/api/orders")")" 401
 check "«Заказы» с токеном сервиса входа проекта (не «Заказам», aud auth-api) — 401" "$(code "$(call "$PROJECT_USER" GET "$SHOP/api/orders")")" 401
 check "«Заказы» с токеном другого проекта (песочница) — 401" "$(code "$(call "$SANDBOX_USER" GET "$SHOP/api/orders")")" 401
 check "«Заказы» с токеном сервиса по ключу — 401" "$(code "$(call "$ORDERS_KEY" GET "$SHOP/api/orders")")" 401
 BODY="{\"userId\":\"$CUSTOMER_ID\",\"text\":\"чужое\"}"
 check "«Уведомления» без токена — 401" "$(code "$(call "" POST "$NOTIFY/api/notifications" "$BODY")")" 401
-check "«Уведомления» с токеном человека — 403" "$(code "$(call "$PROJECT_USER" POST "$NOTIFY/api/notifications" "$BODY")")" 403
+check "«Уведомления» с токеном человека из сервиса входа проекта (aud auth-api) — 401" \
+  "$(code "$(call "$PROJECT_USER" POST "$NOTIFY/api/notifications" "$BODY")")" 401
 check "«Уведомления» с токеном покупателя «Заказов» — 401" "$(code "$(call "$CUSTOMER" POST "$NOTIFY/api/notifications" "$BODY")")" 401
-check "«Уведомления» с ключом не из списка (service-notifications) — 403" \
-  "$(code "$(call "$NOTIFICATIONS_KEY" POST "$NOTIFY/api/notifications" "$BODY")")" 403
+check "«Уведомления» с ключом без их прав (service-notifications, aud только auth-api) — 401" \
+  "$(code "$(call "$NOTIFICATIONS_KEY" POST "$NOTIFY/api/notifications" "$BODY")")" 401
 check "«Уведомления» с токеном другого проекта — 401" "$(code "$(call "$SANDBOX_USER" POST "$NOTIFY/api/notifications" "$BODY")")" 401
 check "в журнале «Уведомлений» чужого нет" "$(get "$(call "$ORDERS_KEY" GET "$NOTIFY/api/notifications?userId=$CUSTOMER_ID")" 'len(r)')" "200 1"
 check "ключ «Заказов» читать пользователей сервиса входа не может (права не выдано) — 403" \
@@ -173,29 +179,43 @@ admin() {
   printf '%s ' "$(curl "${args[@]}" "$API$2")"
   cat "$WORK/r.json"
 }
+# save_orders_secret <ответ на перевыпуск> — новый секрет в файл «Заказов» (на месте: контейнер видит его сразу)
+save_orders_secret() {
+  get "$1" 'r["result"]["clientSecret"]' | cut -d' ' -f2 | tr -d '\n' > "$SECRETS/orders.key"
+}
+order_notification() { get "$(call "$CUSTOMER" POST "$SHOP/api/orders" "{\"item\":\"$1\"}")" 'r["notification"]'; }
 R=$(admin POST /auth/admin/services/orders/rotate)
-SECRET=$(get "$R" 'r["result"]["clientSecret"]' | cut -d' ' -f2)
-check "ключ «Заказов» перевыпущен" "$(code "$R") $([ -n "$SECRET" ] && echo 'новый секрет')" "200 новый секрет"
-check "у «Заказов» старый секрет: заказ принят, уведомление не ушло — старый ключ не принимается сразу" \
-  "$(get "$(call "$CUSTOMER" POST "$SHOP/api/orders" '{"item":"Сахар"}')" 'r["notification"]')" \
+sleep 2 # отметки отзыва сервис держит в памяти до 2 с (TokenRevocationOptions.LocalCache)
+check "ключ «Заказов» перевыпущен срочно (мог утечь)" "$(code "$R") $([ -n "$(get "$R" 'r["result"]["clientSecret"]')" ] && echo 'новый секрет')" "200 новый секрет"
+check "старый секрет и его токены не принимаются сразу: заказ принят, уведомление не ушло" "$(order_notification Сахар)" \
   "201 не отправлено: сервис входа не принял ключ «Заказов»"
-# Новый секрет — в окружение «Заказов» и перезапуск: на лету сервис ключ не перечитывает.
-python3 - "$ROOT/.env" "$SECRET" <<'PY'
-import re, sys
-path, secret = sys.argv[1:]
-text = open(path).read()
-open(path, "w").write(re.sub(r"(?m)^SHOP_ORDERS_KEY_SECRET=.*$", "SHOP_ORDERS_KEY_SECRET=" + secret, text))
-PY
-"${SHOP_COMPOSE[@]}" up -d --no-build --force-recreate shop-orders > /dev/null 2>&1
-for _ in $(seq 30); do [ "$(curl -s -o /dev/null -w '%{http_code}' "$SHOP/health/live")" = 200 ] && break; sleep 1; done
-check "новый секрет в .env, «Заказы» перезапущены — уведомления снова идут" \
-  "$(get "$(call "$CUSTOMER" POST "$SHOP/api/orders" '{"item":"Соль"}')" 'r["notification"]')" "201 SMS на +$NEW"
+save_orders_secret "$R"
+check "новый секрет — в файл, без перезапуска «Заказов»: уведомления снова идут" "$(order_notification Соль)" "201 SMS на +$NEW"
+R=$(admin POST /auth/admin/services/orders/rotate '{"keepTokens":true}')
+check "плановый перевыпуск (keepTokens): выданный токен доживает срок — уведомления идут и со старым секретом в файле" \
+  "$(code "$R") $(order_notification Перец)" "200 201 SMS на +$NEW"
+check "старым секретом новый токен уже не взять" "$(service_token service-orders "$(key_secret orders)" | sed 's/^$/нет/')" нет
+save_orders_secret "$R"
+check "новый секрет в файле — новый токен по нему выдаётся" "$(service_token service-orders "$(key_secret orders)" | cut -c1-2)" ey
 
 admin DELETE /auth/admin/services/check-stranger > /dev/null
 R=$(admin POST /auth/admin/services '{"code":"check-stranger","name":"Чужой сервис","permissions":["service.users.read"]}')
-STRANGER=$(service_token service-check-stranger "$(get "$R" 'r["result"]["clientSecret"]' | cut -d' ' -f2)")
+STRANGER_SECRET=$(get "$R" 'r["result"]["clientSecret"]' | cut -d' ' -f2)
+STRANGER=$(service_token service-check-stranger "$STRANGER_SECRET")
 check "ещё один ключ проекта: пользователей читает" "$(code "$(call "$STRANGER" GET "$API/auth/services/users/$CUSTOMER_ID")")" 200
-check "но «Уведомления» его не пускают — его нет в списке" "$(code "$(call "$STRANGER" POST "$NOTIFY/api/notifications" "$BODY")")" 403
+check "но в «Уведомления» не пройдёт: их прав у ключа нет (aud без notifications) — 401" \
+  "$(code "$(call "$STRANGER" POST "$NOTIFY/api/notifications" "$BODY")")" 401
+check "права в приложении, которого нет, ключу не выдать — 400" \
+  "$(code "$(admin PUT /auth/admin/services/check-stranger/permissions '{"permissions":["notifications:notifications.nope"]}')")" 400
+check "выдали право «Уведомлений» — пускают (новый токен)" \
+  "$(code "$(admin PUT /auth/admin/services/check-stranger/permissions '{"permissions":["service.users.read","notifications:notifications.send"]}')") $(code "$(call "$(service_token service-check-stranger "$STRANGER_SECRET")" POST "$NOTIFY/api/notifications" "$BODY")")" \
+  "200 200"
+check "сняли — прежний токен не действует сразу (401), читать пользователей тоже больше нельзя" \
+  "$(code "$(admin PUT /auth/admin/services/check-stranger/permissions '{"permissions":[]}')") $(code "$(call "$STRANGER" GET "$API/auth/services/users/$CUSTOMER_ID")")" \
+  "200 401"
+admin PUT /auth/admin/services/check-stranger/permissions '{"permissions":["service.users.read"]}' > /dev/null
+sleep 1 # отметка отзыва включает свою секунду — токен той же секунды тоже был бы отклонён
+STRANGER=$(service_token service-check-stranger "$STRANGER_SECRET")
 check "ключ отозван" "$(code "$(admin DELETE /auth/admin/services/check-stranger)")" 200
 check "токен отозванного ключа не действует сразу — 401" "$(code "$(call "$STRANGER" GET "$API/auth/services/users/$CUSTOMER_ID")")" 401
 check "и нового токена по нему не дают" "$(service_token service-check-stranger x | sed 's/^$/нет/')" нет
@@ -209,8 +229,14 @@ check "роли из кода: customer и manager со своими права�
   "200 customer=orders.create,orders.view manager=orders.manage,orders.view"
 check "право, которое проверяет код, в админке не удалить — 409" "$(code "$(admin DELETE /auth/admin/apps/orders/permissions/orders.view)")" 409
 CATALOG='{"permissions":[{"name":"orders.view","description":"x"}],"roles":[]}'
-check "ключ без права объявлять каталог («Уведомления») — 403" \
-  "$(code "$(call "$NOTIFICATIONS_KEY" PUT "$API/auth/services/catalog" "$CATALOG")")" 403
+admin DELETE /auth/admin/services/check-reader > /dev/null
+R=$(admin POST /auth/admin/services '{"code":"check-reader","name":"Читатель","permissions":["service.users.read"]}')
+ORDERS_ONLY_READ=$(service_token service-check-reader "$(get "$R" 'r["result"]["clientSecret"]' | cut -d' ' -f2)")
+check "ключ без права объявлять каталог — 403" \
+  "$(code "$(call "$ORDERS_ONLY_READ" PUT "$API/auth/services/catalog" "$CATALOG")")" 403
+check "права «Уведомлений» — тоже из их кода: только права, ролей для людей нет" \
+  "$(get "$(admin GET /auth/admin/services/grantable)" '[(a["app"], [p["name"] for p in a["permissions"]]) for a in r["result"]]')" \
+  "200 [('notifications', ['notifications.read', 'notifications.send']), ('orders', ['orders.create', 'orders.manage', 'orders.view'])]"
 # Админ поменял состав роли — перезапуск «Заказов» (каталог объявляется заново) его правку не откатывает.
 check "админ добавил сотруднику право «оформить заказ»" \
   "$(code "$(admin PUT /auth/admin/apps/orders/roles/manager '{"permissions":["orders.view","orders.manage","orders.create"]}')")" 200
@@ -223,5 +249,36 @@ check "«Заказы» перезапущены и снова объявили 
 check "правка админа осталась" "$(get "$(admin GET /auth/admin/apps/orders/roles)" "$ROLES")" \
   "200 customer=orders.create,orders.view manager=orders.create,orders.manage,orders.view"
 admin PUT /auth/admin/apps/orders/roles/manager '{"permissions":["orders.view","orders.manage"]}' > /dev/null
+admin DELETE /auth/admin/services/check-reader > /dev/null
+
+echo "7. Режим в «Заказах» — сам, в личном кабинете (POST /auth/mode с app)"
+CABINET="$WORK/cabinet"; : > "$CABINET"
+login "$CABINET" /account/ 79995550002 > /dev/null
+# cabinet <метод> <путь> [тело] — API сервиса входа проекта из личного кабинета сотрудника
+cabinet() {
+  local args=(-s -o "$WORK/r.json" -w '%{http_code}' -b "$CABINET" -c "$CABINET" -X "$1")
+  [ -n "${3:-}" ] && args+=(-H 'Content-Type: application/json' -d "$3")
+  printf '%s ' "$(curl "${args[@]}" "$API$2")"
+  cat "$WORK/r.json"
+}
+check "кабинет: режимы сотрудника в «Заказах» — customer и manager, выбран manager" \
+  "$(get "$(cabinet GET /auth/modes)" '[(a["app"], a["modes"], a["activeMode"]) for a in r["result"] if a["app"] == "orders"]')" \
+  "200 [('orders', ['customer', 'manager'], 'manager')]"
+check "режима, которого нет, не выбрать — 403" "$(code "$(cabinet POST /auth/mode '{"app":"orders","activeMode":"admin"}')")" 403
+check "переключил «Заказы» на customer" "$(get "$(cabinet POST /auth/mode '{"app":"orders","activeMode":"customer"}')" 'r["result"]["activeMode"]')" "200 customer"
+R=$(call "$MANAGER" GET "$SHOP/api/me")
+check "старый токен «Заказов» сразу не принимается — обновить (access_changed)" \
+  "$(code "$R") $(grep -o access_changed "$WORK/r.json" | head -1)" "401 access_changed"
+MANAGER=$(shop_login 79995550002)
+check "новый токен «Заказов» — режим customer и его права" "$(get "$(call "$MANAGER" GET "$SHOP/api/me")" 'r["mode"], ",".join(r["permissions"])')" \
+  "200 ('customer', 'orders.create,orders.view')"
+cabinet POST /auth/mode '{"app":"orders","activeMode":"manager"}' > /dev/null
+check "и обратно на manager" "$(get "$(call "$(shop_login 79995550002)" GET "$SHOP/api/me")" 'r["mode"]')" "200 manager"
+
+echo "8. Модуль входа для страницы приложения"
+check "сервис входа отдаёт /sdk/platform-login.js" \
+  "$(curl -s -o "$WORK/sdk.js" -w '%{http_code} %{content_type}' "$API/sdk/platform-login.js") $(grep -c 'PlatformLogin = { create: create }' "$WORK/sdk.js")" \
+  "200 text/javascript 1"
+check "страница «Заказов» входит через него" "$(curl -s "$SHOP/" | grep -c "PlatformLogin.create")" 1
 
 summary

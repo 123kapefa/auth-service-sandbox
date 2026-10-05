@@ -4,9 +4,10 @@ using PlatformAuth;
 using PlatformAuth.Redis;
 using PlatformAuth.ServiceTokens;
 
-// «Заказы» магазина. Покупатель входит через сервис входа проекта (страница — wwwroot, клиент orders-web) и приходит
-// с токеном приложения «Заказы» (aud=orders): в нём его роли и права в «Заказах». О заказе сообщают «Уведомления» —
-// туда «Заказы» ходят сами, со своим ключом доступа (service-orders).
+// «Заказы» магазина. Покупатель входит через сервис входа проекта (страница — wwwroot, модуль входа сервиса входа,
+// клиент orders-web) и приходит с токеном приложения «Заказы» (aud=orders): в нём его роли и права в «Заказах». О
+// заказе сообщают «Уведомления» — туда «Заказы» ходят сами, со своим ключом доступа (service-orders) и правом
+// «Уведомлений» notifications.send, которое админ выдал этому ключу.
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // Токены пользователей: подпись, издатель, адресат (секция Authentication) + права из токена.
@@ -43,13 +44,14 @@ app.UseAuthorization();
 
 app.MapGet("/health/live", () => Results.Ok());
 
-// Странице — где вход: realm проекта и клиент входа «Заказов».
+// Странице — где вход: realm проекта, клиент входа «Заказов» и сервис входа (модуль входа, личный кабинет).
 app.MapGet("/config", (IConfiguration configuration) => new
 {
     authority = configuration["Authentication:Authority"],
     clientId = configuration["Shop:LoginClient"] ?? "orders-web",
     app = configuration["Authentication:Audience"],
     project = configuration["Shop:Name"] ?? "Магазин",
+    authService = configuration["Shop:AuthServiceUrl"]?.TrimEnd('/'),
 });
 
 // Кто вошёл: из токена, без похода в сервис входа.

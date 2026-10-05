@@ -33,6 +33,7 @@ public sealed class JwtAuthenticationTests : IDisposable
             ["Authentication:ValidIssuer"] = ISSUER,
             ["Authentication:Audience"] = AUDIENCE,
             ["Authentication:RequireHttpsMetadata"] = "false",
+            ["Authentication:AccessTokenCookie"] = AuthCookies.ACCESS_TOKEN,
         });
     }
 
@@ -95,6 +96,35 @@ public sealed class JwtAuthenticationTests : IDisposable
     [Fact]
     public async Task NoCookie_NoToken() =>
         Assert.Null(await ReceiveTokenAsync(_bearer, cookie: null));
+
+    [Fact]
+    public async Task CookieNotConfigured_HeaderOnly()
+    {
+        // По умолчанию — только заголовок: cookie сервиса входа чужому сервису не нужна.
+        JwtBearerOptions byDefault = BuildBearerOptions(new()
+        {
+            ["Authentication:Authority"] = ISSUER,
+            ["Authentication:Audience"] = AUDIENCE,
+            ["Authentication:RequireHttpsMetadata"] = "false",
+        });
+
+        Assert.Null(await ReceiveTokenAsync(byDefault, cookie: "token-from-cookie"));
+    }
+
+    [Fact]
+    public void InternalAuthority_GivesMetadataAddress_IssuerStaysAuthority()
+    {
+        JwtBearerOptions inside = BuildBearerOptions(new()
+        {
+            ["Authentication:Authority"] = ISSUER,
+            ["Authentication:InternalAuthority"] = "http://keycloak:8180/realms/sandbox/",
+            ["Authentication:Audience"] = AUDIENCE,
+            ["Authentication:RequireHttpsMetadata"] = "false",
+        });
+
+        Assert.Equal("http://keycloak:8180/realms/sandbox/.well-known/openid-configuration", inside.MetadataAddress);
+        Assert.Equal(ISSUER, inside.TokenValidationParameters.ValidIssuer);
+    }
 
     [Fact]
     public async Task EmptyCookieSetting_DisablesCookie()

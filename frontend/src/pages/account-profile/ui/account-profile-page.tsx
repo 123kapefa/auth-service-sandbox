@@ -1,10 +1,14 @@
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { accountProfileQueries } from "@/entities/account-profile";
 import { AccountActionLink, useActionStatus } from "@/features/account-action";
+import { AppModesCard } from "@/features/account-mode-switch";
 import { formatDateTime } from "@/shared/lib/format";
 import { Badge, Card, CardTitle } from "@/shared/ui";
 
-/** Профиль: телефон (логин) и почта. Смена почты — на странице сервера входа; пароль — в «Безопасности». */
+/**
+ * Профиль: телефон (логин), почта и режим в приложениях проекта. Смена почты — на странице сервера входа; пароль — в
+ * «Безопасности».
+ */
 export function AccountProfilePage() {
   const queryClient = useQueryClient();
   const { data: profile } = useSuspenseQuery(accountProfileQueries.profile());
@@ -50,6 +54,8 @@ export function AccountProfilePage() {
           перехода по ссылке из письма.
         </p>
       </Card>
+
+      <AppModesCard />
 
       {createdAt !== "—" && (
         <p className="text-xs text-muted-foreground">Учётная запись создана {createdAt}.</p>

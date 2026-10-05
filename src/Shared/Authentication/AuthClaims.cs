@@ -42,4 +42,10 @@ public static class AuthClaims
     /// сервисов — по нему сервис отличается от человека.
     /// </summary>
     public const string CLIENT_ID = "client_id";
+
+    /// <summary>
+    /// Права сервиса по ключу в приложениях проекта: JSON-объект { "notifications": ["notifications.send"] }. Есть только
+    /// у токенов сервисов; приложения из него — в aud. Сервис берёт права своего приложения (Authentication:Audience).
+    /// </summary>
+    public const string APP_PERMISSIONS = "app_permissions";
 }

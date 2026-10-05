@@ -9,8 +9,14 @@ public sealed class JwtAuthenticationOptions
     public string Authority { get; init; } = string.Empty;
 
     /// <summary>
-    /// Адрес discovery, если сервис видит сервер входа не по Authority (контейнер → keycloak:8180).
-    /// Не задан — {Authority}/.well-known/openid-configuration.
+    /// Тот же realm, но адресом изнутри сети, если сервис видит сервер входа не по Authority (контейнер →
+    /// http://keycloak:8180/realms/shop). Из него — адрес ключей (discovery) и выдачи токенов по ключу (ServiceToken);
+    /// iss в токенах по-прежнему — Authority. Не задан — всё по Authority.
+    /// </summary>
+    public string? InternalAuthority { get; init; }
+
+    /// <summary>
+    /// Адрес discovery, если нужен особый. Не задан — {InternalAuthority или Authority}/.well-known/openid-configuration.
     /// </summary>
     public string? MetadataAddress { get; init; }
 
@@ -21,13 +27,20 @@ public sealed class JwtAuthenticationOptions
     public string Audience { get; init; } = string.Empty;
 
     /// <summary>
-    /// Cookie, из которой берётся access-токен, если нет заголовка Authorization.
-    /// Пусто — только заголовок.
+    /// Cookie, из которой берётся access-токен, если нет заголовка Authorization (accessToken — cookie сервиса входа).
+    /// Не задана — только заголовок: чужому сервису cookie сервиса входа не нужна (на localhost браузер отправит её на
+    /// любой порт).
     /// </summary>
-    public string? AccessTokenCookie { get; init; } = AuthCookies.ACCESS_TOKEN;
+    public string? AccessTokenCookie { get; init; }
 
     /// <summary>Требовать https для discovery и ключей. false — только локально.</summary>
     public bool RequireHttpsMetadata { get; init; } = true;
 
     public string ResolveIssuer() => string.IsNullOrWhiteSpace(ValidIssuer) ? Authority : ValidIssuer;
+
+    /// <summary>Discovery: MetadataAddress, иначе — по InternalAuthority; null — по Authority (так делает JwtBearer).</summary>
+    public string? ResolveMetadataAddress() =>
+        !string.IsNullOrWhiteSpace(MetadataAddress) ? MetadataAddress
+        : !string.IsNullOrWhiteSpace(InternalAuthority) ? $"{InternalAuthority.TrimEnd('/')}/.well-known/openid-configuration"
+        : null;
 }

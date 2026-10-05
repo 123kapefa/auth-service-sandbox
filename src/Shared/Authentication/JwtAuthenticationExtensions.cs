@@ -39,9 +39,9 @@ public static class JwtAuthenticationExtensions
     private static void Configure(JwtBearerOptions bearer, JwtAuthenticationOptions settings)
     {
         bearer.Authority = settings.Authority;
-        if (!string.IsNullOrWhiteSpace(settings.MetadataAddress))
+        if (settings.ResolveMetadataAddress() is { } metadata)
         {
-            bearer.MetadataAddress = settings.MetadataAddress;
+            bearer.MetadataAddress = metadata;
         }
 
         bearer.RequireHttpsMetadata = settings.RequireHttpsMetadata;
