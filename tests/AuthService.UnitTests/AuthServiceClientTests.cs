@@ -59,16 +59,37 @@ public sealed class AuthServiceClientTests
         Assert.Equal("auth_service.bad_response", user.Error.Messages[0].Code);
     }
 
+    [Fact]
+    public async Task DeclareCatalog_PutsCatalog()
+    {
+        Stub api = new(HttpStatusCode.OK, """{"result":{"app":"orders","createdPermissions":["orders.view"],"updatedPermissions":[],"createdRoles":["customer"],"keptRoles":[],"orphans":[]}}""");
+
+        Result<DeclareCatalogResponse, Error> declared = await Client(api).DeclareCatalogAsync(
+            new DeclareCatalogRequest([new("orders.view", "Свои заказы")], [new("customer", "Покупатель", ["orders.view"])]), default);
+
+        Assert.Equal("orders", declared.Value.App);
+        Assert.Equal(["customer"], declared.Value.CreatedRoles);
+        Assert.Equal(HttpMethod.Put, api.Method);
+        Assert.Equal("http://auth/auth/services/catalog", api.Url);
+        Assert.Contains("\"orders.view\"", api.Body, StringComparison.Ordinal);
+    }
+
     private static AuthServiceClient Client(Stub api) => new(new HttpClient(api) { BaseAddress = new Uri("http://auth/") });
 
     private sealed class Stub(HttpStatusCode status, string body) : HttpMessageHandler
     {
         public string? Url { get; private set; }
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        public HttpMethod? Method { get; private set; }
+
+        public string Body { get; private set; } = string.Empty;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Url = request.RequestUri!.AbsoluteUri;
-            return Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") });
+            Method = request.Method;
+            Body = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
         }
     }
 }

@@ -363,6 +363,21 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         _composites[$"{clientId}/{name}"] = [.. permissions];
     }
 
+    /// <summary>Приложение, как его заводит add-app.py: access-denied и пустая роль по умолчанию (без source).</summary>
+    public void AddApp(string clientId, string? defaultRole = null)
+    {
+        ConcurrentDictionary<string, AppRole> roles = new(StringComparer.Ordinal)
+        {
+            [AppRoles.ACCESS_DENIED] = new AppRole(Guid.NewGuid(), AppRoles.ACCESS_DENIED, null, AppRoleKinds.ROLE, null, false),
+        };
+        if (defaultRole is not null)
+        {
+            roles[defaultRole] = new AppRole(Guid.NewGuid(), defaultRole, defaultRole, AppRoleKinds.ROLE, null, true);
+        }
+
+        _appRoles[clientId] = roles;
+    }
+
     public Task<Result<IReadOnlyList<AppRole>, Error>> GetAppRolesAsync(string clientId, CancellationToken cancellationToken) =>
         Task.FromResult(_appRoles.TryGetValue(clientId, out ConcurrentDictionary<string, AppRole>? roles)
             ? Result.Success<IReadOnlyList<AppRole>, Error>([.. roles.Values.OrderBy(role => role.Name, StringComparer.Ordinal)])

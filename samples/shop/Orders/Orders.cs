@@ -3,9 +3,9 @@ using System.Collections.Concurrent;
 namespace Orders;
 
 /// <summary>
-/// Права «Заказов». Объявлены здесь, а заведены в сервисе входа (права приложения orders) — скриптом
-/// samples/shop/setup.sh или в админке: «Роли и права» → «Заказы». Роль = набор прав: customer — свои заказы,
-/// manager — все заказы и статусы.
+/// Права «Заказов» — одни и те же константы и в проверках (RequirePermissions), и в объявлении каталога
+/// (AddAppCatalog в Program.cs): при старте сервис сам заводит их в сервисе входа, руками в админке ничего не нужно.
+/// Роль = набор прав: customer — свои заказы, manager — все заказы и статусы.
 /// </summary>
 internal static class OrderPermissions
 {

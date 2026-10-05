@@ -2,7 +2,8 @@
 # Проверка этапа 6а.4 (docs/keycloak/06a-embedding.md#магазин-заказы-и-уведомления): новый проект на сервисе входа —
 # магазин из двух мини-сервисов (samples/shop). Покупатель входит через сервис входа проекта и приходит в «Заказы» со
 # своими правами; «Заказы» зовут «Уведомления» по своему ключу, «Уведомления» узнают у сервиса входа, куда писать;
-# чужие запросы отклоняются; перевыпущенный и отозванный ключ перестаёт действовать сразу.
+# чужие запросы отклоняются; перевыпущенный и отозванный ключ перестаёт действовать сразу; права и роли «Заказы»
+# объявляют из своего кода.
 # Запуск: стенд песочницы поднят (docker compose up -d --build --wait), затем
 #   scripts/keycloak/check-shop.sh
 # Сначала поднимает магазин с нуля (samples/shop/setup.sh; SKIP_SETUP=1 — магазин уже поднят, SKIP_BUILD=1 — образы
@@ -198,5 +199,29 @@ check "но «Уведомления» его не пускают — его н�
 check "ключ отозван" "$(code "$(admin DELETE /auth/admin/services/check-stranger)")" 200
 check "токен отозванного ключа не действует сразу — 401" "$(code "$(call "$STRANGER" GET "$API/auth/services/users/$CUSTOMER_ID")")" 401
 check "и нового токена по нему не дают" "$(service_token service-check-stranger x | sed 's/^$/нет/')" нет
+
+echo "6. Права и роли «Заказов» — из их кода (AddAppCatalog), не из админки"
+check "права «Заказов» заведены кодом (source=code)" \
+  "$(get "$(admin GET /auth/admin/apps/orders/permissions)" '",".join(sorted(p["name"] + ":" + str(p["source"]) for p in r["result"]))')" \
+  "200 orders.create:code,orders.manage:code,orders.view:code"
+ROLES='" ".join(sorted(x["name"] + "=" + ",".join(sorted(x["permissions"])) for x in r["result"]))'
+check "роли из кода: customer и manager со своими правами" "$(get "$(admin GET /auth/admin/apps/orders/roles)" "$ROLES")" \
+  "200 customer=orders.create,orders.view manager=orders.manage,orders.view"
+check "право, которое проверяет код, в админке не удалить — 409" "$(code "$(admin DELETE /auth/admin/apps/orders/permissions/orders.view)")" 409
+CATALOG='{"permissions":[{"name":"orders.view","description":"x"}],"roles":[]}'
+check "ключ без права объявлять каталог («Уведомления») — 403" \
+  "$(code "$(call "$NOTIFICATIONS_KEY" PUT "$API/auth/services/catalog" "$CATALOG")")" 403
+# Админ поменял состав роли — перезапуск «Заказов» (каталог объявляется заново) его правку не откатывает.
+check "админ добавил сотруднику право «оформить заказ»" \
+  "$(code "$(admin PUT /auth/admin/apps/orders/roles/manager '{"permissions":["orders.view","orders.manage","orders.create"]}')")" 200
+SINCE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+"${SHOP_COMPOSE[@]}" restart shop-orders > /dev/null 2>&1
+for _ in $(seq 30); do "${SHOP_COMPOSE[@]}" logs --since "$SINCE" shop-orders 2>/dev/null | grep -q "App catalog of orders declared" && break; sleep 1; done
+check "«Заказы» перезапущены и снова объявили каталог" \
+  "$("${SHOP_COMPOSE[@]}" logs --since "$SINCE" shop-orders 2>/dev/null | grep -o "App catalog of orders declared: new permissions \[\]" | head -1)" \
+  "App catalog of orders declared: new permissions []"
+check "правка админа осталась" "$(get "$(admin GET /auth/admin/apps/orders/roles)" "$ROLES")" \
+  "200 customer=orders.create,orders.view manager=orders.create,orders.manage,orders.view"
+admin PUT /auth/admin/apps/orders/roles/manager '{"permissions":["orders.view","orders.manage"]}' > /dev/null
 
 summary

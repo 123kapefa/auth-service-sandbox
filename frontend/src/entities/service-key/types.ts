@@ -5,7 +5,7 @@ export interface ServiceKey {
   name: string;
   issuedAt: string;
   rotatedAt: string | null;
-  /** Что сервису можно в сервисе входа: service.users.read, service.access.check; null — не удалось прочитать. */
+  /** Что сервису можно в сервисе входа: service.users.read, service.access.check, service.catalog.declare; null — не удалось прочитать. */
   permissions: string[] | null;
 }
 
@@ -32,5 +32,10 @@ export const SERVICE_PERMISSIONS = [
     name: "service.access.check",
     label: "Проверять доступ пользователя",
     hint: "Есть ли у пользователя право в приложении — для фоновых задач без его токена",
+  },
+  {
+    name: "service.catalog.declare",
+    label: "Объявлять права и роли своего приложения",
+    hint: "Сервис при старте заводит права и роли из своего кода — только для приложения с тем же кодом",
   },
 ] as const;

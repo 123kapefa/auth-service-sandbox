@@ -23,6 +23,7 @@ services:
       ServiceToken__TokenEndpoint: http://keycloak:8180/realms/demo-shop/protocol/openid-connect/token
       ServiceToken__ClientSecret: ${SHOP_ORDERS_KEY_SECRET:?ключ «Заказов» не выдан — samples/shop/setup.sh}
       Notifications__BaseUrl: http://shop-notifications:8080/
+      AuthService__BaseUrl: http://auth-service-demo-shop:8080/
     depends_on:
       redis:
         condition: service_healthy

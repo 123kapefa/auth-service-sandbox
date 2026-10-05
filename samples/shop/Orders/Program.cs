@@ -1,3 +1,4 @@
+using AuthService.Client.AppCatalog;
 using Orders;
 using PlatformAuth;
 using PlatformAuth.Redis;
@@ -22,6 +23,16 @@ builder.Services.AddHttpClient<NotificationsClient>(client =>
                                      ?? throw new InvalidOperationException("Не задан адрес «Уведомлений» Notifications:BaseUrl")))
     .AddServiceToken();
 builder.Services.AddSingleton<OrderStore>();
+
+// Права и роли «Заказов» — из кода, а не руками в админке: при старте сервис отправляет их в сервис входа своим
+// ключом (тому нужно право «Объявлять права и роли своего приложения»). Права заводятся и не удаляются в админке,
+// пока их проверяет код; роли заводятся один раз — дальше их составом управляет админ. Подробно — AppCatalogBuilder.
+builder.Services.AddAppCatalog(builder.Configuration, catalog => catalog
+    .Permission(OrderPermissions.VIEW, "Свои заказы")
+    .Permission(OrderPermissions.CREATE, "Оформить заказ")
+    .Permission(OrderPermissions.MANAGE, "Все заказы и смена статуса")
+    .Role("customer", "Покупатель", OrderPermissions.VIEW, OrderPermissions.CREATE)
+    .Role("manager", "Сотрудник магазина", OrderPermissions.VIEW, OrderPermissions.MANAGE));
 
 WebApplication app = builder.Build();
 

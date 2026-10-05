@@ -77,6 +77,7 @@ public static class Registration
         services.AddScoped<LoginHistoryHandler>();
         services.AddScoped<ServiceKeysHandler>();
         services.AddScoped<ServiceUsersHandler>();
+        services.AddScoped<AppCatalogHandler>();
         services.AddScoped<BrandingHandler>();
         services.AddScoped<AppBrandingHandler>();
 

@@ -55,7 +55,13 @@ public static class AuthServicePermissions
         /// <summary>Проверить, есть ли у пользователя право в приложении (фоновые задачи без токена пользователя).</summary>
         public const string ACCESS_CHECK = "service.access.check";
 
-        public static IReadOnlyList<string> All { get; } = [USERS_READ, ACCESS_CHECK];
+        /// <summary>
+        /// Объявить каталог своего приложения: права и встроенные роли из кода (PUT /auth/services/catalog). Только
+        /// для приложения с тем же кодом, что у ключа: ключ «orders» (service-orders) → приложение orders.
+        /// </summary>
+        public const string CATALOG_DECLARE = "service.catalog.declare";
+
+        public static IReadOnlyList<string> All { get; } = [USERS_READ, ACCESS_CHECK, CATALOG_DECLARE];
     }
 
     public static class Roles
@@ -78,5 +84,6 @@ public static class AuthServicePermissions
         new(Branding.MANAGE, "Оформление проекта: название, логотип, цвет, тема"),
         new(ServiceAccess.USERS_READ, "Сервис: читать пользователя"),
         new(ServiceAccess.ACCESS_CHECK, "Сервис: проверить доступ пользователя"),
+        new(ServiceAccess.CATALOG_DECLARE, "Сервис: объявить права и роли своего приложения"),
     ];
 }

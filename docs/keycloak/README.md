@@ -32,7 +32,7 @@ scripts/keycloak/check-stand.sh
 `check-roles.sh` 71, `check-admin-ui.sh` 28, `check-migration.sh` 26 (нужен .NET SDK), `check-service-keys.sh` 34 (нужно
 разрешение на регистрацию: `scripts/keycloak/registration-token.sh --write-env`, затем `docker compose up -d --wait`),
 весь этап 6б — `check-6b.sh` 138 (кабинет, устройства, оформление, новый проект), магазин из двух сервисов (этап 6а.4) —
-`check-shop.sh` 38. Тестов: .NET — 525, плагина Keycloak
+`check-shop.sh` 45. Тестов: .NET — 548, плагина Keycloak
 (Java, в сборке образа) — 83, админки и кабинета (Vitest) — 83, темы входа (Vitest) — 30.
 
 Стенд, поднятый до этапа 6б, после `git pull` и `docker compose up -d --build --wait` — `scripts/project/upgrade-6b.py
