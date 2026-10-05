@@ -599,6 +599,14 @@ internal sealed partial class KeycloakAdminClient(
         return await SendExpectingSuccessAsync(HttpMethod.Put, $"users/{userId}", cancellationToken, JsonContent.Create(user.Value));
     }
 
+    public async Task<Result<IReadOnlyList<string>, Error>> GetLinkedProvidersAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        Result<FederatedIdentity[], Error> links = await GetJsonAsync<FederatedIdentity[]>($"users/{userId}/federated-identity", cancellationToken);
+        return links.IsSuccess
+            ? Result.Success<IReadOnlyList<string>, Error>([.. links.Value.Select(link => link.IdentityProvider).Order(StringComparer.Ordinal)])
+            : links.Error;
+    }
+
     public async Task<Result<IReadOnlyList<IdentitySession>, Error>> GetSessionsAsync(Guid userId, CancellationToken cancellationToken)
     {
         Result<SessionRepresentation[], Error> sessions = await GetJsonAsync<SessionRepresentation[]>($"users/{userId}/sessions", cancellationToken);
@@ -717,7 +725,8 @@ internal sealed partial class KeycloakAdminClient(
             (user.Attributes ?? [])
                 .Where(attribute => attribute.Key.StartsWith(UserAttributes.APP_MODE_PREFIX, StringComparison.Ordinal) && attribute.Value.Length > 0)
                 .ToDictionary(attribute => attribute.Key[UserAttributes.APP_MODE_PREFIX.Length..], attribute => attribute.Value[0], StringComparer.Ordinal),
-            user.EmailVerified);
+            user.EmailVerified,
+            Attribute(user, UserAttributes.DISABLED_SIGN_IN_METHODS));
 
     private static string? Attribute(UserRepresentation user, string name) =>
         user.Attributes is not null && user.Attributes.TryGetValue(name, out string[]? values) && values.Length > 0 ? values[0] : null;
@@ -763,6 +772,8 @@ internal sealed partial class KeycloakAdminClient(
         [property: JsonPropertyName("error")] string? Error,
         [property: JsonPropertyName("details")] Dictionary<string, string>? Details,
         [property: JsonPropertyName("sessionId")] string? SessionId = null);
+
+    private sealed record FederatedIdentity([property: JsonPropertyName("identityProvider")] string IdentityProvider);
 
     private sealed record Credential(
         [property: JsonPropertyName("type")] string Type,

@@ -27,4 +27,10 @@ final class LogPhoneProvider implements PhoneProvider {
         LOG.infof("[DEV SMS] %s: код входа %s", PhoneNormalizer.toE164(phone), code);
         return true;
     }
+
+    @Override
+    public boolean message(KeycloakSession session, String phone, String text) {
+        LOG.infof("[DEV SMS] %s: %s", PhoneNormalizer.toE164(phone), text);
+        return true;
+    }
 }

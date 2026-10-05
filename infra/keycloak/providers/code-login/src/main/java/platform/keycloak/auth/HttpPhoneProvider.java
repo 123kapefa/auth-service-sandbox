@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 import org.jboss.logging.Logger;
 import org.keycloak.http.simple.SimpleHttp;
+import org.keycloak.http.simple.SimpleHttpRequest;
 import org.keycloak.http.simple.SimpleHttpResponse;
 import org.keycloak.models.KeycloakSession;
 
@@ -16,7 +17,7 @@ import org.keycloak.models.KeycloakSession;
  * <ul>
  *   <li>POST {url}/call, phone=79990000001 → 200 {"code":"1234"} — звонок-сброс, code — последние 4 цифры номера,
  *       с которого звонят;</li>
- *   <li>POST {url}/sms, phone, code, text → 200 — SMS.</li>
+ *   <li>POST {url}/sms, phone, code, text → 200 — SMS (у уведомления code нет).</li>
  * </ul>
  * Любой другой ответ или ошибка сети — «не удалось» (у звонка тогда — запасная SMS).
  */
@@ -49,8 +50,20 @@ final class HttpPhoneProvider implements PhoneProvider {
 
     @Override
     public boolean sms(KeycloakSession session, String phone, String code) {
-        try (SimpleHttpResponse response = SimpleHttp.create(session).doPost(url + "/sms")
-            .param("phone", phone).param("code", code).param("text", PhoneProvider.smsText(code)).asResponse()) {
+        return send(session, phone, code, PhoneProvider.smsText(code));
+    }
+
+    @Override
+    public boolean message(KeycloakSession session, String phone, String text) {
+        return send(session, phone, null, text);
+    }
+
+    private boolean send(KeycloakSession session, String phone, String code, String text) {
+        SimpleHttpRequest request = SimpleHttp.create(session).doPost(url + "/sms").param("phone", phone).param("text", text);
+        if (code != null) {
+            request.param("code", code);
+        }
+        try (SimpleHttpResponse response = request.asResponse()) {
             if (response.getStatus() != 200) {
                 LOG.warnf("SMS на %s не ушла: провайдер ответил %d", PhoneNormalizer.toE164(phone), response.getStatus());
                 return false;

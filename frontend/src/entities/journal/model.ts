@@ -6,6 +6,8 @@ export const ACTION_LABELS: Record<string, string> = {
   UserLoggedOutEverywhere: "«Выйти везде»",
   UserPasswordResetRequested: "Ссылка на смену пароля",
   UserTwoFactorDisabled: "Отключение 2FA",
+  UserSignInMethodChanged: "Способ входа",
+  UserSignInMethodsReset: "Способы входа по умолчанию",
   PermissionCreated: "Право создано",
   PermissionDeleted: "Право удалено",
   RoleCreated: "Роль создана",

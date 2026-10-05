@@ -116,6 +116,11 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
         }
     }
 
+    /** Телефония для уведомлений (AccountNoticeResource): та же, что у кодов. */
+    PhoneProvider phone() {
+        return phone;
+    }
+
     @Override
     public void postInit(KeycloakSessionFactory factory) {
         // зависимостей от других провайдеров пока нет

@@ -9,6 +9,7 @@ import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.authenticators.browser.UsernamePasswordForm;
 import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.UserModel;
 import org.keycloak.events.Details;
 import org.keycloak.events.Errors;
 import org.keycloak.services.managers.AuthenticationManager;
@@ -18,6 +19,8 @@ import org.keycloak.services.validation.Validation;
  * Обычная форма «Телефон или почта + пароль» (встроенный UsernamePasswordForm), но номер приводится к логину
  * на сервере: «+7 (999) 000-00-01», «8 999 000 00 01» и «9990000001» — один пользователь 79990000001.
  * Скрипт темы только показывает «+»; запрос в обход формы тоже найдёт пользователя.
+ *
+ * Вход по паролю выключен у человека (SignInMethods) — отказ, как на неверный пароль, даже если пароль верный.
  *
  * Кнопка «Войти по коду» (codeLogin) на той же форме: пароль не нужен, номер или почта запоминается в сессии входа,
  * дальше — подсценарий «вход по коду» (CodeRequestedCondition → CodeLoginAuthenticator).
@@ -56,6 +59,14 @@ public final class PasswordLoginForm extends UsernamePasswordForm {
         context.getAuthenticationSession().setAuthNote(ATTEMPTED_USERNAME, target.get().value());
         CodeLoginNotes.save(context.getAuthenticationSession(), target.get());
         context.success();
+    }
+
+    @Override
+    public boolean validatePassword(AuthenticationFlowContext context, UserModel user,
+                                    MultivaluedMap<String, String> inputData, boolean clearUser) {
+        return super.validatePassword(context, user, inputData, clearUser)
+            && !SignInMethods.rejectPassword(context, user,
+                () -> challenge(context, getDefaultChallengeMessage(context), Validation.FIELD_PASSWORD), clearUser);
     }
 
     @Override
