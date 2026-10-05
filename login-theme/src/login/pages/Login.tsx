@@ -6,11 +6,12 @@ import { useIsPasswordRevealed } from "keycloakify/tools/useIsPasswordRevealed";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../KcContext";
 import { LoginInput } from "../components/LoginInput";
+import { ProviderIcon } from "../components/ProviderIcon";
 import { useSubmitting } from "../lib/use-submitting";
 
 /**
  * Вход (login.ftl): телефон или почта и пароль; «Войти по коду» — тот же логин, без пароля (плагин code-login);
- * «Войти с ключом доступа» — passkey; ниже — «Или войдите через»: Госуслуги, Яндекс ID (провайдеры realm). Номер
+ * «Войти с ключом доступа» — passkey; ниже — «Или войдите через»: значки Госуслуг и Яндекс ID в ряд (провайдеры realm). Номер
  * показывается как +7 (999) 000-00-01 (с 8 и 10 цифр — тоже +7), уходит цифрами скрытым полем username.
  */
 export default function Login(props: PageProps<Extract<KcContext, { pageId: "login.ftl" }>, I18n>) {
@@ -53,15 +54,18 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
             <p className="flex items-center gap-3 font-mono text-[11px] tracking-[0.1em] text-muted-foreground uppercase before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
               {msg("identity-provider-login-label")}
             </p>
-            <ul className="grid gap-2">
+            {/* В один ряд, значками; название — подсказка и имя кнопки для экранного диктора. */}
+            <ul className="flex justify-center gap-3">
               {externalProviders.map((provider) => (
                 <li key={provider.alias}>
                   <a
                     id={`social-${provider.alias}`}
                     href={provider.loginUrl}
-                    className={kcClsx("kcButtonClass", "kcButtonSecondaryClass")}
+                    aria-label={provider.displayName}
+                    title={provider.displayName}
+                    className="flex size-12 items-center justify-center border border-primary bg-transparent transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   >
-                    {provider.displayName}
+                    <ProviderIcon alias={provider.alias} name={provider.displayName} />
                   </a>
                 </li>
               ))}
