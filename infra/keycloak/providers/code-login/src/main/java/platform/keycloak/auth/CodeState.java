@@ -15,10 +15,21 @@ import java.util.stream.Stream;
  * @param resendAllowedAt раньше этого времени новый код не отправляется
  * @param failedAttempts  неверных вводов подряд
  * @param lockedUntil     до этого времени ни отправить, ни ввести код нельзя (или null)
+ * @param delivery        как ушёл последний код (звонок, SMS, письмо) или null
  */
-public record CodeState(String code, Instant expiresAt, Instant resendAllowedAt, int failedAttempts, Instant lockedUntil) {
+public record CodeState(String code, Instant expiresAt, Instant resendAllowedAt, int failedAttempts, Instant lockedUntil,
+                        CodeDelivery delivery) {
 
     public static final CodeState EMPTY = new CodeState(null, null, null, 0, null);
+
+    public CodeState(String code, Instant expiresAt, Instant resendAllowedAt, int failedAttempts, Instant lockedUntil) {
+        this(code, expiresAt, resendAllowedAt, failedAttempts, lockedUntil, null);
+    }
+
+    /** Код, который на самом деле ушёл (у звонка его выбирает провайдер), и как он ушёл. */
+    public CodeState sentAs(String sentCode, CodeDelivery how) {
+        return new CodeState(sentCode, expiresAt, resendAllowedAt, failedAttempts, lockedUntil, how);
+    }
 
     /** В хранилище Keycloak (SingleUseObjectProvider) — строки: ключ → значение. */
     public Map<String, String> toNotes() {
@@ -30,6 +41,9 @@ public record CodeState(String code, Instant expiresAt, Instant resendAllowedAt,
         putInstant(notes, "resendAllowedAt", resendAllowedAt);
         putInstant(notes, "lockedUntil", lockedUntil);
         notes.put("failedAttempts", Integer.toString(failedAttempts));
+        if (delivery != null) {
+            notes.put("delivery", delivery.name());
+        }
         return notes;
     }
 
@@ -43,7 +57,8 @@ public record CodeState(String code, Instant expiresAt, Instant resendAllowedAt,
             instant(notes, "expiresAt"),
             instant(notes, "resendAllowedAt"),
             Integer.parseInt(notes.getOrDefault("failedAttempts", "0")),
-            instant(notes, "lockedUntil"));
+            instant(notes, "lockedUntil"),
+            notes.containsKey("delivery") ? CodeDelivery.valueOf(notes.get("delivery")) : null);
     }
 
     /** Сколько секунд хранить запись: пока действует код, пауза перед повтором или блокировка. Не меньше секунды. */

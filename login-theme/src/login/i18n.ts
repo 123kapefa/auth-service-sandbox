@@ -13,6 +13,11 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
       platformCodeTitle: "Вход по коду",
       platformCodeSentToSms: "Отправили код в SMS на {0}.",
       platformCodeSentToEmail: "Отправили код письмом на {0}.",
+      platformCodeCalling:
+        "Вам звонят на {0}. Отвечать не нужно — введите последние 4 цифры номера, с которого звонят.",
+      platformCodeLabelCall: "Последние 4 цифры номера",
+      platformCodeCallAgain: "Позвонить ещё раз",
+      platformCodeSendSms: "Прислать SMS",
       platformCodeLabelSms: "Код из SMS",
       platformCodeLabelEmail: "Код из письма",
       platformCodeResend: "Отправить код ещё раз",
@@ -26,7 +31,8 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
       platformCodeLimit: "Слишком много запросов кода. Попробуйте через {0} мин.",
       platformCodeCaptchaRequired: "Подтвердите, что вы не робот, и запросите код ещё раз.",
       platformCodeCountryNotAllowed: "На номера этой страны коды не отправляем. Войдите по почте.",
-      platformCodeSmsUnavailable: "Сейчас не можем отправить SMS. Войдите по почте или с ключом доступа.",
+      platformCodeSmsUnavailable:
+        "Сейчас не можем отправить SMS. Войдите по почте или с ключом доступа.",
       platformAppAccessDenied:
         "Доступ к этому приложению для вас закрыт. Обратитесь к администратору приложения.",
       emailInstruction:
@@ -120,6 +126,11 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
       platformCodeTitle: "Sign in with a code",
       platformCodeSentToSms: "We sent a code by SMS to {0}.",
       platformCodeSentToEmail: "We sent a code by email to {0}.",
+      platformCodeCalling:
+        "We are calling {0}. No need to answer — enter the last 4 digits of the calling number.",
+      platformCodeLabelCall: "Last 4 digits of the number",
+      platformCodeCallAgain: "Call again",
+      platformCodeSendSms: "Send an SMS",
       platformCodeLabelSms: "Code from SMS",
       platformCodeLabelEmail: "Code from email",
       platformCodeResend: "Send the code again",
@@ -132,7 +143,8 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
       platformCodeSendFailed: "Could not send the code. Please try again later.",
       platformCodeLimit: "Too many code requests. Try again in {0} min.",
       platformCodeCaptchaRequired: "Confirm you are not a robot and request the code again.",
-      platformCodeCountryNotAllowed: "We do not send codes to numbers in this country. Sign in with email.",
+      platformCodeCountryNotAllowed:
+        "We do not send codes to numbers in this country. Sign in with email.",
       platformCodeSmsUnavailable: "We cannot send SMS right now. Sign in with email or a passkey.",
       platformAppAccessDenied:
         "Your access to this application is closed. Please contact the application administrator.",

@@ -96,11 +96,11 @@ code_start() {
   code_screen "$page"
 }
 
-# code_screen <html> — «куда отправили» с экрана кода (теми же словами, что страница темы: из codeChannel и
+# code_screen <html> — «куда отправили» с экрана кода (теми же словами, что страница темы, коротко: из codeDelivery и
 # codeTarget); не экран кода — ошибка со страницы
 code_screen() {
   if [ "$(kc_page "$1")" = platform-code-login.ftl ]; then
-    kc "$1" '("Отправили код письмом на " if c["codeChannel"] == "EMAIL" else "Отправили код в SMS на ") + c["codeTarget"] + "."'
+    kc "$1" '{"CALL": "Вам звонят на ", "EMAIL": "Отправили код письмом на "}.get(c["codeDelivery"], "Отправили код в SMS на ") + c["codeTarget"] + "."'
   else
     echo "ошибка: $(feedback "$1" | sed 's/^$/нет экрана кода/')"
   fi
@@ -137,14 +137,15 @@ code_send_again() {
   feedback "$page"
 }
 
-# sms_code <логин> [после строки N] — последний код из «SMS» (лог Keycloak), ждём до 10 секунд
-sms_code() {
-  local i code
-  for i in 1 2 3 4 5 6 7 8 9 10; do
-    code=$(docker compose logs keycloak --since 10m 2>/dev/null | grep "\[DEV SMS\] +$1: код входа" | tail -1 | grep -o '[0-9]\{6\}$')
-    [ -n "$code" ] && { echo "$code"; return; }
-    sleep 1
-  done
+# Телефония стенда — заглушка idp-stub (docs/keycloak/10-phone-code.md): звонки и SMS, которые «ушли» на номер.
+PHONE_STUB="${PHONE_STUB:-http://localhost:${IDP_STUB_PORT:-8190}/phone}"
+# phone_code <логин> — код последнего звонка (последние 4 цифры номера, с которого звонят) или SMS (6 цифр) на номер
+phone_code() {
+  curl -s "$PHONE_STUB/messages?to=$1" | python3 -c 'import json,sys; m=json.load(sys.stdin); print(m[-1]["code"] if m else "")'
+}
+# phone_count <логин> [call|sms] — сколько звонков и SMS (или только одного вида) ушло на номер
+phone_count() {
+  curl -s "$PHONE_STUB/messages?to=$1" | python3 -c 'import json,sys; print(sum(1 for m in json.load(sys.stdin) if sys.argv[1] in ("", m["kind"])))' "${2:-}"
 }
 
 # require_service — сервис должен отвечать, иначе проверять нечего

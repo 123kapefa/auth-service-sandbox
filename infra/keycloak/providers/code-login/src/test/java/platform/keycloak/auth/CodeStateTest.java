@@ -44,4 +44,14 @@ class CodeStateTest {
 
         assertEquals(1, state.secondsToKeep(NOW));
     }
+
+    @Test
+    void delivery_survivesStore() {
+        CodeState state = new CodeState("1234", NOW.plusSeconds(300), NOW.plusSeconds(60), 0, null).sentAs("4321", CodeDelivery.CALL);
+
+        CodeState restored = CodeState.fromNotes(state.toNotes());
+        assertEquals("4321", restored.code());
+        assertEquals(CodeDelivery.CALL, restored.delivery());
+        assertEquals(null, CodeState.fromNotes(new CodeState("1", null, null, 0, null).toNotes()).delivery());
+    }
 }

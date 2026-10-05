@@ -76,10 +76,10 @@ public final class CodeLimits {
     }
 
     /**
-     * Решение по отправке. captchaPassed — капча с этого запроса проверена и прошла.
-     * Порядок: страна → лимиты (отказ даже с капчей) → капча → бюджет.
+     * Решение по отправке способом delivery. captchaPassed — капча с этого запроса проверена и прошла.
+     * Порядок: страна → лимиты (отказ даже с капчей) → капча → бюджет (только SMS: звонки и почта идут и без него).
      */
-    public Decision check(CodeTarget target, Usage usage, boolean captchaPassed, Instant now) {
+    public Decision check(CodeTarget target, CodeDelivery delivery, Usage usage, boolean captchaPassed, Instant now) {
         if (!countryAllowed(target)) {
             return new Decision.CountryNotAllowed();
         }
@@ -93,16 +93,20 @@ public final class CodeLimits {
             return new Decision.CaptchaRequired();
         }
 
-        long cost = cost(target);
-        if (cost > 0 && policy.dailyBudget() > 0 && usage.spentToday() + cost > policy.dailyBudget()) {
+        long cost = cost(delivery);
+        if (delivery == CodeDelivery.SMS && policy.dailyBudget() > 0 && usage.spentToday() + cost > policy.dailyBudget()) {
             return new Decision.BudgetExhausted();
         }
         return new Decision.Allow(cost);
     }
 
-    /** Цена отправки, копейки: SMS — по тарифу, почта — бесплатно. */
-    public long cost(CodeTarget target) {
-        return target.channel() == CodeTarget.Channel.SMS ? policy.smsCost() : 0;
+    /** Цена отправки, копейки: SMS и звонок — по тарифу, почта — бесплатно. */
+    public long cost(CodeDelivery delivery) {
+        return switch (delivery) {
+            case SMS -> policy.smsCost();
+            case CALL -> policy.callCost();
+            case EMAIL -> 0;
+        };
     }
 
     /** О какой доле бюджета пора оповестить при таком расходе: 100, 80 (порог из настроек) или 0 — ни о какой. */

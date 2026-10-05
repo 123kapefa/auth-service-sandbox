@@ -3,7 +3,6 @@ package platform.keycloak.auth;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
 
 import org.jboss.logging.Logger;
@@ -22,7 +21,8 @@ import org.keycloak.provider.ProviderConfigProperty;
  * Защита от накрутки (CodeLimitPolicy): у каждого ключа значение берётся из атрибута realm «platform.codes.ключ»
  * (настройки проекта, их пишет API админки — 10.7), иначе из настроек плагина Keycloak, иначе — по умолчанию.
  * Настройки плагина — переменные KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__КЛЮЧ (например, …__IP_PER_HOUR=1000);
- * там же капча: CAPTCHA_SERVER_KEY и CAPTCHA_SITE_KEY (Яндекс SmartCaptcha) или CAPTCHA_STUB=true (только стенд).
+ * там же капча: CAPTCHA_SERVER_KEY и CAPTCHA_SITE_KEY (Яндекс SmartCaptcha) или CAPTCHA_STUB=true (только стенд),
+ * и телефония: PHONE_PROVIDER_URL (HttpPhoneProvider; нет — звонки и SMS пишутся в лог, LogPhoneProvider).
  */
 public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory {
 
@@ -36,6 +36,7 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
     private CaptchaVerifier captcha = CaptchaVerifier.NONE;
     private CodeMetrics metrics;
     private String captchaSiteKey;
+    private PhoneProvider phone = new LogPhoneProvider();
 
     @Override
     public String getId() {
@@ -49,7 +50,7 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
 
     @Override
     public String getHelpText() {
-        return "Одноразовый код на телефон или почту.";
+        return "Одноразовый код на телефон (звонок, затем SMS) или почту.";
     }
 
     @Override
@@ -80,13 +81,10 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
     @Override
     public Authenticator create(KeycloakSession session) {
         Clock clock = Clock.systemUTC();
-        Map<CodeTarget.Channel, CodeSender> senders = Map.of(
-            CodeTarget.Channel.SMS, new SmsToLogSender(),
-            CodeTarget.Channel.EMAIL, new EmailCodeSender(CodePolicy.PRODUCTION));
         Function<RealmModel, CodeLimits> limits = realm -> new CodeLimits(CodeLimitPolicy.from(
             key -> setting(realm, key), CodeLimitPolicy.DEFAULTS));
         return new CodeLoginAuthenticator(new CodeRules(CodePolicy.PRODUCTION, clock, new SecureRandom()), limits,
-            captcha, captchaSiteKey, metrics, senders, clock);
+            captcha, captchaSiteKey, metrics, new EmailCodeSender(CodePolicy.PRODUCTION), phone, clock);
     }
 
     private String setting(RealmModel realm, String key) {
@@ -112,6 +110,10 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
         String siteKey = config.get("captcha-site-key");
         captchaSiteKey = siteKey == null || siteKey.isBlank() ? null : siteKey;
         metrics = CodeMetrics.global();
+        String phoneUrl = config.get("phone-provider-url");
+        if (phoneUrl != null && !phoneUrl.isBlank()) {
+            phone = new HttpPhoneProvider(phoneUrl);
+        }
     }
 
     @Override

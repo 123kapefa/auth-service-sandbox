@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.function.LongToIntFunction;
 
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
@@ -42,23 +43,36 @@ final class CodeLimitStore {
             budget(today).spent());
     }
 
-    /** Записать отправку; возвращает расход до неё. */
-    Budget recordSend(CodeTarget target, String ip, String range, long cost, LocalDate today, Instant now) {
+    /**
+     * Записать отправку и её цену. alertPercent(расход после) — порог оповещения при таком расходе (CodeLimits);
+     * возвращает порог, о котором пора оповестить (0 — не пора). Расход и отметка об оповещении пишутся одной записью:
+     * дважды положить один ключ за запрос Infinispan не даёт («task in progress»).
+     */
+    int recordSend(CodeTarget target, String ip, String range, long cost, LocalDate today, Instant now,
+                   LongToIntFunction alertPercent) {
         append(targetKey(target), CodeLimits.DAY, now);
         append(ipKey(ip), CodeLimits.HOUR, now);
         if (range != null) {
             append(rangeKey(range), CodeLimits.HOUR, now);
         }
-        Budget before = budget(today);
-        if (cost > 0) {
-            saveBudget(today, new Budget(before.spent() + cost, before.alertedPercent()));
+        if (cost == 0) {
+            return 0;
         }
-        return before;
+        Budget before = budget(today);
+        long spent = before.spent() + cost;
+        int percent = alertPercent.applyAsInt(spent);
+        saveBudget(today, new Budget(spent, Math.max(before.alertedPercent(), percent)));
+        return percent > before.alertedPercent() ? percent : 0;
     }
 
-    void markAlerted(LocalDate today, int percent) {
+    /** Отметить оповещение о пороге; true — о нём ещё не оповещали (пора). */
+    boolean markAlerted(LocalDate today, int percent) {
         Budget current = budget(today);
-        saveBudget(today, new Budget(current.spent(), Math.max(current.alertedPercent(), percent)));
+        if (current.alertedPercent() >= percent) {
+            return false;
+        }
+        saveBudget(today, new Budget(current.spent(), percent));
+        return true;
     }
 
     Budget budget(LocalDate day) {

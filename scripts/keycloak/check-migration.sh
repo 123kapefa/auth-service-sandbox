@@ -106,8 +106,8 @@ check "заблокированный (3) — не входит" "$(starts "$(lo
 
 echo "4. Без пароля — вход по коду"
 JAR="$WORK/jar2"; : > "$JAR"
-check "экран кода для 79991110002" "$(code_start_fresh "$JAR" 79991110002)" "Отправили код в SMS на +79991110002."
-check "верный код → вход" "$(code_submit "$JAR" "$(sms_code 79991110002)")" /me/
+check "экран кода для 79991110002" "$(code_start_fresh "$JAR" 79991110002)" "Вам звонят на +79991110002."
+check "верный код → вход" "$(code_submit "$JAR" "$(phone_code 79991110002)")" /me/
 check "вошёл перенесённый пользователь" "$(me "$JAR" phone)" "+79991110002"
 status "$JAR" POST /auth/logout > /dev/null
 

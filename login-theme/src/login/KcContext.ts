@@ -14,6 +14,10 @@ export type KcContextExtensionPerPage = {
   "platform-code-login.ftl": {
     /** SMS или EMAIL — куда ушёл код. */
     codeChannel: "SMS" | "EMAIL";
+    /** Как ушёл код: CALL — звонок-сброс (код — последние 4 цифры номера), SMS, EMAIL. */
+    codeDelivery: "CALL" | "SMS" | "EMAIL";
+    /** "true" — на экране звонка есть «Прислать SMS» (у проекта SMS включены). */
+    codeSmsAvailable: string;
     /** Куда отправлен код — как показать пользователю. */
     codeTarget: string;
     /** Через сколько секунд можно запросить новый код ("0" — уже можно). */

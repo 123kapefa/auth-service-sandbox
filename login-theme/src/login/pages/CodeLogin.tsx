@@ -9,6 +9,7 @@ import { useSubmitting } from "../lib/use-submitting";
 /**
  * Вход по коду (плагин code-login, platform-code-login.ftl): куда ушёл код, поле кода (только цифры; набрали все —
  * форма уходит сама), «Отправить код ещё раз» — когда истечёт пауза (её же проверяет сервер), назад к паролю.
+ * На телефон код сначала приходит звонком (последние 4 цифры номера): тогда «Позвонить ещё раз» и «Прислать SMS».
  * Ошибки (неверный код, блокировка, код истёк, рано) — сообщением Keycloak в каркасе.
  */
 export default function CodeLogin(
@@ -16,9 +17,17 @@ export default function CodeLogin(
 ) {
   const { kcContext, i18n, doUseDefaultCss, Template, classes } = props;
   const { kcClsx } = getKcClsx({ doUseDefaultCss, classes });
-  const { url, codeChannel, codeTarget, codeResendAfter, codeLength } = kcContext;
+  const {
+    url,
+    codeChannel,
+    codeDelivery,
+    codeSmsAvailable,
+    codeTarget,
+    codeResendAfter,
+    codeLength,
+  } = kcContext;
   const { msg, msgStr } = i18n;
-  const byEmail = codeChannel === "EMAIL";
+  const delivery = codeDelivery ?? (codeChannel === "EMAIL" ? "EMAIL" : "SMS");
   const length = Number(codeLength) || 6;
   const resendIn = useCountdown(Number(codeResendAfter) || 0);
   const [code, setCode] = useState("");
@@ -45,7 +54,14 @@ export default function CodeLogin(
       headerNode={msg("platformCodeTitle")}
     >
       <p id="platform-code-target" className="mb-4 text-sm text-muted-foreground">
-        {msg(byEmail ? "platformCodeSentToEmail" : "platformCodeSentToSms", codeTarget)}
+        {msg(
+          delivery === "CALL"
+            ? "platformCodeCalling"
+            : delivery === "EMAIL"
+              ? "platformCodeSentToEmail"
+              : "platformCodeSentToSms",
+          codeTarget,
+        )}
       </p>
       <form
         ref={form}
@@ -58,7 +74,13 @@ export default function CodeLogin(
       >
         <div className={kcClsx("kcFormGroupClass")}>
           <label htmlFor="code" className={kcClsx("kcLabelClass")}>
-            {msg(byEmail ? "platformCodeLabelEmail" : "platformCodeLabelSms")}
+            {msg(
+              delivery === "CALL"
+                ? "platformCodeLabelCall"
+                : delivery === "EMAIL"
+                  ? "platformCodeLabelEmail"
+                  : "platformCodeLabelSms",
+            )}
           </label>
           {/*
             Ячейки по цифре — только вид; поле одно и прозрачное поверх них: автоподстановка кода из SMS, вставка
@@ -121,9 +143,22 @@ export default function CodeLogin(
           disabled={resendIn > 0 || submitting}
           className={kcClsx("kcButtonClass", "kcButtonSecondaryClass")}
         >
-          {msgStr("platformCodeResend")}
+          {msgStr(delivery === "CALL" ? "platformCodeCallAgain" : "platformCodeResend")}
         </button>
       </form>
+      {codeSmsAvailable === "true" && (
+        <form action={url.loginAction} method="post" className="mt-2" onSubmit={markSubmitting}>
+          <button
+            id="platform-code-send-sms"
+            name="sendSms"
+            type="submit"
+            disabled={resendIn > 0 || submitting}
+            className={kcClsx("kcButtonClass", "kcButtonSecondaryClass")}
+          >
+            {msgStr("platformCodeSendSms")}
+          </button>
+        </form>
+      )}
       {resendIn > 0 && (
         <p
           id="platform-code-resend-after"

@@ -138,6 +138,9 @@ services:
       KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_STUB: "true"
       # IP человека — из X-Forwarded-For, как за прокси в бою: check-code-limits.sh проверяет лимиты «с IP» с разных адресов.
       KC_PROXY_HEADERS: xforwarded
+      # Код на телефон — звонок-сброс, затем SMS (docs/keycloak/10-phone-code.md). Телефония стенда — заглушка idp-stub:
+      # звонки и SMS видны на http://localhost:8190/phone. Пусто — звонки и SMS пишутся в лог Keycloak.
+      KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__PHONE_PROVIDER_URL: ${PHONE_PROVIDER_URL-http://idp-stub:8190/phone}
       # Метрики Prometheus (/metrics на порту управления 9000): отправки кодов, расход, отказы.
       KC_METRICS_ENABLED: "true"
     volumes:
@@ -154,7 +157,8 @@ services:
       keycloak-postgres:
         condition: service_healthy
 
-  # Заглушка Яндекс ID и Госуслуг (ЕСИА) и сервиса подписи ГОСТ — для входа без настоящих ключей (infra/idp-stub).
+  # Заглушка Яндекс ID и Госуслуг (ЕСИА), сервиса подписи ГОСТ и телефонии (звонки и SMS) — для входа без настоящих
+  # ключей (infra/idp-stub).
   # Только для песочницы: с настоящими ключами Keycloak ходит к Яндексу и ЕСИА, заглушка не нужна.
   idp-stub:
     image: python:3.13-alpine

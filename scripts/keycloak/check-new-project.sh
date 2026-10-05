@@ -78,8 +78,8 @@ check "роли «Заказов»: customer (по умолчанию у все�
 echo "2. Новый покупатель проекта — по коду"
 NEW="7998$(printf '%07d' $((RANDOM * 32768 % 10000000 + RANDOM % 1000)))"
 CUSTOMER="$WORK/customer"; : > "$CUSTOMER"
-check "экран кода" "$(code_start "$CUSTOMER" "$NEW")" "Отправили код в SMS на +$NEW."
-check "вход по коду" "$(code_submit "$CUSTOMER" "$(sms_code "$NEW")")" /me/
+check "экран кода" "$(code_start "$CUSTOMER" "$NEW")" "Вам звонят на +$NEW."
+check "вход по коду" "$(code_submit "$CUSTOMER" "$(phone_code "$NEW")")" /me/
 check "покупатель проекта: роль customer" "$(curl -s -b "$CUSTOMER" "$API/me/" | python3 -c 'import json,sys; print(",".join(json.load(sys.stdin)["result"]["roles"]))')" customer
 
 echo "3. Ключ сервиса в проекте"

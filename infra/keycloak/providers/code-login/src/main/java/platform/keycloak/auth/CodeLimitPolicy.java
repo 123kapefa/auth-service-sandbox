@@ -20,6 +20,8 @@ import java.util.function.Function;
  * @param countries          коды стран, на номера которых шлём (по началу номера: «7» — Россия)
  * @param dailyBudget        дневной бюджет проекта, копейки; 0 — без бюджета
  * @param smsCost            цена одной SMS, копейки
+ * @param callCost           цена одного звонка-сброса, копейки
+ * @param phoneChannels      как слать код на телефон: звонок и/или SMS (порядок не важен — звонок всегда первый)
  * @param budgetAlertPercent при такой доле бюджета — оповещение
  * @param zone               в каком часовом поясе начинаются сутки бюджета
  */
@@ -34,6 +36,8 @@ public record CodeLimitPolicy(
     List<String> countries,
     long dailyBudget,
     long smsCost,
+    long callCost,
+    List<CodeDelivery> phoneChannels,
     int budgetAlertPercent,
     ZoneId zone) {
 
@@ -48,7 +52,9 @@ public record CodeLimitPolicy(
         2,          // капча после 2 отправок за час
         List.of("7"),
         100_000,    // 1000 ₽ в сутки
-        400,        // SMS — 4 ₽ (уточнить у провайдера, 10.2)
+        400,        // SMS — 4 ₽ (уточнить у провайдера)
+        100,        // звонок — 1 ₽ (уточнить у провайдера)
+        List.of(CodeDelivery.CALL, CodeDelivery.SMS),
         80,
         ZoneId.of("Europe/Moscow"));
 
@@ -61,6 +67,15 @@ public record CodeLimitPolicy(
         }
         cooldowns = List.copyOf(cooldowns);
         countries = List.copyOf(countries);
+        phoneChannels = List.copyOf(phoneChannels);
+        if (phoneChannels.isEmpty() || phoneChannels.contains(CodeDelivery.EMAIL)) {
+            throw new IllegalArgumentException("phone-channels: call и/или sms");
+        }
+    }
+
+    /** Можно ли слать код на телефон этим способом (звонок, SMS). */
+    public boolean allows(CodeDelivery delivery) {
+        return delivery == CodeDelivery.EMAIL || phoneChannels.contains(delivery);
     }
 
     /** Пауза после отправки, которая за час будет sendsInHour-й по счёту (с 1). */
@@ -72,7 +87,8 @@ public record CodeLimitPolicy(
     /**
      * Политика из настроек: setting(ключ) — значение или null (тогда берётся из base). Ключи — в kebab-case:
      * cooldowns («60,120,300,900», секунды), target-per-hour, target-per-day, ip-per-hour, range-per-hour, range-digits,
-     * captcha-after, countries («7,375»), daily-budget, sms-cost (копейки), budget-alert-percent, zone.
+     * captcha-after, countries («7,375»), daily-budget, sms-cost, call-cost (копейки), phone-channels («call,sms», «sms»),
+     * budget-alert-percent, zone.
      * Неверное значение — ошибка: лучше не отправить код, чем отправить без лимита.
      */
     public static CodeLimitPolicy from(Function<String, String> setting, CodeLimitPolicy base) {
@@ -87,6 +103,9 @@ public record CodeLimitPolicy(
             list(setting.apply("countries"), base.countries(), Function.identity()),
             number(setting.apply("daily-budget"), base.dailyBudget()),
             number(setting.apply("sms-cost"), base.smsCost()),
+            number(setting.apply("call-cost"), base.callCost()),
+            list(setting.apply("phone-channels"), base.phoneChannels(),
+                value -> CodeDelivery.valueOf(value.toUpperCase(java.util.Locale.ROOT))),
             integer(setting.apply("budget-alert-percent"), base.budgetAlertPercent()),
             blank(setting.apply("zone")) ? base.zone() : ZoneId.of(setting.apply("zone").trim()));
     }

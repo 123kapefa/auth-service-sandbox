@@ -4,7 +4,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -34,26 +33,32 @@ public final class CodeLoginAuthenticator implements Authenticator {
     static final String FORM = "platform-code-login.ftl";
     static final String FIELD_CODE = "code";
     static final String BUTTON_RESEND = "resend";
+    /** «Прислать SMS» — вместо звонка (звонок не дошёл). */
+    static final String BUTTON_SEND_SMS = "sendSms";
 
     private static final Logger LOG = Logger.getLogger(CodeLoginAuthenticator.class);
     private static final String CUSTOMER_MODE = "customer";
+    /** Код звонка — последние 4 цифры номера, с которого звонят. */
+    private static final int CALL_CODE_LENGTH = 4;
 
     private final CodeRules rules;
     private final Function<RealmModel, CodeLimits> limits;
     private final CaptchaVerifier captcha;
     private final String captchaSiteKey;
     private final CodeMetrics metrics;
-    private final Map<CodeTarget.Channel, CodeSender> senders;
+    private final CodeSender email;
+    private final PhoneProvider phone;
     private final Clock clock;
 
     CodeLoginAuthenticator(CodeRules rules, Function<RealmModel, CodeLimits> limits, CaptchaVerifier captcha,
-                           String captchaSiteKey, CodeMetrics metrics, Map<CodeTarget.Channel, CodeSender> senders, Clock clock) {
+                           String captchaSiteKey, CodeMetrics metrics, CodeSender email, PhoneProvider phone, Clock clock) {
         this.rules = rules;
         this.limits = limits;
         this.captcha = captcha;
         this.captchaSiteKey = captchaSiteKey;
         this.metrics = metrics;
-        this.senders = senders;
+        this.email = email;
+        this.phone = phone;
         this.clock = clock;
     }
 
@@ -65,7 +70,7 @@ public final class CodeLoginAuthenticator implements Authenticator {
             context.attempted();
             return;
         }
-        send(context, target.get());
+        send(context, target.get(), false);
     }
 
     @Override
@@ -78,8 +83,8 @@ public final class CodeLoginAuthenticator implements Authenticator {
         CodeTarget target = loaded.get();
 
         MultivaluedMap<String, String> formData = context.getHttpRequest().getDecodedFormParameters();
-        if (formData.containsKey(BUTTON_RESEND)) {
-            send(context, target);
+        if (formData.containsKey(BUTTON_RESEND) || formData.containsKey(BUTTON_SEND_SMS)) {
+            send(context, target, formData.containsKey(BUTTON_SEND_SMS));
             return;
         }
 
@@ -90,7 +95,7 @@ public final class CodeLoginAuthenticator implements Authenticator {
         switch (rules.verify(current, formData.getFirst(FIELD_CODE))) {
             case CodeRules.VerifyResult.Success success -> {
                 store.save(target, success.state(), clock.instant());
-                metrics.verified(context.getRealm().getName(), target.channel());
+                metrics.verified(context.getRealm().getName(), delivery(target, current));
                 signIn(context, target, success.state());
             }
             case CodeRules.VerifyResult.Wrong wrong -> {
@@ -108,7 +113,7 @@ public final class CodeLoginAuthenticator implements Authenticator {
         }
     }
 
-    private void send(AuthenticationFlowContext context, CodeTarget target) {
+    private void send(AuthenticationFlowContext context, CodeTarget target, boolean smsRequested) {
         RealmModel realm = context.getRealm();
         CodeStore store = new CodeStore(context.getSession(), realm);
         CodeState current = store.load(target);
@@ -122,21 +127,39 @@ public final class CodeLoginAuthenticator implements Authenticator {
 
         switch (rules.send(current, limits.cooldown(usage.target(), now))) {
             case CodeRules.SendResult.Sent sent -> {
-                CodeLimits.Decision decision = decide(context, limits, target, usage, ip, now);
-                if (!(decision instanceof CodeLimits.Decision.Allow allow)) {
+                // «Ещё раз» после SMS — снова SMS; иначе на телефон — звонок.
+                CodeDelivery delivery = choose(target, limits, smsRequested || current.delivery() == CodeDelivery.SMS);
+                CodeLimits.Decision decision = decide(context, limits, target, delivery, usage, ip, now);
+                if (!(decision instanceof CodeLimits.Decision.Allow)) {
                     refuse(context, target, current, limits, limitStore, today, decision);
                     return;
                 }
+                Optional<String> code = deliver(context, target, delivery, sent.code());
+                // Звонок не удался (провайдер недоступен) — сразу запасная SMS, если она у проекта есть и в бюджете.
+                // Капча и лимиты уже пройдены этим запросом.
+                if (code.isEmpty() && delivery == CodeDelivery.CALL && limits.policy().allows(CodeDelivery.SMS)) {
+                    delivery = CodeDelivery.SMS;
+                    decision = limits.check(target, delivery, usage, true, now);
+                    if (!(decision instanceof CodeLimits.Decision.Allow)) {
+                        refuse(context, target, current, limits, limitStore, today, decision);
+                        return;
+                    }
+                    code = deliver(context, target, delivery, sent.code());
+                }
                 // Сохраняем только отправленный код: иначе пауза перед повтором началась бы без письма.
-                if (!senders.get(target.channel()).send(context, target.value(), sent.code())) {
+                if (code.isEmpty()) {
                     context.challenge(form(context, target, current).setError("platformCodeSendFailed").createForm(FORM));
                     return;
                 }
-                store.save(target, sent.state(), now);
-                CodeLimitStore.Budget before = limitStore.recordSend(target, ip, range, allow.cost(), today, now);
-                metrics.sent(realm.getName(), target.channel(), allow.cost());
-                alertBudget(realm, limits, limitStore, today, before, limits.alertPercent(before.spent() + allow.cost()));
-                context.challenge(form(context, target, sent.state()).createForm(FORM));
+                CodeState state = sent.state().sentAs(code.get(), delivery);
+                long cost = limits.cost(delivery);
+                store.save(target, state, now);
+                int alert = limitStore.recordSend(target, ip, range, cost, today, now, limits::alertPercent);
+                metrics.sent(realm.getName(), delivery, cost);
+                if (alert > 0) {
+                    alertBudget(realm, limits, alert);
+                }
+                context.challenge(form(context, target, state).createForm(FORM));
             }
             case CodeRules.SendResult.TooEarly early -> context.challenge(
                 form(context, target, current).setInfo("platformCodeTooEarly", early.retryAfterSeconds()).createForm(FORM));
@@ -145,10 +168,38 @@ public final class CodeLoginAuthenticator implements Authenticator {
         }
     }
 
+    // Почта — письмом. Телефон — звонком-сбросом (дешевле); SMS — если попросили или звонки у проекта выключены.
+    private static CodeDelivery choose(CodeTarget target, CodeLimits limits, boolean smsWanted) {
+        if (target.channel() == CodeTarget.Channel.EMAIL) {
+            return CodeDelivery.EMAIL;
+        }
+        if (smsWanted && limits.policy().allows(CodeDelivery.SMS)) {
+            return CodeDelivery.SMS;
+        }
+        return limits.policy().allows(CodeDelivery.CALL) ? CodeDelivery.CALL : CodeDelivery.SMS;
+    }
+
+    // Код, который ушёл (у звонка — последние 4 цифры номера, их выбирает провайдер), или пусто — не удалось.
+    private Optional<String> deliver(AuthenticationFlowContext context, CodeTarget target, CodeDelivery delivery, String generated) {
+        return switch (delivery) {
+            case CALL -> phone.call(context.getSession(), target.value());
+            case SMS -> phone.sms(context.getSession(), target.value(), generated) ? Optional.of(generated) : Optional.empty();
+            case EMAIL -> email.send(context, target.value(), generated) ? Optional.of(generated) : Optional.empty();
+        };
+    }
+
+    // Как ушёл действующий код; кода ещё не было — как ушёл бы по умолчанию для канала.
+    private static CodeDelivery delivery(CodeTarget target, CodeState state) {
+        if (state.delivery() != null) {
+            return state.delivery();
+        }
+        return target.channel() == CodeTarget.Channel.EMAIL ? CodeDelivery.EMAIL : CodeDelivery.SMS;
+    }
+
     // Защита от накрутки; капчу проверяем у сервиса, только если она нужна и её прислали.
     private CodeLimits.Decision decide(AuthenticationFlowContext context, CodeLimits limits, CodeTarget target,
-                                       CodeLimits.Usage usage, String ip, Instant now) {
-        CodeLimits.Decision decision = limits.check(target, usage, false, now);
+                                       CodeDelivery delivery, CodeLimits.Usage usage, String ip, Instant now) {
+        CodeLimits.Decision decision = limits.check(target, delivery, usage, false, now);
         if (!(decision instanceof CodeLimits.Decision.CaptchaRequired)) {
             return decision;
         }
@@ -156,7 +207,7 @@ public final class CodeLoginAuthenticator implements Authenticator {
         if (token == null || token.isBlank() || !captcha.verify(context.getSession(), token, ip)) {
             return decision;
         }
-        return limits.check(target, usage, true, now);
+        return limits.check(target, delivery, usage, true, now);
     }
 
     private void refuse(AuthenticationFlowContext context, CodeTarget target, CodeState current, CodeLimits limits,
@@ -180,7 +231,9 @@ public final class CodeLoginAuthenticator implements Authenticator {
             }
             case CodeLimits.Decision.BudgetExhausted ignored -> {
                 metrics.refused(realm.getName(), "budget");
-                alertBudget(realm, limits, limitStore, today, limitStore.budget(today), 100);
+                if (limitStore.markAlerted(today, 100)) {
+                    alertBudget(realm, limits, 100);
+                }
                 form.setError("platformCodeSmsUnavailable");
             }
             case CodeLimits.Decision.Allow ignored -> throw new IllegalStateException("Allow — не отказ");
@@ -190,12 +243,7 @@ public final class CodeLoginAuthenticator implements Authenticator {
 
     // Оповещение о расходе — один раз на каждый порог за сутки. Пока — в лог Keycloak (WARN, «[CODE BUDGET]»);
     // кому ещё слать (почта админам проекта), решает 10.7.
-    private void alertBudget(RealmModel realm, CodeLimits limits, CodeLimitStore limitStore, LocalDate today,
-                             CodeLimitStore.Budget budget, int percent) {
-        if (percent == 0 || budget.alertedPercent() >= percent) {
-            return;
-        }
-        limitStore.markAlerted(today, percent);
+    private void alertBudget(RealmModel realm, CodeLimits limits, int percent) {
         metrics.budgetAlert(realm.getName(), percent);
         long budgetRub = limits.policy().dailyBudget() / 100;
         if (percent >= 100) {
@@ -270,6 +318,7 @@ public final class CodeLoginAuthenticator implements Authenticator {
             ? 0
             : (Duration.between(now, state.resendAllowedAt()).toMillis() + 999) / 1000;
 
+        CodeDelivery delivery = delivery(target, state);
         // Нужна ли капча для следующей отправки: тема заранее показывает её у кнопки «Отправить ещё раз».
         CodeLimits limits = this.limits.apply(context.getRealm());
         CodeLimitStore limitStore = new CodeLimitStore(context.getSession(), context.getRealm());
@@ -279,9 +328,13 @@ public final class CodeLoginAuthenticator implements Authenticator {
         LoginFormsProvider form = context.form()
             .setExecution(context.getExecution().getId())
             .setAttribute("codeChannel", target.channel().name())
+            .setAttribute("codeDelivery", delivery.name())
+            // «Прислать SMS» — на экране звонка, если SMS у проекта есть.
+            .setAttribute("codeSmsAvailable", Boolean.toString(
+                delivery == CodeDelivery.CALL && limits.policy().allows(CodeDelivery.SMS)))
             .setAttribute("codeTarget", target.display())
             .setAttribute("codeResendAfter", Long.toString(resendAfter))
-            .setAttribute("codeLength", Integer.toString(rules.codeLength()))
+            .setAttribute("codeLength", Integer.toString(delivery == CodeDelivery.CALL ? CALL_CODE_LENGTH : rules.codeLength()))
             .setAttribute("captchaRequired", Boolean.toString(limits.captchaRequired(usage, now)));
         if (captchaSiteKey != null) {
             form.setAttribute("captchaSiteKey", captchaSiteKey);
