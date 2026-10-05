@@ -7,7 +7,7 @@ import io.micrometer.core.instrument.Metrics;
 /**
  * Метрики кодов (Prometheus Keycloak, /metrics на порту управления при metrics-enabled):
  * <ul>
- *   <li>platform_code_sent_total{realm,channel} — отправлено кодов;</li>
+ *   <li>platform_code_sent_total{realm,channel} — отправлено кодов (CALL, SMS, EMAIL);</li>
  *   <li>platform_code_verified_total{realm,channel} — введено верно (доля введённых = verified / sent);</li>
  *   <li>platform_code_cost_kopecks_total{realm,channel} — расход;</li>
  *   <li>platform_code_refused_total{realm,reason} — не отправлено: limit, captcha, country, budget;</li>
@@ -28,14 +28,14 @@ final class CodeMetrics {
         return new CodeMetrics(Metrics.globalRegistry);
     }
 
-    void sent(String realm, CodeTarget.Channel channel, long cost) {
+    void sent(String realm, CodeDelivery channel, long cost) {
         counter("platform_code_sent", realm, "channel", channel.name()).increment();
         if (cost > 0) {
             counter("platform_code_cost_kopecks", realm, "channel", channel.name()).increment(cost);
         }
     }
 
-    void verified(String realm, CodeTarget.Channel channel) {
+    void verified(String realm, CodeDelivery channel) {
         counter("platform_code_verified", realm, "channel", channel.name()).increment();
     }
 

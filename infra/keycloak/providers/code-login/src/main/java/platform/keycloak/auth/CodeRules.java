@@ -89,7 +89,7 @@ public final class CodeRules {
         }
 
         if (input != null && constantTimeEquals(current.code(), input.trim())) {
-            return new VerifyResult.Success(new CodeState(null, null, current.resendAllowedAt(), 0, null));
+            return new VerifyResult.Success(new CodeState(null, null, current.resendAllowedAt(), 0, null, current.delivery()));
         }
 
         int failed = current.failedAttempts() + 1;
@@ -101,7 +101,7 @@ public final class CodeRules {
         }
 
         return new VerifyResult.Wrong(
-            new CodeState(current.code(), current.expiresAt(), current.resendAllowedAt(), failed, null),
+            new CodeState(current.code(), current.expiresAt(), current.resendAllowedAt(), failed, null, current.delivery()),
             policy.maxAttempts() - failed);
     }
 

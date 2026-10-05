@@ -49,6 +49,15 @@ class CodeRulesTest {
     }
 
     @Test
+    void wrongCode_keepsHowCodeWasSent_andCallCodeOf4DigitsVerifies() {
+        CodeState call = sent(CodeState.EMPTY).state().sentAs("4821", CodeDelivery.CALL);
+
+        CodeRules.VerifyResult.Wrong wrong = assertInstanceOf(CodeRules.VerifyResult.Wrong.class, rules.verify(call, "0000"));
+        assertEquals(CodeDelivery.CALL, wrong.state().delivery());
+        assertInstanceOf(CodeRules.VerifyResult.Success.class, rules.verify(wrong.state(), "4821"));
+    }
+
+    @Test
     void newCode_replacesOld() {
         CodeRules.SendResult.Sent first = sent(CodeState.EMPTY);
         clock.advance(Duration.ofSeconds(60));

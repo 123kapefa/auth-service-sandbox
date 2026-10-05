@@ -119,6 +119,52 @@ describe("вход по коду", () => {
     expect(screen.getByRole("button", { name: "Отправить код ещё раз" })).toBeEnabled();
   });
 
+  it("звонок: «Вам звонят», 4 цифры, «Позвонить ещё раз» и «Прислать SMS» после паузы", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(
+      <KcPage
+        kcContext={getKcContextMock({
+          pageId: "platform-code-login.ftl",
+          overrides: {
+            codeDelivery: "CALL",
+            codeSmsAvailable: "true",
+            codeLength: "4",
+            codeResendAfter: "1",
+          },
+        })}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "Вам звонят на +7 999 *** ** 01. Отвечать не нужно — введите последние 4 цифры номера, с которого звонят.",
+        ),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText("Последние 4 цифры номера")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Прислать SMS" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Позвонить ещё раз" })).toBeDisabled();
+
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(screen.getByRole("button", { name: "Прислать SMS" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Прислать SMS" })).toHaveAttribute("name", "sendSms");
+    expect(screen.getByRole("button", { name: "Позвонить ещё раз" })).toBeEnabled();
+  });
+
+  it("SMS у проекта выключены — на экране звонка нет «Прислать SMS»", async () => {
+    render(
+      <KcPage
+        kcContext={getKcContextMock({
+          pageId: "platform-code-login.ftl",
+          overrides: { codeDelivery: "CALL", codeSmsAvailable: "false", codeLength: "4" },
+        })}
+      />,
+    );
+    await screen.findByRole("button", { name: "Позвонить ещё раз" });
+    expect(screen.queryByRole("button", { name: "Прислать SMS" })).toBeNull();
+  });
+
   it("в поле — только цифры и не больше длины кода; набрали все — форма уходит сама", async () => {
     const submit = vi
       .spyOn(HTMLFormElement.prototype, "requestSubmit")
@@ -163,6 +209,7 @@ describe("вход по коду", () => {
           pageId: "platform-code-login.ftl",
           overrides: {
             codeChannel: "EMAIL",
+            codeDelivery: "EMAIL",
             codeTarget: "c***@sandbox.test",
             codeResendAfter: "0",
           },

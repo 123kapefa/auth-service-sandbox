@@ -42,7 +42,7 @@ class CodeLimitsTest {
 
     @Test
     void firstSends_allowed_withoutCaptcha() {
-        CodeLimits.Decision decision = limits.check(PHONE, usage(sends(1, NOW.minusSeconds(120)), SendHistory.EMPTY), false, NOW);
+        CodeLimits.Decision decision = limits.check(PHONE, CodeDelivery.SMS, usage(sends(1, NOW.minusSeconds(120)), SendHistory.EMPTY), false, NOW);
         CodeLimits.Decision.Allow allow = assertInstanceOf(CodeLimits.Decision.Allow.class, decision);
         assertEquals(400, allow.cost());
     }
@@ -50,17 +50,17 @@ class CodeLimitsTest {
     @Test
     void captcha_afterTwoSendsInHour_toNumberOrFromIp() {
         assertInstanceOf(CodeLimits.Decision.CaptchaRequired.class,
-            limits.check(PHONE, usage(sends(2, NOW.minusSeconds(600)), SendHistory.EMPTY), false, NOW));
+            limits.check(PHONE, CodeDelivery.SMS, usage(sends(2, NOW.minusSeconds(600)), SendHistory.EMPTY), false, NOW));
         assertInstanceOf(CodeLimits.Decision.CaptchaRequired.class,
-            limits.check(PHONE, usage(SendHistory.EMPTY, sends(2, NOW.minusSeconds(600))), false, NOW));
+            limits.check(PHONE, CodeDelivery.SMS, usage(SendHistory.EMPTY, sends(2, NOW.minusSeconds(600))), false, NOW));
         assertInstanceOf(CodeLimits.Decision.Allow.class,
-            limits.check(PHONE, usage(sends(2, NOW.minusSeconds(600)), SendHistory.EMPTY), true, NOW));
+            limits.check(PHONE, CodeDelivery.SMS, usage(sends(2, NOW.minusSeconds(600)), SendHistory.EMPTY), true, NOW));
     }
 
     @Test
     void numberLimit_5PerHour_refusedEvenWithCaptcha() {
         Instant first = NOW.minus(Duration.ofMinutes(50));
-        CodeLimits.Decision decision = limits.check(PHONE, usage(sends(5, first), SendHistory.EMPTY), true, NOW);
+        CodeLimits.Decision decision = limits.check(PHONE, CodeDelivery.SMS, usage(sends(5, first), SendHistory.EMPTY), true, NOW);
 
         CodeLimits.Decision.Limited limited = assertInstanceOf(CodeLimits.Decision.Limited.class, decision);
         assertEquals("target-per-hour", limited.limit());
@@ -72,7 +72,7 @@ class CodeLimitsTest {
     void numberLimit_10PerDay() {
         SendHistory history = sends(10, NOW.minus(Duration.ofHours(20)));
         CodeLimits.Decision.Limited limited = assertInstanceOf(CodeLimits.Decision.Limited.class,
-            limits.check(PHONE, usage(history, SendHistory.EMPTY), true, NOW));
+            limits.check(PHONE, CodeDelivery.SMS, usage(history, SendHistory.EMPTY), true, NOW));
         assertEquals("target-per-day", limited.limit());
         assertEquals(Duration.ofHours(4).toSeconds(), limited.retryAfterSeconds());
     }
@@ -80,7 +80,7 @@ class CodeLimitsTest {
     @Test
     void ipLimit_10PerHour() {
         CodeLimits.Decision.Limited limited = assertInstanceOf(CodeLimits.Decision.Limited.class,
-            limits.check(PHONE, usage(SendHistory.EMPTY, sends(10, NOW.minusSeconds(1200))), true, NOW));
+            limits.check(PHONE, CodeDelivery.SMS, usage(SendHistory.EMPTY, sends(10, NOW.minusSeconds(1200))), true, NOW));
         assertEquals("ip-per-hour", limited.limit());
     }
 
@@ -90,7 +90,7 @@ class CodeLimitsTest {
         assertNull(limits.range(EMAIL));
 
         CodeLimits.Usage usage = new CodeLimits.Usage(SendHistory.EMPTY, SendHistory.EMPTY, sends(20, NOW.minusSeconds(1200)), 0);
-        CodeLimits.Decision.Limited limited = assertInstanceOf(CodeLimits.Decision.Limited.class, limits.check(PHONE, usage, true, NOW));
+        CodeLimits.Decision.Limited limited = assertInstanceOf(CodeLimits.Decision.Limited.class, limits.check(PHONE, CodeDelivery.SMS, usage, true, NOW));
         assertEquals("range-per-hour", limited.limit());
     }
 
@@ -98,7 +98,7 @@ class CodeLimitsTest {
     void longestLimit_wins() {
         CodeLimits.Usage usage = new CodeLimits.Usage(
             sends(10, NOW.minus(Duration.ofHours(20))), sends(10, NOW.minusSeconds(1200)), SendHistory.EMPTY, 0);
-        CodeLimits.Decision.Limited limited = assertInstanceOf(CodeLimits.Decision.Limited.class, limits.check(PHONE, usage, true, NOW));
+        CodeLimits.Decision.Limited limited = assertInstanceOf(CodeLimits.Decision.Limited.class, limits.check(PHONE, CodeDelivery.SMS, usage, true, NOW));
         assertEquals("target-per-day", limited.limit());
     }
 
@@ -108,21 +108,40 @@ class CodeLimitsTest {
         assertFalse(limits.countryAllowed(new CodeTarget(CodeTarget.Channel.SMS, "375291234567")));
         assertTrue(limits.countryAllowed(EMAIL));
         assertInstanceOf(CodeLimits.Decision.CountryNotAllowed.class,
-            limits.check(new CodeTarget(CodeTarget.Channel.SMS, "375291234567"), usage(SendHistory.EMPTY, SendHistory.EMPTY), true, NOW));
+            limits.check(new CodeTarget(CodeTarget.Channel.SMS, "375291234567"), CodeDelivery.SMS, usage(SendHistory.EMPTY, SendHistory.EMPTY), true, NOW));
     }
 
     @Test
     void budget_exhausted_blocksSms_notEmail() {
         CodeLimits.Usage spent = new CodeLimits.Usage(SendHistory.EMPTY, SendHistory.EMPTY, SendHistory.EMPTY, 99_800);
-        assertInstanceOf(CodeLimits.Decision.BudgetExhausted.class, limits.check(PHONE, spent, false, NOW));
-        CodeLimits.Decision.Allow email = assertInstanceOf(CodeLimits.Decision.Allow.class, limits.check(EMAIL, spent, false, NOW));
+        assertInstanceOf(CodeLimits.Decision.BudgetExhausted.class, limits.check(PHONE, CodeDelivery.SMS, spent, false, NOW));
+        CodeLimits.Decision.Allow email = assertInstanceOf(CodeLimits.Decision.Allow.class, limits.check(EMAIL, CodeDelivery.EMAIL, spent, false, NOW));
         assertEquals(0, email.cost());
+    }
+
+    @Test
+    void budget_exhausted_callsStillGo_andCostLess() {
+        CodeLimits.Usage spent = new CodeLimits.Usage(SendHistory.EMPTY, SendHistory.EMPTY, SendHistory.EMPTY, 100_000);
+        CodeLimits.Decision.Allow call =
+            assertInstanceOf(CodeLimits.Decision.Allow.class, limits.check(PHONE, CodeDelivery.CALL, spent, false, NOW));
+        assertEquals(100, call.cost());
+    }
+
+    @Test
+    void phoneChannels_callAndSmsByDefault_canTurnOffEither() {
+        assertTrue(CodeLimitPolicy.DEFAULTS.allows(CodeDelivery.CALL));
+        assertTrue(CodeLimitPolicy.DEFAULTS.allows(CodeDelivery.SMS));
+        CodeLimitPolicy smsOnly = policy(Map.of("phone-channels", "sms"));
+        assertFalse(smsOnly.allows(CodeDelivery.CALL));
+        assertTrue(smsOnly.allows(CodeDelivery.EMAIL));
+        assertThrows(IllegalArgumentException.class, () -> policy(Map.of("phone-channels", "email")));
+        assertThrows(IllegalArgumentException.class, () -> policy(Map.of("phone-channels", "fax")));
     }
 
     @Test
     void budget_lastSmsThatFits_isAllowed() {
         CodeLimits.Usage spent = new CodeLimits.Usage(SendHistory.EMPTY, SendHistory.EMPTY, SendHistory.EMPTY, 99_600);
-        assertInstanceOf(CodeLimits.Decision.Allow.class, limits.check(PHONE, spent, false, NOW));
+        assertInstanceOf(CodeLimits.Decision.Allow.class, limits.check(PHONE, CodeDelivery.SMS, spent, false, NOW));
     }
 
     @Test

@@ -11,6 +11,8 @@ export const { getKcContextMock } = createGetKcContextMock({
   kcContextExtensionPerPage: {
     "platform-code-login.ftl": {
       codeChannel: "SMS" as "SMS" | "EMAIL",
+      codeDelivery: "SMS" as "CALL" | "SMS" | "EMAIL",
+      codeSmsAvailable: "false",
       codeTarget: "+7 999 *** ** 01",
       codeResendAfter: "42",
       codeLength: "6",

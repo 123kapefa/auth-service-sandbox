@@ -61,13 +61,13 @@ shop_login() {
     --data-urlencode "password=$PASSWORD" "$(form_action "$WORK/page.html")"
   shop_tokens "$(header "$WORK/h" location)"
 }
-# shop_code_login <телефон> — новый покупатель: «Войти по коду», код из «SMS» (лог Keycloak); печатает access-токен
+# shop_code_login <телефон> — новый покупатель: «Войти по коду», код звонка (заглушка телефонии); печатает access-токен
 shop_code_login() {
   local jar="$WORK/jar-$1"; : > "$jar"
   shop_login_page "$jar"
   curl -s -o "$WORK/page.html" -b "$jar" -c "$jar" --data-urlencode "username=$1" --data-urlencode "codeLogin=" \
     "$(form_action "$WORK/page.html")"
-  curl -s -o "$WORK/page.html" -D "$WORK/h" -b "$jar" -c "$jar" --data-urlencode "code=$(sms_code "$1")" \
+  curl -s -o "$WORK/page.html" -D "$WORK/h" -b "$jar" -c "$jar" --data-urlencode "code=$(phone_code "$1")" \
     "$(form_action "$WORK/page.html")"
   shop_tokens "$(header "$WORK/h" location)"
 }

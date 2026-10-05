@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Проверка этапа 5 (docs/keycloak/05-code-login.md): вход по коду из SMS и из письма через страницу Keycloak.
-# Код «SMS» песочницы пишется в лог Keycloak — скрипт берёт его оттуда (нужен docker compose); письма — из Mailpit.
+# Проверка этапа 5 (docs/keycloak/05-code-login.md): вход по коду на телефон и из письма через страницу Keycloak.
+# Код на телефон приходит звонком (10.2): скрипт берёт его у заглушки телефонии (idp-stub); письма — из Mailpit.
+# Запасная SMS и каналы проекта — check-phone-code.sh.
 # Запуск: сервис и Keycloak подняты, затем
 #   scripts/keycloak/check-code-login.sh                            # Docker: http://localhost:8080
 #   API=http://localhost:5080 scripts/keycloak/check-code-login.sh    # Development: dotnet run
@@ -12,8 +13,6 @@ source "$(dirname "$0")/lib.sh"
 
 MAILPIT="${MAILPIT:-http://localhost:${MAILPIT_UI_PORT:-8025}}"
 
-# sms_count <логин> — сколько «SMS» ушло на номер за 10 минут
-sms_count() { docker compose logs keycloak --since 10m 2>/dev/null | grep -c "\[DEV SMS\] +$1: код входа"; }
 
 # mail_code <адрес> — код из последнего письма на адрес (Mailpit), ждём до 10 секунд
 mail_code() {
@@ -59,19 +58,19 @@ check "страница входа — тема platform" \
 echo "2. Вход по коду существующего пользователя (номер как набрали, без скрипта темы)"
 JAR="$WORK/jar2"; : > "$JAR"
 SCREEN=$(code_start_fresh "$JAR" "8 (999) 000-00-03")
-check "экран кода: «$SCREEN»" "$SCREEN" "Отправили код в SMS на +79990000003."
-check "экран знает длину кода и паузу до повтора" "$(kc "$WORK/page.html" 'c["codeLength"] + " " + str(0 < int(c["codeResendAfter"]) <= 60)')" "6 True"
-check "неверный код отклонён" "$(code_submit "$JAR" 000000)" "keycloak: Неверный код. Осталось попыток: 4."
+check "экран кода: «$SCREEN»" "$SCREEN" "Вам звонят на +79990000003."
+check "экран знает длину кода (4 цифры звонка) и паузу до повтора" "$(kc "$WORK/page.html" 'c["codeLength"] + " " + str(0 < int(c["codeResendAfter"]) <= 60)')" "4 True"
+check "неверный код отклонён" "$(code_submit "$JAR" 0000)" "keycloak: Неверный код. Осталось попыток: 4."
 check "повтор раньше 60 с — не отправляется" "$(starts "$(code_send_again "$JAR")" "Код уже отправлен")" "Код уже отправлен"
-check "верный код → вход и возврат на return_to" "$(code_submit "$JAR" "$(sms_code 79990000003)")" /me/
+check "верный код → вход и возврат на return_to" "$(code_submit "$JAR" "$(phone_code 79990000003)")" /me/
 check "вошёл пользователь 79990000003" "$(me "$JAR" phone)" +79990000003
 status "$JAR" POST /auth/logout > /dev/null
 
 echo "3. Новый номер — новый покупатель после верного кода"
 NEW="7998$(printf '%07d' $((RANDOM * 32768 % 10000000 + RANDOM % 1000)))"
 JAR="$WORK/jar3"; : > "$JAR"
-check "экран кода для неизвестного номера — такой же" "$(code_start "$JAR" "+$NEW")" "Отправили код в SMS на +$NEW."
-check "верный код → вход" "$(code_submit "$JAR" "$(sms_code "$NEW")")" /me/
+check "экран кода для неизвестного номера — такой же" "$(code_start "$JAR" "+$NEW")" "Вам звонят на +$NEW."
+check "верный код → вход" "$(code_submit "$JAR" "$(phone_code "$NEW")")" /me/
 check "создан покупатель +$NEW" "$(me "$JAR" phone)" "+$NEW"
 check "роль customer" "$(me "$JAR" roles)" customer
 status "$JAR" POST /auth/logout > /dev/null
@@ -80,12 +79,12 @@ echo "4. Пять неверных кодов — блокировка номе�
 LOCK="7998$(printf '%07d' $((RANDOM * 32768 % 10000000 + RANDOM % 1000 + 1)))"
 JAR="$WORK/jar4"; : > "$JAR"
 code_start "$JAR" "$LOCK" > /dev/null
-for i in 1 2 3 4; do code_submit "$JAR" 000000 > /dev/null; done
-check "пятый неверный — блокировка на 300 с" "$(code_submit "$JAR" 000000)" "keycloak: Слишком много неверных попыток. Попробуйте через 300 с."
-check "даже верный код больше не принимается" "$(starts "$(code_submit "$JAR" "$(sms_code "$LOCK")")" "keycloak: Слишком много неверных попыток")" "keycloak: Слишком много неверных попыток"
+for i in 1 2 3 4; do code_submit "$JAR" 0000 > /dev/null; done
+check "пятый неверный — блокировка на 300 с" "$(code_submit "$JAR" 0000)" "keycloak: Слишком много неверных попыток. Попробуйте через 300 с."
+check "даже верный код больше не принимается" "$(starts "$(code_submit "$JAR" "$(phone_code "$LOCK")")" "keycloak: Слишком много неверных попыток")" "keycloak: Слишком много неверных попыток"
 JAR="$WORK/jar5"; : > "$JAR"
 check "новая попытка входа не обходит блокировку" "$(code_start "$JAR" "$LOCK" > /dev/null; starts "$(feedback "$WORK/page.html")" "Слишком много неверных попыток")" "Слишком много неверных попыток"
-check "SMS на заблокированный номер не отправлялось повторно" "$(sms_count "$LOCK")" 1
+check "на заблокированный номер повторно не звонили" "$(phone_count "$LOCK")" 1
 
 echo "5. Вход по коду из письма"
 curl -s -o /dev/null -X DELETE "$MAILPIT/api/v1/messages"
@@ -113,8 +112,8 @@ echo "6. 2FA после кода — только у тех, кто её вкл�
 # У 79990000006 включена 2FA (OTP). Без 2FA после кода ничего не спрашивают — это разделы 2, 3 и 5.
 JAR="$WORK/jar11"; : > "$JAR"
 code_start_fresh "$JAR" 79990000006 > /dev/null
-code_submit "$JAR" "$(sms_code 79990000006)" > /dev/null
-check "после верного кода из SMS спрашивают код 2FA" "$(kc_page "$WORK/page.html")" login-otp.ftl
+code_submit "$JAR" "$(phone_code 79990000006)" > /dev/null
+check "после верного кода из звонка спрашивают код 2FA" "$(kc_page "$WORK/page.html")" login-otp.ftl
 curl -s -o "$WORK/page.html" -b "$JAR" -c "$JAR" --data-urlencode "otp=000000" "$(form_action "$WORK/page.html")"
 check "неверный код 2FA отклонён" "$([ "$(kc_page "$WORK/page.html")" = login-otp.ftl ] && echo "форма осталась: $(feedback "$WORK/page.html")" || echo пустили)" "форма осталась: Неверный код аутентификатора."
 curl -s -o "$WORK/page.html" -D "$WORK/h" -b "$JAR" -c "$JAR" --data-urlencode "otp=$(fresh_totp sandbox-otp-test-secret)" \
@@ -131,6 +130,6 @@ check "ни номер, ни почта — просят телефон или �
 JAR="$WORK/jar7"; : > "$JAR"
 code_start_fresh "$JAR" 79990000004 > /dev/null
 check "заблокированный пользователь — после кода вход не пускает" \
-  "$(starts "$(code_submit "$JAR" "$(sms_code 79990000004)")" "keycloak: Учетная запись заблокирована")" "keycloak: Учетная запись заблокирована"
+  "$(starts "$(code_submit "$JAR" "$(phone_code 79990000004)")" "keycloak: Учетная запись заблокирована")" "keycloak: Учетная запись заблокирована"
 
 summary

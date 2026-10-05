@@ -1,4 +1,4 @@
-"""Заглушка Яндекс ID и Госуслуг (ЕСИА) для песочницы — чтобы проверить вход без настоящих ключей.
+"""Заглушка Яндекс ID, Госуслуг (ЕСИА) и телефонии для песочницы — чтобы проверить вход без настоящих ключей.
 
 Ведёт себя, как настоящие сервисы, в той части, которую видит Keycloak:
   Яндекс ID   GET  /yandex/authorize   — страница «войти как» (тестовые люди) → redirect_uri?code&state
@@ -8,6 +8,11 @@
               POST /esia/aas/oauth2/v3/te   — то же для обмена кода; access_token — JWT с urn:esia:sbj_id
               GET  /esia/rs/prns/{oid}      — человек; /esia/rs/prns/{oid}/ctts?embed=(elements) — контакты
   Подпись     POST /sign                — «подпись ГОСТ» текста: здесь HMAC-SHA256 с ключом заглушки, base64
+  Телефония   POST /phone/call          — звонок-сброс (phone=79990000001) → {"code": последние 4 цифры, "from": номер};
+                                          номера 7995… «недоступны» (503) — так проверяется запасная SMS
+              POST /phone/sms           — SMS (phone, code, text)
+              GET  /phone               — страница «звонки и SMS» (последние сверху);
+              GET  /phone/messages?to=79990000001 — то же в JSON для скриптов проверки (последние в конце)
 Только stdlib Python: образ python:3.13-alpine без сборки (compose.yaml → idp-stub).
 """
 import base64
@@ -18,6 +23,7 @@ import json
 import os
 import re
 import secrets
+import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -54,7 +60,11 @@ ESIA_PEOPLE = {
                    "contacts": [{"type": "MBT", "value": "+7(999)0000001", "vrfStu": "NOT_VERIFIED"}]},
 }
 
+PHONE_UNREACHABLE = "7995"   # звонки на такие номера «не проходят»
+PHONE_KEEP = 500             # сколько звонков и SMS помнить
+
 codes = {}    # код → (провайдер, человек, client_id, redirect_uri)
+phone_log = []  # звонки и SMS: {"kind", "to", "from", "code", "text", "at"}
 tokens = {}   # access_token → (провайдер, человек)
 
 
@@ -124,6 +134,19 @@ class Handler(BaseHTTPRequestHandler):
         path = url.path
         if path == "/health":
             return self.send(200, {"status": "UP"})
+        if path == "/phone/messages":
+            to = q.get("to", "")
+            return self.send(200, [m for m in phone_log if not to or m["to"] == to])
+        if path == "/phone":
+            rows = "".join(
+                f'<tr><td>{time.strftime("%H:%M:%S", time.localtime(m["at"]))}</td><td>{"звонок" if m["kind"] == "call" else "SMS"}</td>'
+                f'<td>+{html.escape(m["to"])}</td><td>{html.escape(m.get("from") or m.get("text") or "")}</td></tr>'
+                for m in reversed(phone_log))
+            return self.send(200, f"""<!doctype html><html lang="ru"><meta charset="utf-8"><title>Телефония — заглушка</title>
+<body style="font-family:system-ui;max-width:48rem;margin:3rem auto"><h1>Звонки и SMS</h1>
+<p>Заглушка песочницы: настоящих звонков и SMS нет. Код звонка — последние 4 цифры номера «кто звонит».</p>
+<table cellpadding="6"><tr><th>Когда</th><th>Что</th><th>Кому</th><th>Кто звонит / текст</th></tr>{rows}</table></body></html>""",
+                             "text/html; charset=utf-8")
         if path == "/yandex/authorize":
             if q.get("client_id") != YANDEX_CLIENT_ID or q.get("response_type") != "code" or not q.get("redirect_uri"):
                 return self.send(400, {"error": "invalid_request", "error_description": "client_id, response_type=code, redirect_uri"})
@@ -190,6 +213,21 @@ class Handler(BaseHTTPRequestHandler):
         raw, f = self.form()
         if path == "/sign":
             return self.send(200, sign(raw), "text/plain; charset=utf-8")
+        if path == "/phone/call":
+            phone = f.get("phone", "")
+            if not phone.isdigit():
+                return self.send(400, {"error": "phone — цифры номера"})
+            if phone.startswith(PHONE_UNREACHABLE):
+                return self.send(503, {"error": "звонок не прошёл"})
+            code = f"{secrets.randbelow(10000):04d}"
+            caller = f"+7900{secrets.randbelow(1000):03d}{code}"
+            self.remember({"kind": "call", "to": phone, "from": caller, "code": code})
+            return self.send(200, {"code": code, "from": caller})
+        if path == "/phone/sms":
+            if not f.get("phone", "").isdigit() or not f.get("text"):
+                return self.send(400, {"error": "нужны phone и text"})
+            self.remember({"kind": "sms", "to": f["phone"], "code": f.get("code", ""), "text": f["text"]})
+            return self.send(200, {"ok": True})
         if path == "/yandex/token":
             if f.get("client_id") != YANDEX_CLIENT_ID or f.get("client_secret") != YANDEX_CLIENT_SECRET:
                 return self.send(401, {"error": "invalid_client"})
@@ -202,6 +240,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(400, {"error": "invalid_request", "error_description": problem})
             return self.issue("esia", f, lambda person: self.esia_tokens(person, f["state"]))
         self.send(404, {"error": "not_found"})
+
+    @staticmethod
+    def remember(message):
+        phone_log.append({**message, "at": time.time()})
+        del phone_log[:-PHONE_KEEP]
+        print(f'[idp-stub] {message["kind"]} → +{message["to"]}: {message.get("from") or message.get("text")}', flush=True)
 
     def issue(self, provider, f, body):
         found = codes.pop(f.get("code", ""), None)
@@ -223,5 +267,5 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print(f"[idp-stub] Яндекс ID и Госуслуги (заглушка) на :{PORT}", flush=True)
+    print(f"[idp-stub] Яндекс ID, Госуслуги и телефония (заглушка) на :{PORT}", flush=True)
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
