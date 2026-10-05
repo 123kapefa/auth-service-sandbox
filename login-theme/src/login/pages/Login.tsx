@@ -10,8 +10,8 @@ import { useSubmitting } from "../lib/use-submitting";
 
 /**
  * Вход (login.ftl): телефон или почта и пароль; «Войти по коду» — тот же логин, без пароля (плагин code-login);
- * «Войти с ключом доступа» — passkey. Номер показывается как +7 (999) 000-00-01 (с 8 и 10 цифр — тоже +7), уходит
- * цифрами скрытым полем username.
+ * «Войти с ключом доступа» — passkey; ниже — «Или войдите через»: Госуслуги, Яндекс ID (провайдеры realm). Номер
+ * показывается как +7 (999) 000-00-01 (с 8 и 10 цифр — тоже +7), уходит цифрами скрытым полем username.
  */
 export default function Login(props: PageProps<Extract<KcContext, { pageId: "login.ftl" }>, I18n>) {
   const { kcContext, i18n, doUseDefaultCss, Template, classes } = props;
@@ -26,11 +26,15 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
     messagesPerField,
     enableWebAuthnConditionalUI,
     authenticators,
+    social,
   } = kcContext;
   const { msg, msgStr } = i18n;
   const { submitting, markSubmitting } = useSubmitting();
   const webAuthnButtonId = "authenticateWebAuthnButton";
   const hasError = messagesPerField.existsError("username", "password");
+  // Подтверждение пароля при привязке Госуслуг или Яндекс ID к существующей учётной записи (логин уже известен):
+  // только пароль — без «Войти по коду» и без кнопок внешнего входа.
+  const externalProviders = usernameHidden ? [] : (social?.providers ?? []);
 
   useScript({ webAuthnButtonId, kcContext, i18n });
 
@@ -43,6 +47,28 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
       displayMessage={!hasError}
       headerNode={msg("loginAccountTitle")}
       displayInfo={realm.password && realm.registrationAllowed && !registrationDisabled}
+      socialProvidersNode={
+        externalProviders.length > 0 && (
+          <div id="kc-social-providers" className="mt-6 grid gap-3">
+            <p className="flex items-center gap-3 font-mono text-[11px] tracking-[0.1em] text-muted-foreground uppercase before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
+              {msg("identity-provider-login-label")}
+            </p>
+            <ul className="grid gap-2">
+              {externalProviders.map((provider) => (
+                <li key={provider.alias}>
+                  <a
+                    id={`social-${provider.alias}`}
+                    href={provider.loginUrl}
+                    className={kcClsx("kcButtonClass", "kcButtonSecondaryClass")}
+                  >
+                    {provider.displayName}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      }
       infoNode={
         <span>
           {msg("noAccount")}{" "}
@@ -133,15 +159,17 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
               {msgStr("doLogIn")}
             </button>
             {/* Вход по коду: пароль не нужен, номер или почта — из поля выше. */}
-            <button
-              id="platform-code-login"
-              name="codeLogin"
-              type="submit"
-              disabled={submitting}
-              className={kcClsx("kcButtonClass", "kcButtonSecondaryClass")}
-            >
-              {msgStr("platformCodeLoginDo")}
-            </button>
+            {!usernameHidden && (
+              <button
+                id="platform-code-login"
+                name="codeLogin"
+                type="submit"
+                disabled={submitting}
+                className={kcClsx("kcButtonClass", "kcButtonSecondaryClass")}
+              >
+                {msgStr("platformCodeLoginDo")}
+              </button>
+            )}
           </div>
         </form>
       )}

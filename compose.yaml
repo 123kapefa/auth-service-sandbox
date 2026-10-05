@@ -112,6 +112,19 @@ services:
       # Подставляются в realm JSON при импорте (${SANDBOX_BFF_CLIENT_SECRET}, ${LEGACY_IMPORT_CLIENT_SECRET}).
       SANDBOX_BFF_CLIENT_SECRET: ${SANDBOX_BFF_CLIENT_SECRET}
       LEGACY_IMPORT_CLIENT_SECRET: ${LEGACY_IMPORT_CLIENT_SECRET}
+      # Вход через Госуслуги и Яндекс ID (docs/keycloak/09-external-login.md). По умолчанию — заглушка idp-stub:
+      # в браузере — localhost, из Keycloak — по имени контейнера. Настоящие ключи и адреса — в .env.
+      ESIA_CLIENT_ID: ${ESIA_CLIENT_ID:-SANDBOX}
+      ESIA_AUTHORIZATION_URL: ${ESIA_AUTHORIZATION_URL:-http://localhost:${IDP_STUB_PORT:-8190}/esia/aas/oauth2/v2/ac}
+      ESIA_TOKEN_URL: ${ESIA_TOKEN_URL:-http://idp-stub:8190/esia/aas/oauth2/v3/te}
+      ESIA_API_URL: ${ESIA_API_URL:-http://idp-stub:8190/esia}
+      ESIA_SIGNER_URL: ${ESIA_SIGNER_URL:-http://idp-stub:8190/sign}
+      ESIA_CERTIFICATE_HASH: ${ESIA_CERTIFICATE_HASH:-sandbox-certificate-hash}
+      YANDEX_CLIENT_ID: ${YANDEX_CLIENT_ID:-sandbox-yandex}
+      YANDEX_CLIENT_SECRET: ${YANDEX_CLIENT_SECRET:-sandbox-yandex-secret}
+      YANDEX_AUTHORIZATION_URL: ${YANDEX_AUTHORIZATION_URL:-http://localhost:${IDP_STUB_PORT:-8190}/yandex/authorize}
+      YANDEX_TOKEN_URL: ${YANDEX_TOKEN_URL:-http://idp-stub:8190/yandex/token}
+      YANDEX_USER_INFO_URL: ${YANDEX_USER_INFO_URL:-http://idp-stub:8190/yandex/info?format=json}
     volumes:
       - ./infra/keycloak/realm:/opt/keycloak/data/import:ro
       # Тема входа — в образе (jar из login-theme/). Правки страниц без Keycloak — npm run dev в login-theme/.
@@ -125,6 +138,26 @@ services:
     depends_on:
       keycloak-postgres:
         condition: service_healthy
+
+  # Заглушка Яндекс ID и Госуслуг (ЕСИА) и сервиса подписи ГОСТ — для входа без настоящих ключей (infra/idp-stub).
+  # Только для песочницы: с настоящими ключами Keycloak ходит к Яндексу и ЕСИА, заглушка не нужна.
+  idp-stub:
+    image: python:3.13-alpine
+    command: ["python", "/stub/stub.py"]
+    environment:
+      ESIA_CLIENT_ID: ${ESIA_CLIENT_ID:-SANDBOX}
+      ESIA_CERTIFICATE_HASH: ${ESIA_CERTIFICATE_HASH:-sandbox-certificate-hash}
+      YANDEX_CLIENT_ID: ${YANDEX_CLIENT_ID:-sandbox-yandex}
+      YANDEX_CLIENT_SECRET: ${YANDEX_CLIENT_SECRET:-sandbox-yandex-secret}
+    ports:
+      - "${IDP_STUB_PORT:-8190}:8190"
+    volumes:
+      - ./infra/idp-stub:/stub:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8190/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
 volumes:
   postgres_data:

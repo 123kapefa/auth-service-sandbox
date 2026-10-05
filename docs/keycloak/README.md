@@ -32,15 +32,17 @@ scripts/keycloak/check-stand.sh
 `check-roles.sh` 71, `check-admin-ui.sh` 28, `check-migration.sh` 26 (нужен .NET SDK), `check-service-keys.sh` 34 (нужно
 разрешение на регистрацию: `scripts/keycloak/registration-token.sh --write-env`, затем `docker compose up -d --wait`),
 весь этап 6б — `check-6b.sh` 138 (кабинет, устройства, оформление, новый проект), магазин из двух сервисов (этап 6а.4) —
-`check-shop.sh` 61. Тестов: .NET — 556, плагина Keycloak
-(Java, в сборке образа) — 83, админки и кабинета (Vitest) — 87, темы входа (Vitest) — 30.
+`check-shop.sh` 61, вход через Госуслуги и Яндекс ID (на заглушке) — `check-external-login.sh` 41. Тестов: .NET — 556,
+плагина Keycloak (Java, в сборке образа) — 94, админки и кабинета (Vitest) — 87, темы входа (Vitest) — 32.
 
 Стенд, поднятый до этапа 6б, после `git pull` и `docker compose up -d --build --wait` — `scripts/project/upgrade-6b.py
-sandbox` (realm импортируется только в пустую базу; подробнее — [06b](06b-account-branding.md#проекты-созданные-до-6б)).
+sandbox` (realm импортируется только в пустую базу; подробнее — [06b](06b-account-branding.md#проекты-созданные-до-6б)),
+вход через Госуслуги и Яндекс ID — `scripts/project/enable-external-login.py sandbox --stub`.
 
 | Что | Адрес | Доступ |
 |---|---|---|---|
 | Почта (Mailpit) — письма сброса пароля и коды входа | http://localhost:8025 | — |
+| Заглушка Госуслуг и Яндекс ID (вход без настоящих ключей) | http://localhost:8190 | на странице входа — «Госуслуги», «Яндекс ID» |
 | Админка доступа (своя, этап 4б) | http://localhost:8080/admin/ | админ проекта `1234567890`, админ «Менеджера 1С» `79990000007` |
 | Админка Keycloak | http://localhost:8180/admin | `admin` / `admin`, слева выбрать realm **sandbox** |
 | Discovery | http://localhost:8180/realms/sandbox/.well-known/openid-configuration | — |
@@ -80,6 +82,7 @@ sandbox` (realm импортируется только в пустую базу
 | 6б | Личный кабинет и оформление под проект | ✅ | [06b-account-branding.md](06b-account-branding.md) |
 | 7 | Документация | идёт по ходу | — |
 | 8 | Выводы и ADR: брать ли Keycloak, чего стоит, что своё | ✅ (решения приняты) | [08-conclusions.md](08-conclusions.md), [ADR](../adr/README.md) |
+| 9 | Вход через Госуслуги и Яндекс ID (на заглушке; ключи — подставить) | ✅ | [09-external-login.md](09-external-login.md) |
 
 Каждый этап — отдельная ветка `stage-N/...`. План, шаги и статусы — в
 [задачах GitHub](https://github.com/123kapefa/auth-service-sandbox/issues) и на
@@ -96,11 +99,12 @@ Keycloak; проекты друг друга не видят. **Приложен
 | `compose.yaml` → `keycloak`, `keycloak-postgres` | Keycloak 26.4 и его отдельная БД |
 | `compose.yaml` → `redis`, `auth-migrator` | отметки мгновенного отзыва токенов; миграции базы сервиса (`efbundle`) до старта сервиса |
 | `infra/keycloak/realm/sandbox-realm.json` | весь realm как код |
-| `infra/keycloak/providers/code-login` | плагин Keycloak (Java): форма входа с нормализацией номера, вход по коду, проверка BCrypt-паролей из боевого сервиса; собирается в `infra/keycloak/Dockerfile` |
-| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал, пароль и 2FA; `check-roles.sh` — роли и права приложений, роли пользователей, умный рефреш, «Менеджер 1С» (этап 4а); `check-admin-ui.sh` — своя админка: раздача, CSP, путь админов (этап 4б); `check-migration.sh` — перенос пользователей с BCrypt-паролями (этап 6); `check-service-keys.sh`, `check-new-project.sh`, `check-deploy.sh`, `check-shop.sh` — ключи сервисов, проект с нуля, поставка, магазин из двух сервисов (этап 6а); `check-account.sh`, `check-devices.sh`, `check-branding.sh`, `check-app-branding.sh` — кабинет, устройства, оформление проекта и приложения, `check-6b.sh` — весь этап 6б (этап 6б); `lib.sh` — общие помощники, `master-token.sh` — токен мастер-админки изнутри контейнера |
+| `infra/keycloak/providers/code-login` | плагин Keycloak (Java): форма входа с нормализацией номера, вход по коду, проверка BCrypt-паролей из боевого сервиса, провайдеры Яндекс ID и Госуслуг (ЕСИА); собирается в `infra/keycloak/Dockerfile` |
+| `infra/idp-stub/` | заглушка Яндекс ID, Госуслуг и сервиса подписи ГОСТ (сервис `idp-stub`) — вход через них без настоящих ключей |
+| `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал, пароль и 2FA; `check-roles.sh` — роли и права приложений, роли пользователей, умный рефреш, «Менеджер 1С» (этап 4а); `check-admin-ui.sh` — своя админка: раздача, CSP, путь админов (этап 4б); `check-migration.sh` — перенос пользователей с BCrypt-паролями (этап 6); `check-service-keys.sh`, `check-new-project.sh`, `check-deploy.sh`, `check-shop.sh` — ключи сервисов, проект с нуля, поставка, магазин из двух сервисов (этап 6а); `check-account.sh`, `check-devices.sh`, `check-branding.sh`, `check-app-branding.sh` — кабинет, устройства, оформление проекта и приложения, `check-6b.sh` — весь этап 6б (этап 6б); `check-external-login.sh` — вход через Госуслуги и Яндекс ID (этап 9); `lib.sh` — общие помощники, `master-token.sh` — токен мастер-админки изнутри контейнера |
 | `login-theme/` | страницы входа Keycloak на React (Keycloakify) и письма (`src/email/`, FreeMarker) — тема `platform`, см. `login-theme/CLAUDE.md`; jar собирается в образе Keycloak |
 | `frontend/` | админка доступа на `/admin` и личный кабинет на `/account` (React, FSD) — см. `frontend/CLAUDE.md`; в образ сервиса попадает сборка |
-| `scripts/project/` | новый проект и его обслуживание: `create-project.sh`, `add-admin.py`, `add-app.py`; `upgrade-6b.py` — кабинет и оформление в проекте, созданном до 6б |
+| `scripts/project/` | новый проект и его обслуживание: `create-project.sh`, `add-admin.py`, `add-app.py`; `upgrade-6b.py` — кабинет и оформление в проекте, созданном до 6б; `enable-external-login.py` — Госуслуги и Яндекс ID с ключами проекта |
 | `samples/shop/` | новый проект на сервисе входа (этап 6а.4): «Заказы» со страницей и «Уведомления» на пакетах `Platform.*`, `setup.sh` — поднять с нуля; что мешало — [06a-friction.md](06a-friction.md) |
 | `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права из токена, хук мгновенного отзыва и умного рефреша (`access_changed`) — переиспользуемая библиотека |
 | `src/Shared/Authentication.Redis` | отметки отзыва и версии доступа в Redis, кэш проверки, `AddPlatformTokenRevocation` |

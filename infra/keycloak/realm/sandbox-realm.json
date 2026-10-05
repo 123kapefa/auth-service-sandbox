@@ -175,11 +175,154 @@
           "priority": 40
         }
       ]
+    },
+    {
+      "alias": "platform first external login",
+      "description": "Первый вход через Госуслуги или Яндекс ID: новый человек — новая учётная запись; телефон или почта уже есть — привязать к ней, подтвердив паролем",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "priority": 10,
+          "authenticator": "idp-review-profile",
+          "authenticatorConfig": "platform-review-profile"
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "priority": 20,
+          "flowAlias": "platform create or link"
+        }
+      ]
+    },
+    {
+      "alias": "platform create or link",
+      "description": "Новая учётная запись, если такого телефона и почты ещё нет, иначе — привязка к существующей",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "userSetupAllowed": false,
+          "priority": 10,
+          "authenticator": "idp-create-user-if-unique"
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "userSetupAllowed": false,
+          "priority": 20,
+          "flowAlias": "platform link existing"
+        }
+      ]
+    },
+    {
+      "alias": "platform link existing",
+      "description": "Учётная запись уже есть: «Привязать?» и пароль от неё (2FA — после, в platform after external login)",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "priority": 10,
+          "authenticator": "idp-confirm-link"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "priority": 20,
+          "authenticator": "platform-link-password"
+        }
+      ]
+    },
+    {
+      "alias": "platform after external login",
+      "description": "После каждого входа через Госуслуги или Яндекс ID: 2FA, если человек её включил, и открыт ли доступ к приложению",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "userSetupAllowed": false,
+          "priority": 10,
+          "flowAlias": "platform external 2FA"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "priority": 20,
+          "authenticator": "platform-app-access-check"
+        }
+      ]
+    },
+    {
+      "alias": "platform external 2FA",
+      "description": "После внешнего входа — 2FA, если человек её включил (как platform conditional 2FA)",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "conditional-user-configured",
+          "priority": 10
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "conditional-credential",
+          "authenticatorConfig": "platform-external-conditional-credential",
+          "priority": 20
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "userSetupAllowed": false,
+          "authenticator": "auth-otp-form",
+          "priority": 30
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "userSetupAllowed": false,
+          "authenticator": "auth-recovery-authn-code-form",
+          "priority": 40
+        }
+      ]
     }
   ],
   "authenticatorConfig": [
     {
       "alias": "platform-conditional-credential",
+      "config": {
+        "credentials": "webauthn-passwordless"
+      }
+    },
+    {
+      "alias": "platform-review-profile",
+      "config": {
+        "update.profile.on.first.login": "missing"
+      }
+    },
+    {
+      "alias": "platform-external-conditional-credential",
       "config": {
         "credentials": "webauthn-passwordless"
       }
@@ -1949,6 +2092,56 @@
       }
     }
   ],
+  "identityProviders": [
+    {
+      "alias": "esia",
+      "displayName": "Госуслуги",
+      "providerId": "esia",
+      "enabled": true,
+      "trustEmail": true,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "hideOnLogin": false,
+      "firstBrokerLoginFlowAlias": "platform first external login",
+      "postBrokerLoginFlowAlias": "platform after external login",
+      "config": {
+        "clientId": "${ESIA_CLIENT_ID}",
+        "authorizationUrl": "${ESIA_AUTHORIZATION_URL}",
+        "tokenUrl": "${ESIA_TOKEN_URL}",
+        "apiUrl": "${ESIA_API_URL}",
+        "signerUrl": "${ESIA_SIGNER_URL}",
+        "certificateHash": "${ESIA_CERTIFICATE_HASH}",
+        "syncMode": "IMPORT",
+        "guiOrder": "1"
+      }
+    },
+    {
+      "alias": "yandex",
+      "displayName": "Яндекс ID",
+      "providerId": "yandex",
+      "enabled": true,
+      "trustEmail": true,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "hideOnLogin": false,
+      "firstBrokerLoginFlowAlias": "platform first external login",
+      "postBrokerLoginFlowAlias": "platform after external login",
+      "config": {
+        "clientId": "${YANDEX_CLIENT_ID}",
+        "clientSecret": "${YANDEX_CLIENT_SECRET}",
+        "clientAuthMethod": "client_secret_post",
+        "authorizationUrl": "${YANDEX_AUTHORIZATION_URL}",
+        "tokenUrl": "${YANDEX_TOKEN_URL}",
+        "userInfoUrl": "${YANDEX_USER_INFO_URL}",
+        "syncMode": "IMPORT",
+        "guiOrder": "2"
+      }
+    }
+  ],
   "components": {
     "org.keycloak.userprofile.UserProfileProvider": [
       {
@@ -2004,5 +2197,6 @@
         ]
       }
     ]
-  }
+  },
+  "firstBrokerLoginFlow": "platform first external login"
 }

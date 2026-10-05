@@ -36,6 +36,14 @@ export const { getKcContextMock } = createGetKcContextMock({
         resetPasswordAllowed: true,
         rememberMe: false,
       },
+      // Внешний вход (провайдеры realm sandbox): Госуслуги и Яндекс ID.
+      social: {
+        displayInfo: true,
+        providers: [
+          { alias: "esia", providerId: "esia", displayName: "Госуслуги", loginUrl: "#esia" },
+          { alias: "yandex", providerId: "yandex", displayName: "Яндекс ID", loginUrl: "#yandex" },
+        ],
+      },
     },
     "login-reset-password.ftl": { realm: { loginWithEmailAllowed: true } },
     "webauthn-authenticate.ftl": { realm: { registrationAllowed: false } },
