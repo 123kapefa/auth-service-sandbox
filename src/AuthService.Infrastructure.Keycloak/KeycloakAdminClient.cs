@@ -726,7 +726,11 @@ internal sealed partial class KeycloakAdminClient(
                 .Where(attribute => attribute.Key.StartsWith(UserAttributes.APP_MODE_PREFIX, StringComparison.Ordinal) && attribute.Value.Length > 0)
                 .ToDictionary(attribute => attribute.Key[UserAttributes.APP_MODE_PREFIX.Length..], attribute => attribute.Value[0], StringComparer.Ordinal),
             user.EmailVerified,
-            Attribute(user, UserAttributes.DISABLED_SIGN_IN_METHODS));
+            Attribute(user, UserAttributes.DISABLED_SIGN_IN_METHODS),
+            DateTimeOffset.TryParse(Attribute(user, UserAttributes.PHONE_CHANGED_AT), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset phoneChangedAt)
+                ? phoneChangedAt
+                : null,
+            Attribute(user, UserAttributes.PHONE_PREVIOUS));
 
     private static string? Attribute(UserRepresentation user, string name) =>
         user.Attributes is not null && user.Attributes.TryGetValue(name, out string[]? values) && values.Length > 0 ? values[0] : null;

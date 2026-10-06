@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using AuthService.Core.Abstractions;
+using AuthService.Domain.AuditLog;
 using AuthService.Domain.Sessions;
 using AuthService.IntegrationTests.Infrastructure;
 using CSharpFunctionalExtensions;
@@ -60,6 +61,7 @@ public sealed class LoginFlowTests : IClassFixture<AuthServiceWebFactory>
     [InlineData("configure-totp", AccountAction.ConfigureTotp)]
     [InlineData("register-passkey", AccountAction.RegisterPasskey)]
     [InlineData("configure-recovery-codes", AccountAction.ConfigureRecoveryCodes)]
+    [InlineData("update-phone", AccountAction.UpdatePhone)]
     public async Task Login_WithAccountAction_AsksLoginPageForAction(string action, AccountAction expected)
     {
         using HttpClient browser = _factory.CreateBrowserClient();
@@ -163,6 +165,45 @@ public sealed class LoginFlowTests : IClassFixture<AuthServiceWebFactory>
         Assert.Equal("http://localhost/auth/callback", redirectUri.ToString());
         Assert.Equal("access-1", SetCookie(response, AuthCookies.ACCESS_TOKEN).Value.ToString());
         Assert.Equal("/auth/", SetCookie(response, AuthCookies.REFRESH_TOKEN).Path.ToString());
+    }
+
+    [Fact]
+    public async Task Callback_AfterPhoneChange_AuditedOnce_ByThePerson()
+    {
+        _factory.AuditLog.Reset();
+        _factory.IdentityAdmin.Add(TestUser.Customer);
+        _factory.IdentityAdmin.SetPhoneChanged(TestUser.Customer, "+79990000001", "+79990000002", DateTimeOffset.UtcNow.AddSeconds(-5));
+        _keycloak.TokenResult = FakeIdentityProvider.Tokens(_factory.CreateToken(TestUser.Customer), "refresh-1");
+
+        for (int i = 0; i < 2; i++)
+        {
+            (HttpClient browser, string loginCookie) = await StartActionAsync("update-phone");
+            await Callback(browser, loginCookie, $"code=c&state={_keycloak.LastAuthorization!.State}&kc_action_status=success");
+        }
+
+        AuditEntry entry = Assert.Single(_factory.AuditLog.Entries);
+        Assert.Equal((AuditActions.USER_PHONE_CHANGED, TestUser.Customer.Id, TestUser.Customer.Id), (entry.Action, entry.ObjectId, entry.ActorId!.Value));
+        using JsonDocument changes = JsonDocument.Parse(entry.Changes);
+        Assert.Equal("+79990000001", changes.RootElement.GetProperty("phone").GetProperty("old").GetString());
+        Assert.Equal("+79990000002", changes.RootElement.GetProperty("phone").GetProperty("new").GetString());
+    }
+
+    [Theory]
+    [InlineData("update-phone", "cancelled")]
+    [InlineData("update-email", "success")]
+    [InlineData(null, null)]
+    public async Task Callback_NotAPhoneChange_NotAudited(string? action, string? status)
+    {
+        _factory.AuditLog.Reset();
+        _factory.IdentityAdmin.Add(TestUser.Customer);
+        _factory.IdentityAdmin.SetPhoneChanged(TestUser.Customer, "+79990000001", "+79990000002", DateTimeOffset.UtcNow.AddSeconds(-5));
+        _keycloak.TokenResult = FakeIdentityProvider.Tokens(_factory.CreateToken(TestUser.Customer), "refresh-1");
+
+        (HttpClient browser, string loginCookie) = action is null ? await StartLoginAsync("/account/") : await StartActionAsync(action);
+        string query = $"code=c&state={_keycloak.LastAuthorization!.State}" + (status is null ? "" : $"&kc_action_status={status}");
+        await Callback(browser, loginCookie, query);
+
+        Assert.Empty(_factory.AuditLog.Entries);
     }
 
     [Fact]
@@ -327,6 +368,14 @@ public sealed class LoginFlowTests : IClassFixture<AuthServiceWebFactory>
         HttpClient browser = _factory.CreateBrowserClient();
         HttpResponseMessage login = await browser.GetAsync(
             new Uri($"/auth/login?return_to={Uri.EscapeDataString(returnTo)}", UriKind.Relative));
+        return (browser, SetCookie(login, LOGIN_COOKIE).Value.ToString());
+    }
+
+    private async Task<(HttpClient Browser, string LoginCookie)> StartActionAsync(string action)
+    {
+        HttpClient browser = _factory.CreateBrowserClient();
+        HttpResponseMessage login = await browser.GetAsync(
+            new Uri($"/auth/login?return_to=/account/&action={action}", UriKind.Relative));
         return (browser, SetCookie(login, LOGIN_COOKIE).Value.ToString());
     }
 

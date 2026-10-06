@@ -10,7 +10,34 @@ export type KcContextExtension = {
  * Свои страницы плагина (code-login): ключ — имя шаблона из createForm(...), поля — атрибуты, которые ставит
  * аутентификатор (form.setAttribute). Keycloakify по ключу собирает .ftl в тему.
  */
+type CodeScreen = {
+  /** SMS или EMAIL — куда ушёл код. */
+  codeChannel: "SMS" | "EMAIL";
+  /** Как ушёл код: CALL — звонок-сброс (код — последние 4 цифры номера), SMS, EMAIL. */
+  codeDelivery: "CALL" | "SMS" | "EMAIL";
+  /** "true" — на экране звонка есть «Прислать SMS» (у проекта SMS включены). */
+  codeSmsAvailable: string;
+  /** Куда отправлен код — как показать пользователю. */
+  codeTarget: string;
+  /** Через сколько секунд можно запросить новый код ("0" — уже можно). */
+  codeResendAfter: string;
+  /** Сколько цифр в коде (политика плагина). */
+  codeLength: string;
+  /** "true" — следующий код уйдёт только с капчей (поле smart-token в форме). Экран капчи — 10.8. */
+  captchaRequired?: string;
+  /** Ключ клиента Яндекс SmartCaptcha (нет — капча не настроена). */
+  captchaSiteKey?: string;
+};
+
 export type KcContextExtensionPerPage = {
+  /** Смена номера (действие platform-update-phone): шаг phone — новый номер, code — код на него (как у входа). */
+  "platform-update-phone.ftl": Partial<CodeScreen> & {
+    phoneStep: "phone" | "code";
+    /** Нынешний номер с «+» (нет — номера не было). */
+    phoneCurrent?: string;
+    /** Меняли меньше суток назад: когда снова можно (ISO). */
+    phoneNextAllowed?: string;
+  };
   /** Вход в два шага (PasswordLoginForm). Без loginStep — прежняя форма в один шаг (подтверждение пароля при привязке). */
   "login.ftl": {
     /** login — телефон или почта; password — пароль сразу; methods — список способов (пароль выключен). */
@@ -25,24 +52,7 @@ export type KcContextExtensionPerPage = {
     /** Единственный способ — открыть сам (passkey). */
     loginAutoStart?: string;
   };
-  "platform-code-login.ftl": {
-    /** SMS или EMAIL — куда ушёл код. */
-    codeChannel: "SMS" | "EMAIL";
-    /** Как ушёл код: CALL — звонок-сброс (код — последние 4 цифры номера), SMS, EMAIL. */
-    codeDelivery: "CALL" | "SMS" | "EMAIL";
-    /** "true" — на экране звонка есть «Прислать SMS» (у проекта SMS включены). */
-    codeSmsAvailable: string;
-    /** Куда отправлен код — как показать пользователю. */
-    codeTarget: string;
-    /** Через сколько секунд можно запросить новый код ("0" — уже можно). */
-    codeResendAfter: string;
-    /** Сколько цифр в коде (политика плагина). */
-    codeLength: string;
-    /** "true" — следующий код уйдёт только с капчей (поле smart-token в форме). Экран капчи — 10.8. */
-    captchaRequired?: string;
-    /** Ключ клиента Яндекс SmartCaptcha (нет — капча не настроена). */
-    captchaSiteKey?: string;
-  };
+  "platform-code-login.ftl": CodeScreen;
 };
 
 export type KcContext = ExtendKcContext<KcContextExtension, KcContextExtensionPerPage>;

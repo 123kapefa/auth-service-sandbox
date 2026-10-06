@@ -449,6 +449,15 @@
       "config": {}
     },
     {
+      "alias": "platform-update-phone",
+      "name": "Sandbox: сменить номер телефона",
+      "providerId": "platform-update-phone",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 140,
+      "config": {}
+    },
+    {
       "alias": "update_user_locale",
       "name": "Update User Locale",
       "providerId": "update_user_locale",

@@ -157,6 +157,8 @@ public sealed record UserChanges(bool? Enabled, IReadOnlyDictionary<string, stri
 /// <param name="AppModes">Активные режимы в других приложениях: clientId → режим (атрибуты active_mode.{clientId}).</param>
 /// <param name="EmailVerified">Почта подтверждена (письмом со ссылкой).</param>
 /// <param name="DisabledSignInMethods">Выключенные способы входа — значение атрибута как есть (через запятую).</param>
+/// <param name="PhoneChangedAt">Когда человек сам сменил номер (10.5; действие Keycloak platform-update-phone).</param>
+/// <param name="PreviousPhone">Номер до той смены, с «+».</param>
 public sealed record IdentityUser(
     Guid Id,
     string Username,
@@ -169,7 +171,9 @@ public sealed record IdentityUser(
     DateTimeOffset? RestrictedAt = null,
     IReadOnlyDictionary<string, string>? AppModes = null,
     bool EmailVerified = false,
-    string? DisabledSignInMethods = null);
+    string? DisabledSignInMethods = null,
+    DateTimeOffset? PhoneChangedAt = null,
+    string? PreviousPhone = null);
 
 /// <summary>Сессия пользователя на сервере входа.</summary>
 /// <param name="Id">Id сессии (claim sid в токенах этой сессии).</param>
@@ -296,6 +300,11 @@ public static class UserAttributes
     /// плагин Keycloak по нему не пускает (SignInMethods).
     /// </summary>
     public const string DISABLED_SIGN_IN_METHODS = "disabled_sign_in_methods";
+
+    /// <summary>Когда человек сам сменил номер и какой был до того — пишет плагин Keycloak (UpdatePhoneAction).</summary>
+    public const string PHONE_CHANGED_AT = "phone_changed_at";
+
+    public const string PHONE_PREVIOUS = "phone_previous";
 
     /// <summary>Версия доступа: меняется со сменой ролей — в токене access_version.</summary>
     public const string ACCESS_VERSION = "access_version";

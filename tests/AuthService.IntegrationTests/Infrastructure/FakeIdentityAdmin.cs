@@ -128,6 +128,16 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         _accounts[user.Id] = _accounts[user.Id] with { User = _accounts[user.Id].User with { DisabledSignInMethods = value } };
     }
 
+    /// <summary>Человек сменил номер на странице Keycloak (атрибуты phone_changed_at и phone_previous, новый phone).</summary>
+    public void SetPhoneChanged(TestUser user, string previous, string phone, DateTimeOffset at)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        _accounts[user.Id] = _accounts[user.Id] with
+        {
+            User = _accounts[user.Id].User with { Phone = phone, PreviousPhone = previous, PhoneChangedAt = at },
+        };
+    }
+
     public void Reset()
     {
         _accounts.Clear();

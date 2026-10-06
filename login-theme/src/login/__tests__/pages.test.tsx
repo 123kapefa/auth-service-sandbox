@@ -363,3 +363,61 @@ describe("стандартные страницы в нашем каркасе",
     expect(container.querySelector("#kc-recovery-codes-list")).not.toBeNull();
   });
 });
+
+describe("смена номера", () => {
+  const page = (overrides: Record<string, unknown>) => (
+    <KcPage kcContext={getKcContextMock({ pageId: "platform-update-phone.ftl", overrides })} />
+  );
+
+  it("новый номер: нынешний номер, поле, «Получить код» и «Отмена»", async () => {
+    render(page({ phoneStep: "phone", phoneCurrent: "+79990000001" }));
+
+    expect(await screen.findByText("Сейчас: +79990000001")).toBeInTheDocument();
+    const phone = screen.getByLabelText("Новый номер");
+    expect(phone).toHaveAttribute("name", "phone");
+    expect(screen.getByRole("button", { name: "Получить код" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Отмена" })).toHaveAttribute("name", "cancel-aia");
+
+    await userEvent.type(phone, "89990000002");
+    expect(phone).toHaveValue("+7 (999) 000-00-02");
+  });
+
+  it("меняли меньше суток назад — без поля, с причиной", async () => {
+    render(
+      page({
+        phoneStep: "phone",
+        phoneNextAllowed: "2026-10-07T12:00:00Z",
+        message: {
+          type: "error",
+          summary: "Номер можно менять раз в сутки. Снова — примерно через 5 ч.",
+        },
+      }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("раз в сутки");
+    expect(screen.queryByLabelText("Новый номер")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Получить код" })).not.toBeInTheDocument();
+  });
+
+  it("код: экран звонка, «Сменить номер» и «Другой номер»", async () => {
+    render(
+      page({
+        phoneStep: "code",
+        codeChannel: "SMS",
+        codeDelivery: "CALL",
+        codeSmsAvailable: "true",
+        codeTarget: "+79990000002",
+        codeResendAfter: "0",
+        codeLength: "4",
+      }),
+    );
+
+    expect(await screen.findByText(/Вам звонят на \+79990000002/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Сменить номер" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Другой номер" })).toHaveAttribute(
+      "name",
+      "changePhone",
+    );
+    expect(screen.queryByText("Войти по паролю")).not.toBeInTheDocument();
+  });
+});

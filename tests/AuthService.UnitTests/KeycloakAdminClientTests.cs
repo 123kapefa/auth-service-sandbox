@@ -45,6 +45,8 @@ public sealed class KeycloakAdminClientTests : IDisposable
         Assert.True(user.Enabled);
         Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1790000000000), user.CreatedAt);
         Assert.Equal("password,email-code", user.DisabledSignInMethods);
+        Assert.Equal(new DateTimeOffset(2026, 10, 6, 9, 30, 0, 123, TimeSpan.Zero).AddTicks(4560), user.PhoneChangedAt);
+        Assert.Equal("+79990000009", user.PreviousPhone);
     }
 
     [Fact]
@@ -160,7 +162,8 @@ public sealed class KeycloakAdminClientTests : IDisposable
               "email": "customer@sandbox.test",
               "enabled": true,
               "createdTimestamp": 1790000000000,
-              "attributes": { "phone": ["+79990000001"], "active_mode": ["customer"], "disabled_sign_in_methods": ["password,email-code"] }
+              "attributes": { "phone": ["+79990000001"], "active_mode": ["customer"], "disabled_sign_in_methods": ["password,email-code"],
+                              "phone_changed_at": ["2026-10-06T09:30:00.123456Z"], "phone_previous": ["+79990000009"] }
             }
             """;
 

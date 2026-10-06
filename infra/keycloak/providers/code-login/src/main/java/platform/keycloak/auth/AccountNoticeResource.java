@@ -2,7 +2,6 @@ package platform.keycloak.auth;
 
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -18,9 +17,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 import org.jboss.logging.Logger;
-import org.keycloak.authentication.Authenticator;
 import org.keycloak.email.EmailException;
-import org.keycloak.email.EmailTemplateProvider;
 import org.keycloak.models.AdminRoles;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.Constants;
@@ -31,7 +28,6 @@ import org.keycloak.models.UserModel;
 import org.keycloak.services.managers.AppAuthManager;
 import org.keycloak.services.managers.AuthenticationManager.AuthResult;
 import org.keycloak.services.resource.RealmResourceProvider;
-import org.keycloak.theme.Theme;
 
 /**
  * /realms/{realm}/platform-account-notice/users/{userId} — уведомить человека об изменении в его аккаунте (10.3:
@@ -96,24 +92,16 @@ public final class AccountNoticeResource implements RealmResourceProvider {
 
     private String send(RealmModel realm, UserModel user, Notice notice) {
         try {
+            Properties messages = AccountNotices.messages(session, realm, user);
             Locale locale = session.getContext().resolveLocale(user);
-            Properties messages = session.theme().getTheme(Theme.Type.EMAIL).getEnhancedMessages(realm, locale);
-            String realmName = (String) BrandingResolver.effective(realm, null).get("name");
-            String text = text(messages, locale, notice, realmName);
-
-            if (user.getEmail() != null && !user.getEmail().isBlank()) {
-                Map<String, Object> attributes = new HashMap<>();
-                attributes.put("noticeText", text);
-                attributes.put("noticeNotYou", messages.getProperty("platformSignInMethodsNotYou", ""));
-                session.getProvider(EmailTemplateProvider.class).setRealm(realm).setUser(user)
-                    .send("platformSignInMethodsEmailSubject", List.of(), TEMPLATE, attributes);
+            String text = text(messages, locale, notice, AccountNotices.realmName(realm));
+            String notYou = messages.getProperty("platformSignInMethodsNotYou", "");
+            if (AccountNotices.email(session, realm, user, "platformSignInMethodsEmailSubject", TEMPLATE, text, notYou)) {
                 return "email";
             }
-
-            String phone = phone(user);
+            String phone = AccountNotices.phone(user);
             if (phone != null) {
-                String sms = text + " " + messages.getProperty("platformSignInMethodsNotYou", "");
-                return phoneProvider().message(session, phone, sms.trim()) ? "sms" : "none";
+                return AccountNotices.phoneProvider(session).message(session, phone, (text + " " + notYou).trim()) ? "sms" : "none";
             }
             return "none";
         } catch (EmailException | IOException e) {
@@ -139,20 +127,6 @@ public final class AccountNoticeResource implements RealmResourceProvider {
             case SignInMethods.PHONE_CODE -> "platformSignInMethodPhoneCode";
             default -> "platformSignInMethodEmailCode";
         };
-    }
-
-    // Номер для SMS: атрибут phone («+79990000001») или логин-номер.
-    private static String phone(UserModel user) {
-        String phone = user.getFirstAttribute("phone");
-        if (phone != null && !phone.isBlank()) {
-            return PhoneNormalizer.normalizeLogin(phone);
-        }
-        return user.getUsername().matches("\\d{10,15}") ? user.getUsername() : null;
-    }
-
-    private PhoneProvider phoneProvider() {
-        Object factory = session.getKeycloakSessionFactory().getProviderFactory(Authenticator.class, CodeLoginAuthenticatorFactory.PROVIDER_ID);
-        return factory instanceof CodeLoginAuthenticatorFactory codeLogin ? codeLogin.phone() : new LogPhoneProvider();
     }
 
     private Response checkCaller(RealmModel realm) {

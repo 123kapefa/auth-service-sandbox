@@ -16,6 +16,9 @@ public static class AuditActions
     /// <summary>Админ вернул способы входа по умолчанию.</summary>
     public const string USER_SIGN_IN_METHODS_RESET = "UserSignInMethodsReset";
 
+    /// <summary>Человек сам сменил номер (10.5) на странице Keycloak; запись — когда он вернулся в сервис.</summary>
+    public const string USER_PHONE_CHANGED = "UserPhoneChanged";
+
     public const string PERMISSION_CREATED = "PermissionCreated";
     public const string PERMISSION_DELETED = "PermissionDeleted";
 
