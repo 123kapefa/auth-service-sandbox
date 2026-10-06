@@ -145,6 +145,8 @@ public final class CodeLoginAuthenticator implements Authenticator {
         }
 
         context.setUser(user);
+        // После входа по коду — предложить ключ доступа (PasskeyOfferAction решит, пора ли).
+        context.getAuthenticationSession().setAuthNote(PasskeyOfferAction.NOTE_CODE_LOGIN, "true");
         context.getEvent().detail(Details.AUTH_METHOD, method(target));
         context.success();
     }

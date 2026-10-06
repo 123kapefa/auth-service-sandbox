@@ -1,1 +1,2 @@
 platform.keycloak.auth.UpdatePhoneActionFactory
+platform.keycloak.auth.PasskeyOfferActionFactory

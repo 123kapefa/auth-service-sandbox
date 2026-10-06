@@ -61,7 +61,8 @@ shop_login() {
     --data-urlencode "password=$PASSWORD" "$(form_action "$WORK/page.html")"
   shop_tokens "$(header "$WORK/h" location)"
 }
-# shop_code_login <телефон> — новый покупатель: «Войти по коду», код звонка (заглушка телефонии); печатает access-токен
+# shop_code_login <телефон> — новый покупатель: «Войти по коду», код звонка (заглушка телефонии), «Не сейчас» на
+# предложении ключа доступа; печатает access-токен
 shop_code_login() {
   local jar="$WORK/jar-$1"; : > "$jar"
   shop_login_page "$jar"
@@ -69,6 +70,7 @@ shop_code_login() {
     "$(form_action "$WORK/page.html")"
   curl -s -o "$WORK/page.html" -D "$WORK/h" -b "$jar" -c "$jar" --data-urlencode "code=$(phone_code "$1")" \
     "$(form_action "$WORK/page.html")"
+  skip_passkey_offer "$jar" "$WORK/page.html" "$WORK/h"
   shop_tokens "$(header "$WORK/h" location)"
 }
 # call <токен> <метод> <адрес> [тело] — печатает «<код> <JSON ответа>»

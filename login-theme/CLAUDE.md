@@ -17,7 +17,8 @@ src/login/branding.ts  — оформление проекта (плагин pla
 src/login/classes.ts   — классы Keycloak → Tailwind (так стандартные страницы выглядят как наши)
 src/login/i18n.ts      — свои тексты и тексты realm для страниц входа (только литералы: читаются при сборке)
 src/login/pages/       — Login (телефон или почта, «Войти по коду», ключ доступа, «Или войдите через»: Госуслуги,
-                         Яндекс ID; при привязке к аккаунту — только пароль), CodeLogin (экран кода)
+                         Яндекс ID; при привязке к аккаунту — только пароль), CodeLogin (экран кода), UpdatePhone
+                         (смена номера), PasskeyOffer («Входите без кода» — регистрация ключа с platformPasskeyOffer)
 src/login/lib/phone.ts — «+» перед номером, логин цифрами
 src/email/            — тема писем (FreeMarker, без React): каркас html/template.ftl, сброс пароля, ссылка из админки,
                          подтверждение почты, код входа плагина (platform-login-code.ftl); тексты — messages/*.properties

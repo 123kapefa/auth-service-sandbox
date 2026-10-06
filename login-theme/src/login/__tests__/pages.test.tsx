@@ -430,3 +430,54 @@ describe("смена номера", () => {
     expect(screen.queryByText("Войти по паролю")).not.toBeInTheDocument();
   });
 });
+
+describe("предложение ключа доступа", () => {
+  it("после входа по коду: «Входите без кода», «Добавить ключ доступа», «Не сейчас»", async () => {
+    render(
+      <KcPage
+        kcContext={getKcContextMock({
+          pageId: "webauthn-register.ftl",
+          overrides: { platformPasskeyOffer: "true" },
+        })}
+      />,
+    );
+
+    expect(await screen.findByText("Входите без кода")).toBeInTheDocument();
+    expect(screen.getByText(/Face ID, отпечатку или PIN/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Добавить ключ доступа" })).toHaveAttribute(
+      "type",
+      "button",
+    );
+    expect(screen.getByRole("button", { name: "Не сейчас" })).toHaveAttribute("name", "skip");
+    expect(screen.getByText(/Спросим снова через 30 дней/)).toBeInTheDocument();
+    expect(document.getElementById("register")).toContainElement(
+      document.getElementById("clientDataJSON"),
+    );
+  });
+
+  it("не получилось: «Попробовать ещё раз» и «Не сейчас»", async () => {
+    render(
+      <KcPage
+        kcContext={getKcContextMock({
+          pageId: "webauthn-error.ftl",
+          overrides: { platformPasskeyOffer: "true" },
+        })}
+      />,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Не получилось добавить ключ");
+    const retry = screen.getByRole("button", { name: "Попробовать ещё раз" });
+    expect(retry.closest("form")?.elements.namedItem("isSetRetry")).toHaveValue("retry");
+    expect(screen.getByRole("button", { name: "Не сейчас" })).toHaveAttribute("name", "skip");
+  });
+
+  it("регистрация ключа из кабинета — стандартная страница, без «Не сейчас»", async () => {
+    render(
+      <KcPage kcContext={getKcContextMock({ pageId: "webauthn-register.ftl", overrides: {} })} />,
+    );
+
+    await waitFor(() => expect(document.getElementById("register")).toBeInTheDocument());
+    expect(screen.queryByText("Входите без кода")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Не сейчас" })).not.toBeInTheDocument();
+  });
+});

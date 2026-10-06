@@ -34,6 +34,16 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
       platformPhoneTaken:
         "Этот номер уже привязан к другому аккаунту. Если это ваш номер, напишите в поддержку.",
       platformPhoneTooOften: "Номер можно менять раз в сутки. Снова — примерно через {0} ч.",
+      platformPasskeyOfferTitle: "Входите без кода",
+      platformPasskeyOfferText:
+        "Добавьте ключ доступа — в следующий раз войдёте по Face ID, отпечатку или PIN этого устройства. Без звонков и SMS, и его нельзя украсть вместе с номером.",
+      platformPasskeyOfferAdd: "Добавить ключ доступа",
+      platformPasskeyOfferRetry: "Попробовать ещё раз",
+      platformPasskeyOfferSkip: "Не сейчас",
+      platformPasskeyOfferLater: "Спросим снова через 30 дней. Добавить можно и в кабинете.",
+      platformPasskeyOfferFailed:
+        "Не получилось добавить ключ. Попробуйте ещё раз или пропустите — войдёте по коду, как сегодня.",
+      platformPasskeyLabel: "Ключ доступа",
       platformCodeTitle: "Вход по коду",
       platformCodeSentToSms: "Отправили код в SMS на {0}.",
       platformCodeSentToEmail: "Отправили код письмом на {0}.",
@@ -169,6 +179,17 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
       platformPhoneTaken:
         "This number belongs to another account. If it is yours, contact support.",
       platformPhoneTooOften: "The number can be changed once a day. Try again in about {0} h.",
+      platformPasskeyOfferTitle: "Sign in without a code",
+      platformPasskeyOfferText:
+        "Add a passkey and next time sign in with Face ID, a fingerprint or this device's PIN. No calls or SMS, and it can't be stolen along with your number.",
+      platformPasskeyOfferAdd: "Add a passkey",
+      platformPasskeyOfferRetry: "Try again",
+      platformPasskeyOfferSkip: "Not now",
+      platformPasskeyOfferLater:
+        "We'll ask again in 30 days. You can also add one in your account.",
+      platformPasskeyOfferFailed:
+        "Couldn't add the passkey. Try again or skip and sign in with a code, as today.",
+      platformPasskeyLabel: "Passkey",
       platformCodeTitle: "Sign in with a code",
       platformCodeSentToSms: "We sent a code by SMS to {0}.",
       platformCodeSentToEmail: "We sent a code by email to {0}.",
