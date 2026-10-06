@@ -10,6 +10,12 @@ public static class AuditActions
     public const string USER_PASSWORD_RESET_REQUESTED = "UserPasswordResetRequested";
     public const string USER_TWO_FACTOR_DISABLED = "UserTwoFactorDisabled";
 
+    /// <summary>Человек выключил или включил способ входа (10.3); сделал сам — ActorId совпадает с ObjectId.</summary>
+    public const string USER_SIGN_IN_METHOD_CHANGED = "UserSignInMethodChanged";
+
+    /// <summary>Админ вернул способы входа по умолчанию.</summary>
+    public const string USER_SIGN_IN_METHODS_RESET = "UserSignInMethodsReset";
+
     public const string PERMISSION_CREATED = "PermissionCreated";
     public const string PERMISSION_DELETED = "PermissionDeleted";
 

@@ -126,6 +126,9 @@ public interface IIdentityAdmin
     /// <summary>Изменить пользователя: включён ли он и атрибуты (null — удалить). Остальное не меняется.</summary>
     Task<UnitResult<Error>> UpdateUserAsync(Guid userId, UserChanges changes, CancellationToken cancellationToken);
 
+    /// <summary>Привязанные внешние входы пользователя (Яндекс ID, Госуслуги): алиасы провайдеров.</summary>
+    Task<Result<IReadOnlyList<string>, Error>> GetLinkedProvidersAsync(Guid userId, CancellationToken cancellationToken);
+
     /// <summary>Сессии пользователя на сервере входа: где и когда вошёл, в какие приложения.</summary>
     Task<Result<IReadOnlyList<IdentitySession>, Error>> GetSessionsAsync(Guid userId, CancellationToken cancellationToken);
 
@@ -153,6 +156,7 @@ public sealed record UserChanges(bool? Enabled, IReadOnlyDictionary<string, stri
 /// <param name="RestrictedAt">Когда заблокирован.</param>
 /// <param name="AppModes">Активные режимы в других приложениях: clientId → режим (атрибуты active_mode.{clientId}).</param>
 /// <param name="EmailVerified">Почта подтверждена (письмом со ссылкой).</param>
+/// <param name="DisabledSignInMethods">Выключенные способы входа — значение атрибута как есть (через запятую).</param>
 public sealed record IdentityUser(
     Guid Id,
     string Username,
@@ -164,7 +168,8 @@ public sealed record IdentityUser(
     string? RestrictionReason = null,
     DateTimeOffset? RestrictedAt = null,
     IReadOnlyDictionary<string, string>? AppModes = null,
-    bool EmailVerified = false);
+    bool EmailVerified = false,
+    string? DisabledSignInMethods = null);
 
 /// <summary>Сессия пользователя на сервере входа.</summary>
 /// <param name="Id">Id сессии (claim sid в токенах этой сессии).</param>
@@ -285,6 +290,12 @@ public static class UserAttributes
 {
     public const string RESTRICTION_REASON = "restriction_reason";
     public const string RESTRICTED_AT = "restricted_at";
+
+    /// <summary>
+    /// Выключенные человеком способы входа (password, phone-code, email-code через запятую). Пишет только сервис;
+    /// плагин Keycloak по нему не пускает (SignInMethods).
+    /// </summary>
+    public const string DISABLED_SIGN_IN_METHODS = "disabled_sign_in_methods";
 
     /// <summary>Версия доступа: меняется со сменой ролей — в токене access_version.</summary>
     public const string ACCESS_VERSION = "access_version";

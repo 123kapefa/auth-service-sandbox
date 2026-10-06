@@ -17,6 +17,7 @@ import org.keycloak.services.clientpolicy.executor.ClientPolicyExecutorProvider;
  * Исполнитель политики клиентов: не выдаёт и не обновляет токены приложения тому, у кого закрыт доступ к нему
  * (роль access-denied клиента). Работает для любого приложения realm, а не только для нашего сервиса:
  * refresh-токен уже открытой сессии перестаёт работать, сессии остальных приложений — нет.
+ * Ещё — не выдаёт токен по логину и паролю (direct grant) тому, у кого вход по паролю выключен (10.3).
  */
 public final class AppAccessExecutor implements ClientPolicyExecutorProvider<ClientPolicyExecutorConfigurationRepresentation> {
 
@@ -45,8 +46,9 @@ public final class AppAccessExecutor implements ClientPolicyExecutorProvider<Cli
                 // токен по логину и паролю (клиенты отладки, например manager-1c-cli)
                 ResourceOwnerPasswordCredentialsResponseContext tokens = (ResourceOwnerPasswordCredentialsResponseContext) context;
                 if (tokens.getClientSessionContext() != null) {
-                    check(tokens.getClientSessionContext().getClientSession().getClient(),
-                        tokens.getClientSessionContext().getClientSession().getUserSession().getUser());
+                    UserModel user = tokens.getClientSessionContext().getClientSession().getUserSession().getUser();
+                    check(tokens.getClientSessionContext().getClientSession().getClient(), user);
+                    checkPassword(user);
                 }
             }
             case TOKEN_REFRESH_RESPONSE -> {
@@ -59,6 +61,13 @@ public final class AppAccessExecutor implements ClientPolicyExecutorProvider<Cli
             default -> {
                 // остальные события не касаются выдачи токенов пользователю
             }
+        }
+    }
+
+    // Вход по паролю выключен у человека (SignInMethods) — и токена по паролю нет; ответ — как на неверный пароль.
+    private void checkPassword(UserModel user) throws ClientPolicyException {
+        if (SignInMethods.isDisabled(session, session.getContext().getRealm(), user, SignInMethods.PASSWORD)) {
+            throw new ClientPolicyException(OAuthErrorException.INVALID_GRANT, "Invalid user credentials");
         }
     }
 

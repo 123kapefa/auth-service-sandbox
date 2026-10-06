@@ -19,6 +19,9 @@ interface PhoneProvider {
     /** SMS с кодом; false — отправить не удалось. */
     boolean sms(KeycloakSession session, String phone, String code);
 
+    /** SMS с текстом без кода (уведомление); false — отправить не удалось. */
+    boolean message(KeycloakSession session, String phone, String text);
+
     /** Текст SMS с кодом. */
     static String smsText(String code) {
         return "Код для входа: " + code + ". Никому его не сообщайте.";

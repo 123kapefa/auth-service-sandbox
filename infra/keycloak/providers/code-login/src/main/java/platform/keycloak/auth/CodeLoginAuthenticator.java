@@ -27,6 +27,7 @@ import org.keycloak.services.messages.Messages;
  * Вход по одноразовому коду. Куда слать код, уже выбрано на форме входа (CodeLoginNotes): номер — SMS, почта — письмо.
  * Здесь — отправка кода, экран «Введите код», проверка и вход. Правила кода — CodeRules (без Keycloak).
  * Неизвестный номер или почта: пользователь создаётся только после верного кода — как в боевом сервисе.
+ * Код на телефон или почту выключен у человека (SignInMethods) — код не уходит, экран тот же.
  */
 public final class CodeLoginAuthenticator implements Authenticator {
 
@@ -134,6 +135,10 @@ public final class CodeLoginAuthenticator implements Authenticator {
                     refuse(context, target, current, limits, limitStore, today, decision);
                     return;
                 }
+                if (methodDisabled(context, target)) {
+                    pretendSent(context, target, sent, delivery, limitStore, ip, range, today, now);
+                    return;
+                }
                 Optional<String> code = deliver(context, target, delivery, sent.code());
                 // Звонок не удался (провайдер недоступен) — сразу запасная SMS, если она у проекта есть и в бюджете.
                 // Капча и лимиты уже пройдены этим запросом.
@@ -166,6 +171,29 @@ public final class CodeLoginAuthenticator implements Authenticator {
             case CodeRules.SendResult.Locked locked -> context.challenge(
                 form(context, target, current).setError("platformCodeLocked", locked.retryAfterSeconds()).createForm(FORM));
         }
+    }
+
+    // У человека выключен этот способ (SignInMethods): код не уходит, а экран — как после отправки (по ответу не
+    // понять, есть ли аккаунт и что выключено). Сохраняется код, которого никто не знает: пауза и лимиты — как обычно,
+    // но без расхода бюджета.
+    private void pretendSent(AuthenticationFlowContext context, CodeTarget target, CodeRules.SendResult.Sent sent,
+                             CodeDelivery delivery, CodeLimitStore limitStore, String ip, String range, LocalDate today,
+                             Instant now) {
+        CodeState state = sent.state().sentAs(sent.code(), delivery);
+        new CodeStore(context.getSession(), context.getRealm()).save(target, state, now);
+        limitStore.recordSend(target, ip, range, 0, today, now, spent -> 0);
+        metrics.refused(context.getRealm().getName(), "method-disabled");
+        LOG.infof("Код на %s не отправлен: способ входа выключен у пользователя", target.value());
+        context.challenge(form(context, target, state).createForm(FORM));
+    }
+
+    private static boolean methodDisabled(AuthenticationFlowContext context, CodeTarget target) {
+        UserModel user = findUser(context.getSession(), context.getRealm(), target);
+        return user != null && SignInMethods.isDisabled(context.getSession(), context.getRealm(), user, signInMethod(target.channel()));
+    }
+
+    private static String signInMethod(CodeTarget.Channel channel) {
+        return channel == CodeTarget.Channel.SMS ? SignInMethods.PHONE_CODE : SignInMethods.EMAIL_CODE;
     }
 
     // Почта — письмом. Телефон — звонком-сбросом (дешевле); SMS — если попросили или звонки у проекта выключены.
@@ -258,6 +286,13 @@ public final class CodeLoginAuthenticator implements Authenticator {
         UserModel user = findUser(context.getSession(), context.getRealm(), target);
         if (user == null) {
             user = createCustomer(context, target);
+        }
+
+        // Способ выключили, пока человек вводил код, — код больше не годится.
+        if (SignInMethods.isDisabled(context.getSession(), context.getRealm(), user, signInMethod(target.channel()))) {
+            context.getEvent().user(user).detail(SignInMethods.EVENT_REASON, "method_disabled");
+            fail(context, target, state, "platformCodeExpired");
+            return;
         }
 
         if (!user.isEnabled()) {

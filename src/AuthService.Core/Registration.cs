@@ -22,6 +22,7 @@ using AuthService.Core.Features.Auth.UseCases.Logout;
 using AuthService.Core.Features.Auth.UseCases.Refresh;
 using AuthService.Core.Features.Auth.UseCases.SwitchMode;
 using AuthService.Core.Features.Security;
+using AuthService.Core.Features.SignInMethods;
 using AuthService.Core.Features.Services;
 using FluentValidation;
 using Framework.Endpoints;
@@ -70,6 +71,7 @@ public static class Registration
         services.AddScoped<AppUsersHandler>();
         services.AddScoped<ManagedApps>();
         services.AddScoped<CredentialsHandler>();
+        services.AddScoped<SignInMethodsHandler>();
         services.AddHostedService<PermissionCatalogSync>();
         services.AddScoped<SessionsHandler>();
         services.AddScoped<LoginDevices>();

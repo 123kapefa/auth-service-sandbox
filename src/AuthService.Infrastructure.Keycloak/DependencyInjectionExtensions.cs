@@ -27,6 +27,7 @@ public static class DependencyInjectionExtensions
         services.AddHttpClient<IIdentityAdmin, KeycloakAdminClient>();
         services.AddHttpClient<IServiceRegistry, KeycloakServiceRegistry>();
         services.AddHttpClient<IProjectBranding, KeycloakBranding>();
+        services.AddHttpClient<IAccountNotices, KeycloakAccountNotices>();
 
         // Discovery кэшируется и сам обновляется; адрес — тот же, по которому сервис берёт ключи для проверки токенов.
         services.AddSingleton<IConfigurationManager<OpenIdConnectConfiguration>>(provider =>

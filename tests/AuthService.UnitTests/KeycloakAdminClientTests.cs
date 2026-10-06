@@ -44,6 +44,16 @@ public sealed class KeycloakAdminClientTests : IDisposable
         Assert.Equal("customer", user.ActiveMode);
         Assert.True(user.Enabled);
         Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1790000000000), user.CreatedAt);
+        Assert.Equal("password,email-code", user.DisabledSignInMethods);
+    }
+
+    [Fact]
+    public async Task LinkedProviders_FromFederatedIdentities()
+    {
+        IReadOnlyList<string> providers = (await CreateClient().GetLinkedProvidersAsync(_userId, default)).Value;
+
+        Assert.Equal($"{ADMIN}/users/{_userId}/federated-identity", _keycloak.AdminRequests.Single().Url);
+        Assert.Equal(["esia", "yandex"], providers);
     }
 
     [Fact]
@@ -150,7 +160,7 @@ public sealed class KeycloakAdminClientTests : IDisposable
               "email": "customer@sandbox.test",
               "enabled": true,
               "createdTimestamp": 1790000000000,
-              "attributes": { "phone": ["+79990000001"], "active_mode": ["customer"] }
+              "attributes": { "phone": ["+79990000001"], "active_mode": ["customer"], "disabled_sign_in_methods": ["password,email-code"] }
             }
             """;
 
@@ -189,6 +199,11 @@ public sealed class KeycloakAdminClientTests : IDisposable
                 if (url.EndsWith("/credentials", StringComparison.Ordinal))
                 {
                     return Json(HttpStatusCode.OK, CREDENTIALS);
+                }
+
+                if (url.EndsWith("/federated-identity", StringComparison.Ordinal))
+                {
+                    return Json(HttpStatusCode.OK, """[{ "identityProvider": "yandex", "userId": "y-1", "userName": "a" }, { "identityProvider": "esia", "userId": "e-1" }]""");
                 }
 
                 if (url.Contains("/events?", StringComparison.Ordinal))

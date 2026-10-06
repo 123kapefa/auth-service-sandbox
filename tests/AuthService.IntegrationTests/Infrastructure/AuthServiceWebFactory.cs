@@ -63,6 +63,9 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
     /// <summary>Оформление проекта в памяти вместо плагина Keycloak.</summary>
     public FakeProjectBranding Branding { get; } = new();
 
+    /// <summary>Уведомления человеку в памяти вместо плагина Keycloak.</summary>
+    public FakeAccountNotices Notices { get; } = new();
+
     /// <summary>Клиент как браузер без автоматических переходов и cookie: тест видит каждый 302 и Set-Cookie.</summary>
     public HttpClient CreateBrowserClient() =>
         CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
@@ -184,6 +187,8 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
             services.AddSingleton<ILoginDeviceStore>(LoginDevices);
             services.RemoveAll<IProjectBranding>();
             services.AddSingleton<IProjectBranding>(Branding);
+            services.RemoveAll<IAccountNotices>();
+            services.AddSingleton<IAccountNotices>(Notices);
             // Ключи шифрования — в памяти: база в тестах недоступна.
             services.AddDataProtection().UseEphemeralDataProtectionProvider();
         });

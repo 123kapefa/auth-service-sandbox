@@ -48,6 +48,9 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     /// <summary>Письма Keycloak с действиями: (пользователь, действия, срок ссылки).</summary>
     public Collection<(Guid UserId, string[] Actions, TimeSpan Lifespan)> ActionEmails { get; } = [];
 
+    /// <summary>Привязанные внешние входы: пользователь → алиасы провайдеров.</summary>
+    private readonly ConcurrentDictionary<Guid, string[]> _linked = new();
+
     /// <summary>Какие сессии сервис завершил по одной.</summary>
     public Collection<string> DeletedSessions { get; } = [];
 
@@ -111,9 +114,24 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         _accounts[user.Id] = _accounts[user.Id] with { User = _accounts[user.Id].User with { Email = email } };
     }
 
+    /// <summary>Привязать пользователю внешний вход (yandex, esia).</summary>
+    public void Link(TestUser user, params string[] providers)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        _linked[user.Id] = providers;
+    }
+
+    /// <summary>Выключенные способы входа — как их записал бы сервис.</summary>
+    public void SetDisabledSignInMethods(TestUser user, string? value)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        _accounts[user.Id] = _accounts[user.Id] with { User = _accounts[user.Id].User with { DisabledSignInMethods = value } };
+    }
+
     public void Reset()
     {
         _accounts.Clear();
+        _linked.Clear();
         _twoFactor.Clear();
         _credentials.Clear();
         ActionEmails.Clear();
@@ -285,6 +303,7 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
                 UserAttributes.RESTRICTION_REASON => user with { RestrictionReason = value },
                 UserAttributes.RESTRICTED_AT => user with { RestrictedAt = value is null ? null : DateTimeOffset.Parse(value, CultureInfo.InvariantCulture) },
                 "active_mode" => user with { ActiveMode = value },
+                UserAttributes.DISABLED_SIGN_IN_METHODS => user with { DisabledSignInMethods = value },
                 _ when name.StartsWith(UserAttributes.APP_MODE_PREFIX, StringComparison.Ordinal) => user with
                 {
                     AppModes = WithMode(user.AppModes, name[UserAttributes.APP_MODE_PREFIX.Length..], value),
@@ -473,6 +492,11 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         ArgumentNullException.ThrowIfNull(user);
         _sessions[sessionId] = (user.Id, apps);
     }
+
+    public Task<Result<IReadOnlyList<string>, Error>> GetLinkedProvidersAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult(_accounts.ContainsKey(userId)
+            ? Result.Success<IReadOnlyList<string>, Error>(_linked.TryGetValue(userId, out string[]? providers) ? providers : [])
+            : IdentityProviderErrors.UserNotFound());
 
     public Task<Result<IReadOnlyList<IdentitySession>, Error>> GetSessionsAsync(Guid userId, CancellationToken cancellationToken) =>
         Task.FromResult(Result.Success<IReadOnlyList<IdentitySession>, Error>(

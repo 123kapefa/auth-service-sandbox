@@ -33,8 +33,8 @@ scripts/keycloak/check-stand.sh
 разрешение на регистрацию: `scripts/keycloak/registration-token.sh --write-env`, затем `docker compose up -d --wait`),
 весь этап 6б — `check-6b.sh` 138 (кабинет, устройства, оформление, новый проект), магазин из двух сервисов (этап 6а.4) —
 `check-shop.sh` 61, вход через Госуслуги и Яндекс ID (на заглушке) — `check-external-login.sh` 41, защита от накрутки
-кодов (этап 10.1) — `check-code-limits.sh` 40, код на телефон звонком и запасной SMS (10.2) — `check-phone-code.sh` 24. Тестов: .NET — 556,
-плагина Keycloak (Java, в сборке образа) — 115, админки и кабинета (Vitest) — 87, темы входа (Vitest) — 34.
+кодов (этап 10.1) — `check-code-limits.sh` 40, код на телефон звонком и запасной SMS (10.2) — `check-phone-code.sh` 24, способы входа человека (10.3) —
+`check-sign-in-methods.sh` 43. Тестов: .NET — 588, плагина Keycloak (Java, в сборке образа) — 125, админки и кабинета (Vitest) — 87, темы входа (Vitest) — 34.
 
 Стенд, поднятый до этапа 6б, после `git pull` и `docker compose up -d --build --wait` — `scripts/project/upgrade-6b.py
 sandbox` (realm импортируется только в пустую базу; подробнее — [06b](06b-account-branding.md#проекты-созданные-до-6б)),
@@ -84,7 +84,7 @@ sandbox` (realm импортируется только в пустую базу
 | 7 | Документация | идёт по ходу | — |
 | 8 | Выводы и ADR: брать ли Keycloak, чего стоит, что своё | ✅ (решения приняты) | [08-conclusions.md](08-conclusions.md), [ADR](../adr/README.md) |
 | 9 | Вход через Госуслуги и Яндекс ID (на заглушке; ключи — подставить) | ✅ | [09-external-login.md](09-external-login.md) |
-| 10 | Вход: способы входа и коды подешевле (10.1 — защита от накрутки кодов, 10.2 — звонок вместо SMS) | 🔄 | [10-code-limits.md](10-code-limits.md), [10-phone-code.md](10-phone-code.md), задача [#128](https://github.com/123kapefa/auth-service-sandbox/issues/128) |
+| 10 | Вход: способы входа и коды подешевле (10.1 — защита от накрутки кодов, 10.2 — звонок вместо SMS, 10.3 — способы входа человека) | 🔄 | [10-code-limits.md](10-code-limits.md), [10-phone-code.md](10-phone-code.md), [10-sign-in-methods.md](10-sign-in-methods.md), задача [#128](https://github.com/123kapefa/auth-service-sandbox/issues/128) |
 
 Каждый этап — отдельная ветка `stage-N/...`. План, шаги и статусы — в
 [задачах GitHub](https://github.com/123kapefa/auth-service-sandbox/issues) и на

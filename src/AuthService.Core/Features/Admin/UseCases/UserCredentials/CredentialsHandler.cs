@@ -2,6 +2,7 @@ using AuthService.Contracts.Admin;
 using AuthService.Core.Abstractions;
 using AuthService.Core.Features.Admin.UseCases.AppUserRoles;
 using AuthService.Core.Features.Admin.UseCases.GetUser;
+using AuthService.Core.Features.SignInMethods;
 using AuthService.Domain.AuditLog;
 using CSharpFunctionalExtensions;
 using SharedKernel;
@@ -12,14 +13,16 @@ namespace AuthService.Core.Features.Admin.UseCases.UserCredentials;
 /// Пароль и 2FA пользователя — уровень аккаунта, только админ проекта. Пароль админ не видит и не задаёт: Keycloak
 /// шлёт пользователю письмо со ссылкой (действие UPDATE_PASSWORD). 2FA — удалить приложение-аутентификатор и коды
 /// восстановления (после недавнего входа: это снимает защиту аккаунта); включит заново сам пользователь. Свои — в
-/// «Настройках входа».
+/// «Настройках входа». Вход по паролю выключен самим человеком (10.3) — ссылку на новый пароль не шлём: сначала админ
+/// возвращает способы входа по умолчанию.
 /// </summary>
 public sealed class CredentialsHandler(
     IIdentityAdmin identityAdmin,
     AdminTargets targets,
     AdminAudit audit,
     TimeProvider timeProvider,
-    GetUserHandler getUser)
+    GetUserHandler getUser,
+    SignInMethodsHandler signInMethods)
 {
     /// <summary>Сколько живёт ссылка из письма.</summary>
     public static readonly TimeSpan ResetLinkLifetime = TimeSpan.FromHours(24);
@@ -40,6 +43,17 @@ public sealed class CredentialsHandler(
         if (string.IsNullOrWhiteSpace(user.Value.Email))
         {
             return AdminErrors.NoEmail();
+        }
+
+        Result<bool, Error> passwordDisabled = await signInMethods.IsDisabledAsync(userId, SignInMethodRules.PASSWORD, cancellationToken);
+        if (passwordDisabled.IsFailure)
+        {
+            return passwordDisabled.Error;
+        }
+
+        if (passwordDisabled.Value)
+        {
+            return SignInMethodErrors.PasswordDisabled();
         }
 
         UnitResult<Error> sent = await identityAdmin.SendActionsEmailAsync(
