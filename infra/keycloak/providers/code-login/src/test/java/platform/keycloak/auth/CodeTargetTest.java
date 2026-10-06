@@ -37,4 +37,11 @@ class CodeTargetTest {
         assertEquals("+79990000001", new CodeTarget(CodeTarget.Channel.SMS, "79990000001").display());
         assertEquals("a@sandbox.test", new CodeTarget(CodeTarget.Channel.EMAIL, "a@sandbox.test").display());
     }
+
+    @Test
+    void masked_hidesMostOfAddress() {
+        assertEquals("+7 *** ***-**-96", new CodeTarget(CodeTarget.Channel.SMS, "79990000096").masked());
+        assertEquals("+*** ***-**-67", new CodeTarget(CodeTarget.Channel.SMS, "375291234567").masked());
+        assertEquals("s***@sandbox.test", new CodeTarget(CodeTarget.Channel.EMAIL, "sign-in@sandbox.test").masked());
+    }
 }

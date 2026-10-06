@@ -33,4 +33,17 @@ public record CodeTarget(Channel channel, String value) {
     public String display() {
         return channel == Channel.SMS ? PhoneNormalizer.toE164(value) : value;
     }
+
+    /**
+     * Для показа, когда адрес взят из аккаунта, а не введён (вход в два шага, LoginSteps): номер — две последние
+     * цифры (у российского — и +7), почта — первая буква и домен.
+     */
+    public String masked() {
+        if (channel == Channel.SMS) {
+            String country = value.length() == 11 && value.charAt(0) == '7' ? "7 " : "";
+            return "+" + country + "*** ***-**-" + value.substring(value.length() - 2);
+        }
+        int at = value.indexOf('@');
+        return value.charAt(0) + "***" + value.substring(at);
+    }
 }
