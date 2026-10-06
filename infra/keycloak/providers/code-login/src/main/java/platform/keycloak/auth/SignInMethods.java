@@ -125,6 +125,11 @@ final class SignInMethods {
         return true;
     }
 
+    /** Что есть у пользователя, с выключенными способами из атрибута (до страховки). */
+    static Facts facts(KeycloakSession session, RealmModel realm, UserModel user) {
+        return facts(session, realm, user, parse(user.getFirstAttribute(ATTRIBUTE)));
+    }
+
     private static Facts facts(KeycloakSession session, RealmModel realm, UserModel user, Set<String> disabled) {
         return new Facts(
             has(user, PASSWORD),

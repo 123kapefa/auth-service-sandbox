@@ -11,6 +11,20 @@ export type KcContextExtension = {
  * аутентификатор (form.setAttribute). Keycloakify по ключу собирает .ftl в тему.
  */
 export type KcContextExtensionPerPage = {
+  /** Вход в два шага (PasswordLoginForm). Без loginStep — прежняя форма в один шаг (подтверждение пароля при привязке). */
+  "login.ftl": {
+    /** login — телефон или почта; password — пароль сразу; methods — список способов (пароль выключен). */
+    loginStep?: "login" | "password" | "methods";
+    /** Способы шага 2 через запятую по цене: passkey, email-code, phone-code. */
+    loginMethods?: string;
+    /** Что ввели на шаге 1 — как показать (номер с «+»). */
+    loginDisplay?: string;
+    /** Почта и номер из аккаунта, скрытые частично (шаг «способы»). */
+    loginEmailHint?: string;
+    loginPhoneHint?: string;
+    /** Единственный способ — открыть сам (passkey). */
+    loginAutoStart?: string;
+  };
   "platform-code-login.ftl": {
     /** SMS или EMAIL — куда ушёл код. */
     codeChannel: "SMS" | "EMAIL";

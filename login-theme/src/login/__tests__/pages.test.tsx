@@ -67,6 +67,69 @@ describe("страница входа", () => {
   });
 });
 
+describe("вход в два шага", () => {
+  const page = (overrides: Record<string, unknown>) => (
+    <KcPage kcContext={getKcContextMock({ pageId: "login.ftl", overrides })} />
+  );
+
+  it("шаг 1: только телефон или почта и «Продолжить»; внешний вход тут же", async () => {
+    render(page({ loginStep: "login" }));
+
+    expect(await screen.findByLabelText("Телефон или почта")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Пароль")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Войти по коду" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Продолжить" })).toHaveAttribute("name", "next");
+    expect(screen.getByRole("link", { name: "Яндекс ID" })).toBeInTheDocument();
+  });
+
+  it("шаг 2 с паролем: что ввели, «Изменить», пароль сразу и код на то, что ввели", async () => {
+    render(
+      page({ loginStep: "password", loginMethods: "phone-code", loginDisplay: "+79990000001" }),
+    );
+
+    expect(await screen.findByLabelText("Пароль")).toBeInTheDocument();
+    expect(screen.getByText("+79990000001")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Изменить" })).toHaveAttribute("name", "changeLogin");
+    expect(screen.queryByLabelText("Телефон или почта")).not.toBeInTheDocument();
+    const code = screen.getByRole("button", { name: "Войти по коду" });
+    expect(code).toHaveAttribute("name", "codeLogin");
+    expect(code).toHaveAttribute("value", "phone-code");
+    expect(screen.getByRole("link", { name: "Забыли пароль?" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Яндекс ID" })).not.toBeInTheDocument();
+  });
+
+  it("шаг 2 без пароля: способы по цене, почта и номер скрыты частично", async () => {
+    render(
+      page({
+        loginStep: "methods",
+        loginMethods: "email-code,phone-code",
+        loginDisplay: "+79990000001",
+        loginEmailHint: "s***@sandbox.test",
+        loginPhoneHint: "+7 *** ***-**-01",
+      }),
+    );
+
+    expect(await screen.findByText("Как войти?")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Пароль")).not.toBeInTheDocument();
+    const buttons = screen.getAllByRole("button", { name: /^(Код на почту|Звонок на)/ });
+    expect(buttons.map((button) => button.textContent)).toEqual([
+      "Код на почту s***@sandbox.test",
+      "Звонок на +7 *** ***-**-01",
+    ]);
+    expect(buttons.map((button) => button.getAttribute("value"))).toEqual([
+      "email-code",
+      "phone-code",
+    ]);
+  });
+
+  it("шаг 2 без пароля и без других способов — войти через Яндекс ID или Госуслуги", async () => {
+    render(page({ loginStep: "methods", loginMethods: "", loginDisplay: "a@sandbox.test" }));
+
+    expect(await screen.findByText(/Войдите через Яндекс ID или Госуслуги/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Госуслуги" })).toBeInTheDocument();
+  });
+});
+
 describe("внешний вход", () => {
   it("«Или войдите через»: Госуслуги и Яндекс ID — ссылки на вход через провайдера", async () => {
     render(<KcPage kcContext={getKcContextMock({ pageId: "login.ftl", overrides: {} })} />);

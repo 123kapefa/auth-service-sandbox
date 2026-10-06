@@ -9,6 +9,7 @@ export const { getKcContextMock } = createGetKcContextMock({
     properties: { ...kcEnvDefaults },
   } satisfies KcContextExtension,
   kcContextExtensionPerPage: {
+    "login.ftl": {},
     "platform-code-login.ftl": {
       codeChannel: "SMS" as "SMS" | "EMAIL",
       codeDelivery: "SMS" as "CALL" | "SMS" | "EMAIL",

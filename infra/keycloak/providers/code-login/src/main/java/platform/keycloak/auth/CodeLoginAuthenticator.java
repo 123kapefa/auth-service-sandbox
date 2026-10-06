@@ -24,7 +24,8 @@ import org.keycloak.models.UserModel;
 import org.keycloak.services.messages.Messages;
 
 /**
- * Вход по одноразовому коду. Куда слать код, уже выбрано на форме входа (CodeLoginNotes): номер — SMS, почта — письмо.
+ * Вход по одноразовому коду. Куда слать код, уже выбрано на форме входа (CodeLoginNotes): номер — звонок или SMS,
+ * почта — письмо. Адрес из аккаунта (вход в два шага) на экране скрыт частично.
  * Здесь — отправка кода, экран «Введите код», проверка и вход. Правила кода — CodeRules (без Keycloak).
  * Неизвестный номер или почта: пользователь создаётся только после верного кода — как в боевом сервисе.
  * Код на телефон или почту выключен у человека (SignInMethods) — код не уходит, экран тот же.
@@ -367,7 +368,7 @@ public final class CodeLoginAuthenticator implements Authenticator {
             // «Прислать SMS» — на экране звонка, если SMS у проекта есть.
             .setAttribute("codeSmsAvailable", Boolean.toString(
                 delivery == CodeDelivery.CALL && limits.policy().allows(CodeDelivery.SMS)))
-            .setAttribute("codeTarget", target.display())
+            .setAttribute("codeTarget", CodeLoginNotes.masked(context.getAuthenticationSession()) ? target.masked() : target.display())
             .setAttribute("codeResendAfter", Long.toString(resendAfter))
             .setAttribute("codeLength", Integer.toString(delivery == CodeDelivery.CALL ? CALL_CODE_LENGTH : rules.codeLength()))
             .setAttribute("captchaRequired", Boolean.toString(limits.captchaRequired(usage, now)));
