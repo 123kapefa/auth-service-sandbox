@@ -89,7 +89,16 @@ describe("вход в два шага", () => {
 
     expect(await screen.findByLabelText("Пароль")).toBeInTheDocument();
     expect(screen.getByText("+79990000001")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Изменить" })).toHaveAttribute("name", "changeLogin");
+    const change = screen.getByRole("button", { name: "Изменить" });
+    expect(change).toHaveAttribute("name", "changeLogin");
+    // Enter в поле пароля жмёт первую кнопку формы пароля: «Войти», а «Изменить» — в своей форме.
+    const passwordForm = (screen.getByLabelText("Пароль") as HTMLInputElement).form;
+    expect((change as HTMLButtonElement).form).not.toBe(passwordForm);
+    // Кнопка по умолчанию — первая кнопка отправки, принадлежащая форме (form.elements, как у браузера).
+    const submits = Array.from(passwordForm?.elements ?? []).filter(
+      (element) => element instanceof HTMLButtonElement && element.type === "submit",
+    );
+    expect(submits[0]).toHaveAttribute("name", "login");
     expect(screen.queryByLabelText("Телефон или почта")).not.toBeInTheDocument();
     const code = screen.getByRole("button", { name: "Войти по коду" });
     expect(code).toHaveAttribute("name", "codeLogin");
