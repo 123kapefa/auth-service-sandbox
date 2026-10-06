@@ -8,6 +8,11 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
   .withCustomTranslations({
     ru: {
       usernameOrEmail: "Телефон или почта",
+      // Страница входа была открыта дольше, чем живёт вход в Keycloak: стандартное «процесс начнётся с начала» сбивает —
+      // человек уже на первом шаге.
+      loginTimeout: "Страница входа была открыта слишком долго. Введите данные ещё раз.",
+      expiredCodeMessage: "Страница входа устарела. Войдите ещё раз.",
+      expiredActionMessage: "Страница устарела. Продолжите вход.",
       platformCodeLoginDo: "Войти по коду",
       platformCodeLoginTargetRequired: "Для входа по коду введите телефон или почту.",
       platformLoginContinue: "Продолжить",
@@ -140,6 +145,9 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
     },
     en: {
       usernameOrEmail: "Phone or email",
+      loginTimeout: "This sign-in page was open too long. Please enter your details again.",
+      expiredCodeMessage: "This sign-in page has expired. Please sign in again.",
+      expiredActionMessage: "This page has expired. Please continue signing in.",
       platformCodeLoginDo: "Sign in with a code",
       platformCodeLoginTargetRequired: "Enter a phone number or email to sign in with a code.",
       platformLoginContinue: "Continue",
