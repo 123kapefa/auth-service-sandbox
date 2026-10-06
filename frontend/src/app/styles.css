@@ -91,6 +91,20 @@
   );
 }
 
+/* Появиться через 0,3 с: короткая загрузка не мигает (PageLoading). */
+@keyframes appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@utility animate-appear-late {
+  animation: appear 0.2s ease-out 0.3s both;
+}
+
 /* Квадрат в левом верхнем углу карточки. */
 @utility corner-mark {
   position: relative;

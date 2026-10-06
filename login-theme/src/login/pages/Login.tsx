@@ -117,7 +117,8 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
     />
   );
 
-  // Что ввели на шаге 1 и «Изменить» — назад к шагу 1.
+  // Что ввели на шаге 1 и «Изменить» — назад к шагу 1. Кнопка стоит в форме входа, но отправляет свою пустую форму:
+  // Enter в поле пароля (и менеджер паролей) жмёт первую кнопку своей формы — это должна быть «Войти», не «Изменить».
   const shownLogin = loginDisplay !== undefined && (
     <div className="flex items-center justify-between gap-3 text-sm">
       <span id="platform-login-display" className="font-medium">
@@ -127,12 +128,16 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
         id="platform-login-change"
         name="changeLogin"
         type="submit"
+        form="platform-login-change-form"
         formNoValidate
         className="underline underline-offset-4 hover:text-muted-foreground"
       >
         {msgStr("platformLoginChange")}
       </button>
     </div>
+  );
+  const changeLoginForm = loginDisplay !== undefined && (
+    <form id="platform-login-change-form" action={url.loginAction} method="post" noValidate hidden />
   );
 
   const codeButtons = (primary: boolean) =>
@@ -260,6 +265,7 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
             {codeButtons(false)}
           </div>
         </form>
+        {changeLoginForm}
         {methods.includes("passkey") && passkeyNode}
       </>
     );
@@ -284,6 +290,7 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
             </p>
           )}
         </form>
+        {changeLoginForm}
         {/* По цене: ключ доступа, затем коды. */}
         {methods.includes("passkey") && passkeyNode}
         {codes.length > 0 && (
