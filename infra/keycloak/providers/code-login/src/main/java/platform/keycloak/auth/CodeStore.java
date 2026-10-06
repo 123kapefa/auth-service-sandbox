@@ -12,14 +12,23 @@ import org.keycloak.models.SingleUseObjectProvider;
  */
 final class CodeStore {
 
-    private static final String PREFIX = "platform-code-login:";
+    /** Коды входа. */
+    static final String LOGIN = "platform-code-login:";
+    /** Коды смены номера: код входа на тот же номер для смены не годится, и наоборот. */
+    static final String PHONE_CHANGE = "platform-phone-change:";
 
     private final SingleUseObjectProvider store;
     private final String realmId;
+    private final String prefix;
 
     CodeStore(KeycloakSession session, RealmModel realm) {
+        this(session, realm, LOGIN);
+    }
+
+    CodeStore(KeycloakSession session, RealmModel realm, String prefix) {
         this.store = session.singleUseObjects();
         this.realmId = realm.getId();
+        this.prefix = prefix;
     }
 
     CodeState load(CodeTarget target) {
@@ -31,6 +40,6 @@ final class CodeStore {
     }
 
     private String key(CodeTarget target) {
-        return PREFIX + realmId + ":" + target.channel() + ":" + target.value();
+        return prefix + realmId + ":" + target.channel() + ":" + target.value();
     }
 }

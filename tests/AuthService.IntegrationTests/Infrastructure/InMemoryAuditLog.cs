@@ -40,6 +40,8 @@ public sealed class InMemoryAuditLog : IAuditLog
                 .Where(entry => query.ActorId is null || entry.ActorId == query.ActorId)
                 .Where(entry => query.Action is null || entry.Action == query.Action)
                 .Where(entry => query.App is null || entry.App == query.App)
+                .Where(entry => query.From is null || entry.OccurredAt >= query.From)
+                .Where(entry => query.To is null || entry.OccurredAt <= query.To)
                 .OrderByDescending(entry => entry.OccurredAt)
                 .Skip((query.Page - 1) * query.PageSize)
                 .Take(query.PageSize + 1),

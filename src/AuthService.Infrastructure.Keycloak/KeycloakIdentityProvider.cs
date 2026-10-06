@@ -71,6 +71,7 @@ internal sealed partial class KeycloakIdentityProvider(
             {
                 AccountAction.UpdatePassword => "UPDATE_PASSWORD",
                 AccountAction.UpdateEmail => "UPDATE_EMAIL",
+                AccountAction.UpdatePhone => "platform-update-phone",
                 AccountAction.ConfigureTotp => "CONFIGURE_TOTP",
                 AccountAction.RegisterPasskey => "webauthn-register-passwordless",
                 AccountAction.ConfigureRecoveryCodes => "CONFIGURE_RECOVERY_AUTHN_CODES",

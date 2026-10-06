@@ -5,8 +5,8 @@ using Microsoft.Extensions.Options;
 
 namespace AuthService.Core.Features.Auth.Cookies;
 
-/// <summary>Что нужно помнить между уходом на страницу входа и возвратом в callback.</summary>
-public sealed record LoginState(string State, string CodeVerifier, string ReturnTo);
+/// <summary>Что нужно помнить между уходом на страницу входа и возвратом в callback; Action — действие с учётной записью.</summary>
+public sealed record LoginState(string State, string CodeVerifier, string ReturnTo, string? Action = null);
 
 /// <summary>
 /// Состояние входа — в зашифрованной одноразовой cookie на 10 минут: сервер ничего не хранит,

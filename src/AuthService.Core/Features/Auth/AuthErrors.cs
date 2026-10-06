@@ -4,11 +4,18 @@ namespace AuthService.Core.Features.Auth;
 
 public static class AuthErrors
 {
+    private const string STATE_MISSING = "auth.login.state_missing";
+    private const string STATE_MISMATCH = "auth.login.state_mismatch";
+
     public static Error LoginStateMissing() =>
-        Error.Validation("auth.login.state_missing", "Вход устарел или не был начат. Начните вход заново.");
+        Error.Validation(STATE_MISSING, "Вход устарел или не был начат. Начните вход заново.");
 
     public static Error LoginStateMismatch() =>
-        Error.Validation("auth.login.state_mismatch", "Ответ сервера входа не относится к этому входу. Начните вход заново.");
+        Error.Validation(STATE_MISMATCH, "Ответ сервера входа не относится к этому входу. Начните вход заново.");
+
+    /// <summary>Сервис не узнал вход, с которого вернулся браузер: метка входа истекла, ушла в другую вкладку и т.п.</summary>
+    public static bool IsLostLogin(Error error) =>
+        error.Messages.Any(message => message.Code is STATE_MISSING or STATE_MISMATCH);
 
     public static Error LoginDenied(string reason) =>
         Error.Authentication("auth.login.denied", $"Вход не выполнен: {reason}.");

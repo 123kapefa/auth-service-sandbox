@@ -80,11 +80,16 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
 
     @Override
     public Authenticator create(KeycloakSession session) {
+        return new CodeLoginAuthenticator(dispatcher(), new EmailCodeSender(CodePolicy.PRODUCTION));
+    }
+
+    /** Отправка кодов с настройками кодов (лимиты, капча, телефония) — и для смены номера (UpdatePhoneAction). */
+    CodeDispatcher dispatcher() {
         Clock clock = Clock.systemUTC();
         Function<RealmModel, CodeLimits> limits = realm -> new CodeLimits(CodeLimitPolicy.from(
             key -> setting(realm, key), CodeLimitPolicy.DEFAULTS));
-        return new CodeLoginAuthenticator(new CodeRules(CodePolicy.PRODUCTION, clock, new SecureRandom()), limits,
-            captcha, captchaSiteKey, metrics, new EmailCodeSender(CodePolicy.PRODUCTION), phone, clock);
+        return new CodeDispatcher(new CodeRules(CodePolicy.PRODUCTION, clock, new SecureRandom()), limits,
+            captcha, captchaSiteKey, metrics, phone, clock);
     }
 
     private String setting(RealmModel realm, String key) {

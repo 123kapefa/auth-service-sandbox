@@ -76,6 +76,7 @@ public static class Registration
         services.AddScoped<SessionsHandler>();
         services.AddScoped<LoginDevices>();
         services.AddScoped<LoginDeviceRecorder>();
+        services.AddScoped<Features.Phone.PhoneChangeRecorder>();
         services.AddScoped<LoginHistoryHandler>();
         services.AddScoped<ServiceKeysHandler>();
         services.AddScoped<ServiceUsersHandler>();

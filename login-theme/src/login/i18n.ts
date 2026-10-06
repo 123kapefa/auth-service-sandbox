@@ -8,6 +8,11 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
   .withCustomTranslations({
     ru: {
       usernameOrEmail: "Телефон или почта",
+      // Страница входа была открыта дольше, чем живёт вход в Keycloak: стандартное «процесс начнётся с начала» сбивает —
+      // человек уже на первом шаге.
+      loginTimeout: "Страница входа была открыта слишком долго. Введите данные ещё раз.",
+      expiredCodeMessage: "Страница входа устарела. Войдите ещё раз.",
+      expiredActionMessage: "Страница устарела. Продолжите вход.",
       platformCodeLoginDo: "Войти по коду",
       platformCodeLoginTargetRequired: "Для входа по коду введите телефон или почту.",
       platformLoginContinue: "Продолжить",
@@ -18,6 +23,17 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
       platformLoginPhoneCall: "Звонок на {0}",
       platformLoginNoMethods: "Войдите через Яндекс ID или Госуслуги — так, как входили раньше.",
       platformLoginMethodUnavailable: "Этот способ входа недоступен — выберите другой.",
+      platformPhoneTitle: "Смена номера",
+      platformPhoneCurrent: "Сейчас: {0}",
+      platformPhoneNew: "Новый номер",
+      platformPhoneSend: "Получить код",
+      platformPhoneConfirm: "Сменить номер",
+      platformPhoneOther: "Другой номер",
+      platformPhoneInvalid: "Введите номер телефона, например +7 999 000-00-01.",
+      platformPhoneSame: "Это ваш нынешний номер.",
+      platformPhoneTaken:
+        "Этот номер уже привязан к другому аккаунту. Если это ваш номер, напишите в поддержку.",
+      platformPhoneTooOften: "Номер можно менять раз в сутки. Снова — примерно через {0} ч.",
       platformCodeTitle: "Вход по коду",
       platformCodeSentToSms: "Отправили код в SMS на {0}.",
       platformCodeSentToEmail: "Отправили код письмом на {0}.",
@@ -129,6 +145,9 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
     },
     en: {
       usernameOrEmail: "Phone or email",
+      loginTimeout: "This sign-in page was open too long. Please enter your details again.",
+      expiredCodeMessage: "This sign-in page has expired. Please sign in again.",
+      expiredActionMessage: "This page has expired. Please continue signing in.",
       platformCodeLoginDo: "Sign in with a code",
       platformCodeLoginTargetRequired: "Enter a phone number or email to sign in with a code.",
       platformLoginContinue: "Continue",
@@ -139,6 +158,17 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
       platformLoginPhoneCall: "Call to {0}",
       platformLoginNoMethods: "Sign in with Yandex ID or Gosuslugi, as you did before.",
       platformLoginMethodUnavailable: "This sign-in method is not available. Choose another one.",
+      platformPhoneTitle: "Change phone number",
+      platformPhoneCurrent: "Now: {0}",
+      platformPhoneNew: "New number",
+      platformPhoneSend: "Get a code",
+      platformPhoneConfirm: "Change number",
+      platformPhoneOther: "Another number",
+      platformPhoneInvalid: "Enter a phone number, for example +7 999 000-00-01.",
+      platformPhoneSame: "This is your current number.",
+      platformPhoneTaken:
+        "This number belongs to another account. If it is yours, contact support.",
+      platformPhoneTooOften: "The number can be changed once a day. Try again in about {0} h.",
       platformCodeTitle: "Sign in with a code",
       platformCodeSentToSms: "We sent a code by SMS to {0}.",
       platformCodeSentToEmail: "We sent a code by email to {0}.",

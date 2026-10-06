@@ -1,6 +1,6 @@
 import { getKcClsx } from "keycloakify/login/lib/kcClsx";
 import type { PageProps } from "keycloakify/login/pages/PageProps";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../KcContext";
 import { useCountdown } from "../lib/use-countdown";
@@ -11,11 +11,16 @@ import { useSubmitting } from "../lib/use-submitting";
  * форма уходит сама), «Отправить код ещё раз» — когда истечёт пауза (её же проверяет сервер), назад к паролю.
  * На телефон код сначала приходит звонком (последние 4 цифры номера): тогда «Позвонить ещё раз» и «Прислать SMS».
  * Ошибки (неверный код, блокировка, код истёк, рано) — сообщением Keycloak в каркасе.
+ * Тот же экран — у смены номера (UpdatePhone): свой заголовок, кнопка и ссылка внизу.
  */
 export default function CodeLogin(
-  props: PageProps<Extract<KcContext, { pageId: "platform-code-login.ftl" }>, I18n>,
+  props: PageProps<Extract<KcContext, { pageId: "platform-code-login.ftl" }>, I18n> & {
+    title?: ReactNode;
+    submitLabel?: string;
+    footer?: ReactNode;
+  },
 ) {
-  const { kcContext, i18n, doUseDefaultCss, Template, classes } = props;
+  const { kcContext, i18n, doUseDefaultCss, Template, classes, title, submitLabel, footer } = props;
   const { kcClsx } = getKcClsx({ doUseDefaultCss, classes });
   const {
     url,
@@ -51,7 +56,7 @@ export default function CodeLogin(
       i18n={i18n}
       doUseDefaultCss={doUseDefaultCss}
       classes={classes}
-      headerNode={msg("platformCodeTitle")}
+      headerNode={title ?? msg("platformCodeTitle")}
     >
       <p id="platform-code-target" className="mb-4 text-sm text-muted-foreground">
         {msg(
@@ -130,7 +135,7 @@ export default function CodeLogin(
             disabled={submitting || code.length < length}
             className={kcClsx("kcButtonClass", "kcButtonPrimaryClass")}
           >
-            {msgStr("doLogIn")}
+            {submitLabel ?? msgStr("doLogIn")}
           </button>
         </div>
       </form>
@@ -168,15 +173,17 @@ export default function CodeLogin(
           {msg("platformCodeResendIn", String(resendIn))}
         </p>
       )}
-      <p className="mt-4 text-center text-sm">
-        <a
-          id="platform-code-back"
-          href={url.loginRestartFlowUrl}
-          className="underline underline-offset-4 hover:text-muted-foreground"
-        >
-          {msg("platformCodeBackToPassword")}
-        </a>
-      </p>
+      {footer ?? (
+        <p className="mt-4 text-center text-sm">
+          <a
+            id="platform-code-back"
+            href={url.loginRestartFlowUrl}
+            className="underline underline-offset-4 hover:text-muted-foreground"
+          >
+            {msg("platformCodeBackToPassword")}
+          </a>
+        </p>
+      )}
     </Template>
   );
 }

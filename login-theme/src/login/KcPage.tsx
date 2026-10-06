@@ -11,6 +11,7 @@ const UserProfileFormFields = lazy(() => import("keycloakify/login/UserProfileFo
 const CodeLogin = lazy(() => import("./pages/CodeLogin"));
 const Login = lazy(() => import("./pages/Login"));
 const LoginResetPassword = lazy(() => import("./pages/LoginResetPassword"));
+const UpdatePhone = lazy(() => import("./pages/UpdatePhone"));
 
 /** Страница по pageId Keycloak: свои — свёрстаны в pages/, остальные — стандартные Keycloakify в нашем каркасе. */
 export default function KcPage({ kcContext }: { kcContext: KcContext }) {
@@ -43,6 +44,16 @@ export default function KcPage({ kcContext }: { kcContext: KcContext }) {
           case "platform-code-login.ftl":
             return (
               <CodeLogin
+                kcContext={kcContext}
+                i18n={i18n}
+                classes={pageClasses}
+                Template={Template}
+                doUseDefaultCss={false}
+              />
+            );
+          case "platform-update-phone.ftl":
+            return (
+              <UpdatePhone
                 kcContext={kcContext}
                 i18n={i18n}
                 classes={pageClasses}

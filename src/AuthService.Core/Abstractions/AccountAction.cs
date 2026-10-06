@@ -21,6 +21,9 @@ public enum AccountAction
     /// <summary>Создать коды восстановления (на случай, если приложения-аутентификатора нет под рукой); старые — недействительны.</summary>
     ConfigureRecoveryCodes,
 
+    /// <summary>Сменить номер телефона: новый подтверждается кодом (звонок, затем SMS), не чаще раза в сутки.</summary>
+    UpdatePhone,
+
     /// <summary>Удалить свои учётные данные (приложение, ключ доступа, коды) — после подтверждения на странице сервера входа.</summary>
     DeleteCredential,
 }
@@ -35,6 +38,7 @@ public static class AccountActions
     {
         ["update-password"] = AccountAction.UpdatePassword,
         ["update-email"] = AccountAction.UpdateEmail,
+        ["update-phone"] = AccountAction.UpdatePhone,
         ["configure-totp"] = AccountAction.ConfigureTotp,
         ["register-passkey"] = AccountAction.RegisterPasskey,
         ["configure-recovery-codes"] = AccountAction.ConfigureRecoveryCodes,

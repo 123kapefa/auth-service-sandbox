@@ -51,6 +51,6 @@ public sealed class LoginHandler(IIdentityProvider identityProvider, ReturnUrlVa
 
         return new LoginStart(
             request.Value.Url,
-            new LoginState(request.Value.State, request.Value.CodeVerifier, returnUrls.Resolve(returnTo)));
+            new LoginState(request.Value.State, request.Value.CodeVerifier, returnUrls.Resolve(returnTo), accountAction is null ? null : action));
     }
 }
