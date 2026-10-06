@@ -255,19 +255,28 @@ public sealed class LoginFlowTests : IClassFixture<AuthServiceWebFactory>
 
         HttpResponseMessage response = await Callback(browser, loginCookie, "code=c&state=forged");
 
-        await AssertErrorAsync(response, HttpStatusCode.BadRequest, "auth.login.state_mismatch");
+        AssertLostLoginRestarts(response);
         Assert.Empty(_keycloak.Exchanges);
         Assert.DoesNotContain(SetCookies(response), cookie => cookie.Name == AuthCookies.ACCESS_TOKEN);
     }
 
     [Fact]
-    public async Task Callback_WithoutStartedLogin_Rejected()
+    public async Task Callback_WithoutStartedLogin_GoesHome_WithoutTokens()
     {
         using HttpClient browser = _factory.CreateBrowserClient();
 
         HttpResponseMessage response = await browser.GetAsync(new Uri("/auth/callback?code=c&state=s", UriKind.Relative));
 
-        await AssertErrorAsync(response, HttpStatusCode.BadRequest, "auth.login.state_missing");
+        AssertLostLoginRestarts(response);
+        Assert.Empty(_keycloak.Exchanges);
+    }
+
+    // Вход, который сервис не узнал: не JSON с ошибкой, а страница по умолчанию — без токенов, код не обменян.
+    private static void AssertLostLoginRestarts(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/account/", response.Headers.Location?.OriginalString);
+        Assert.DoesNotContain(SetCookies(response), cookie => cookie.Name == AuthCookies.ACCESS_TOKEN);
     }
 
     [Fact]

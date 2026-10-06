@@ -1,5 +1,6 @@
 using AuthService.Contracts.Auth;
 using AuthService.Core.Features.Auth.Cookies;
+using AuthService.Core.Features.Auth.ReturnUrls;
 using AuthService.Core.Features.Phone;
 using AuthService.Core.Features.Security;
 using CSharpFunctionalExtensions;
@@ -18,6 +19,9 @@ namespace AuthService.Core.Features.Auth.UseCases.Callback;
 /// kc_action_status — итог действия с учётной записью (смена пароля, почты): уходит в return_to как action_status.
 /// Браузер, с которого вошли, записывается к сессии — для раздела «Устройства» кабинета. Вернулись после смены номера —
 /// запись в журнал.
+/// Вход, который сервис не узнал (метка входа истекла через 10 минут, вход начат во второй вкладке, открыта старая
+/// страница Keycloak), — не ошибка для человека: Keycloak его уже впустил, поэтому браузер уходит на страницу по
+/// умолчанию, а оттуда без сессии — на вход, который Keycloak пропустит без ввода.
 /// </summary>
 public sealed class CallbackEndpoint : IEndpoint
 {
@@ -37,6 +41,7 @@ public sealed class CallbackEndpoint : IEndpoint
         [FromServices] AuthCookieWriter cookies,
         [FromServices] LoginDeviceRecorder devices,
         [FromServices] PhoneChangeRecorder phoneChanges,
+        [FromServices] ReturnUrlValidator returnUrls,
         CancellationToken cancellationToken)
     {
         LoginState? saved = loginState.Take(httpContext.Request, httpContext.Response);
@@ -47,6 +52,11 @@ public sealed class CallbackEndpoint : IEndpoint
             actionStatus,
             CallbackUrl.For(httpContext.Request),
             cancellationToken);
+        if (completed.IsFailure && AuthErrors.IsLostLogin(completed.Error))
+        {
+            return Results.Redirect(returnUrls.Resolve(null));
+        }
+
         if (completed.IsFailure)
         {
             return new EndpointResult<LoginCompleted>(completed);
