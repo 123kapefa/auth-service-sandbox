@@ -42,7 +42,7 @@ export const classes = {
   kcFormOptionsWrapperClass: "flex w-full items-center justify-between gap-2 text-sm",
   // Стоит рядом с kcFormGroupClass (ссылки и кнопки формы) — сетка, не строка: иначе кнопка сжимается.
   kcFormSettingClass: "gap-3 text-sm",
-  kcCheckboxInputClass: "mr-2",
+  kcCheckboxInputClass: "mr-3",
   kcFormButtonsClass: "grid gap-2",
   kcFormButtonsWrapperClass: "grid gap-2",
   kcButtonClass: button,

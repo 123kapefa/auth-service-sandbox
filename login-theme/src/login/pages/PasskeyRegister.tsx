@@ -141,7 +141,7 @@ export default function PasskeyRegister(props: Props) {
                 name="logout-sessions"
                 value="on"
                 type="checkbox"
-                className={`${kcClsx("kcCheckboxInputClass")} accent-primary`}
+                className={kcClsx("kcCheckboxInputClass")}
               />
               {msg("logoutOtherSessions")}
             </label>
