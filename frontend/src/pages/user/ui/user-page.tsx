@@ -7,17 +7,19 @@ import { RestrictionControl } from "@/features/user-restriction";
 import { getErrorMessage } from "@/shared/api";
 import { formatDateTime } from "@/shared/lib/format";
 import { Badge, Card, CardTitle, ErrorState, Loading } from "@/shared/ui";
+import { SignInMethodsSection } from "./sign-in-methods-section";
 import { AppAccessSection, AppRolesSection, SessionsSection } from "./user-sections";
 
 /**
  * Карточка пользователя для админа проекта (и менеджера — только покупатели). Блоки — по правам вызвавшего:
  * блокировка и доступ — users.block, роли — users.roles.manage в приложении, «выйти везде» — users.sessions.manage,
- * пароль и 2FA — users.credentials.manage.
+ * пароль и 2FA, «вернуть способы входа по умолчанию» — users.credentials.manage.
  */
 export function UserPage() {
   const { userId = "" } = useParams();
   const { data: session } = useSuspenseQuery(adminSessionQueries.me());
   const query = useQuery(userQueries.detail(userId));
+  const methods = useQuery(userQueries.signInMethods(userId));
   const can = new Set(session.permissions);
   const roleApps = session.apps.filter((app) =>
     app.permissions.includes(Permissions.usersRolesManage),
@@ -100,17 +102,29 @@ export function UserPage() {
           </div>
         )}
       </Card>
+      <SignInMethodsSection
+        userId={user.id}
+        canReset={can.has(Permissions.usersCredentialsManage)}
+        self={user.id === session.id}
+      />
+      {can.has(Permissions.usersCredentialsManage) && (
+        <Card>
+          <CardTitle>Пароль и 2FA</CardTitle>
+          <CredentialsActions
+            user={user}
+            passwordDisabled={
+              methods.data?.methods.some(
+                (item) => item.method === "password" && item.available && !item.enabled,
+              ) ?? false
+            }
+          />
+        </Card>
+      )}
       {roleApps.map((app) => (
         <AppRolesSection key={app.clientId} app={app} userId={user.id} />
       ))}
       <AppAccessSection userId={user.id} canChange={can.has(Permissions.usersBlock)} />
       <SessionsSection userId={user.id} canLogout={can.has(Permissions.usersSessionsManage)} />
-      {can.has(Permissions.usersCredentialsManage) && (
-        <Card>
-          <CardTitle>Пароль и 2FA</CardTitle>
-          <CredentialsActions user={user} />
-        </Card>
-      )}
     </div>
   );
 }

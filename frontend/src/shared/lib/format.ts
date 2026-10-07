@@ -37,3 +37,15 @@ export function formatPhone(value: string): string {
   const match = /^\+?7(\d{3})(\d{3})(\d{2})(\d{2})$/.exec(value);
   return match ? `+7 ${match[1]} ${match[2]}-${match[3]}-${match[4]}` : value;
 }
+
+const rubles = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 });
+
+/** Копейки — в рубли без копеек: 103000 → «1 030 ₽». */
+export function formatRubles(kopecks: number): string {
+  return `${rubles.format(Math.round(kopecks / 100))} ₽`;
+}
+
+/** Число с разрядами: 1284 → «1 284». */
+export function formatCount(value: number): string {
+  return rubles.format(value);
+}

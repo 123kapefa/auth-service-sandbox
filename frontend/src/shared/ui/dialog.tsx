@@ -6,6 +6,8 @@ interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
+  /** Надпись над заголовком моноширинным капсом: из какого раздела окно («Способы входа в проекте»). */
+  eyebrow?: string;
   description?: string;
   children: ReactNode;
   /** false — не закрывается кликом по фону и Esc: только своими кнопками (например, окно с одноразовым секретом). */
@@ -17,6 +19,7 @@ export function Dialog({
   open,
   onOpenChange,
   title,
+  eyebrow,
   description,
   children,
   dismissible = true,
@@ -36,6 +39,11 @@ export function Dialog({
           onEscapeKeyDown={keepOpen}
           className="fixed top-1/2 left-1/2 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 border-2 border-primary bg-background p-6 text-foreground shadow-hard-lg"
         >
+          {eyebrow && (
+            <p className="mb-1 font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase">
+              {eyebrow}
+            </p>
+          )}
           <DialogPrimitive.Title className="mb-1 text-lg font-bold">{title}</DialogPrimitive.Title>
           {description ? (
             <DialogPrimitive.Description className="mb-4 text-sm text-muted-foreground">

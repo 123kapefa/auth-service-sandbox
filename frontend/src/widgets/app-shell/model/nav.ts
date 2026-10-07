@@ -29,6 +29,10 @@ export function navItems(access: AdminAccess): NavItem[] {
     items.push({ to: "/branding", label: "Оформление" });
   }
 
+  if (access.projectSignIn) {
+    items.push({ to: "/sign-in", label: "Вход и коды" });
+  }
+
   // Приложение — в меню, если в его разделе есть хоть одна вкладка (выдача ролей, роли и права, журнал).
   for (const app of access.apps) {
     if (appTabs(app).length > 0) {

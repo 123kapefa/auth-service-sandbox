@@ -76,10 +76,12 @@
 /* Жёсткая тень со сдвигом: основная кнопка, поле в фокусе, активный пункт меню. */
 /*
  * Галочка — как переключатель в наборе компонентов (Kit): квадрат с рамкой primary, включённая — залита primary,
- * отметка цветом фона. Как на страницах входа (login-theme/src/login/styles.css).
+ * отметка цветом фона. Как на страницах входа (login-theme/src/login/styles.css). Выбор одного из (radio) — такой же
+ * квадрат: так на макетах этапа 10 (окно «Выключить вход по телефону?»).
  */
 @layer base {
-  input[type="checkbox"] {
+  input[type="checkbox"],
+  input[type="radio"] {
     appearance: none;
     flex: none;
     display: inline-grid;
@@ -92,7 +94,8 @@
     background: var(--color-background);
     cursor: pointer;
   }
-  input[type="checkbox"]::before {
+  input[type="checkbox"]::before,
+  input[type="radio"]::before {
     content: "";
     width: 10px;
     height: 10px;
@@ -100,17 +103,21 @@
     clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
     transform: scale(0);
   }
-  input[type="checkbox"]:checked {
+  input[type="checkbox"]:checked,
+  input[type="radio"]:checked {
     background: var(--color-primary);
   }
-  input[type="checkbox"]:checked::before {
+  input[type="checkbox"]:checked::before,
+  input[type="radio"]:checked::before {
     transform: scale(1);
   }
-  input[type="checkbox"]:focus-visible {
+  input[type="checkbox"]:focus-visible,
+  input[type="radio"]:focus-visible {
     outline: 2px solid var(--color-ring);
     outline-offset: 2px;
   }
-  input[type="checkbox"]:disabled {
+  input[type="checkbox"]:disabled,
+  input[type="radio"]:disabled {
     cursor: default;
     opacity: 0.5;
   }
