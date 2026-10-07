@@ -471,13 +471,35 @@ describe("предложение ключа доступа", () => {
     expect(screen.getByRole("button", { name: "Не сейчас" })).toHaveAttribute("name", "skip");
   });
 
-  it("регистрация ключа из кабинета — стандартная страница, без «Не сейчас»", async () => {
+  it("из кабинета: «Ключ доступа», «Добавить ключ доступа» и «Отмена», без «Не сейчас»", async () => {
     render(
-      <KcPage kcContext={getKcContextMock({ pageId: "webauthn-register.ftl", overrides: {} })} />,
+      <KcPage
+        kcContext={getKcContextMock({
+          pageId: "webauthn-register.ftl",
+          overrides: { isAppInitiatedAction: true },
+        })}
+      />,
     );
 
-    await waitFor(() => expect(document.getElementById("register")).toBeInTheDocument());
-    expect(screen.queryByText("Входите без кода")).not.toBeInTheDocument();
+    expect(await screen.findByText(/без пароля и кода/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Добавить ключ доступа" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Отмена" })).toHaveAttribute("name", "cancel-aia");
     expect(screen.queryByRole("button", { name: "Не сейчас" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Спросим снова/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Выполнить выход/)).not.toBeInTheDocument();
+  });
+
+  it("ошибка ключа при входе — стандартная страница", async () => {
+    render(
+      <KcPage
+        kcContext={getKcContextMock({
+          pageId: "webauthn-error.ftl",
+          overrides: { isAppInitiatedAction: false },
+        })}
+      />,
+    );
+
+    await waitFor(() => expect(document.getElementById("kc-try-again")).toBeInTheDocument());
+    expect(screen.queryByText(/Не получилось добавить ключ/)).not.toBeInTheDocument();
   });
 });

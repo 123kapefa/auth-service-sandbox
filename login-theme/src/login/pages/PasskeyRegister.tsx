@@ -13,18 +13,23 @@ type Props = PageProps<
 type RegisterModule = { registerByWebAuthn: (input: Record<string, unknown>) => Promise<void> };
 
 /**
- * «Входите без кода» (плагин code-login, действие platform-passkey-offer, 10.6): после входа по коду — завести ключ
- * доступа. Это страницы регистрации ключа Keycloak (webauthn-register / webauthn-error) с атрибутом
- * platformPasskeyOffer: «Добавить ключ доступа» сразу открывает окно браузера, «Не сейчас» — дальше без ключа
- * (сервер запомнит и 30 дней не спросит). Не получилось — «Попробовать ещё раз» или «Не сейчас».
+ * Добавление ключа доступа — страницы регистрации ключа Keycloak (webauthn-register / webauthn-error).
+ * «Добавить ключ доступа» сразу открывает окно браузера (Face ID, отпечаток, PIN); не получилось — «Попробовать ещё раз».
+ * Два случая:
+ * <ul>
+ *   <li>«Входите без кода» (атрибут platformPasskeyOffer, действие platform-passkey-offer, 10.6) — после входа по
+ *       коду; «Не сейчас» — дальше без ключа (сервер запомнит и 30 дней не спросит);</li>
+ *   <li>из кабинета (kc_action=webauthn-register-passwordless) — «Отмена» возвращает в кабинет.</li>
+ * </ul>
  */
-export default function PasskeyOffer(props: Props) {
+export default function PasskeyRegister(props: Props) {
   const { kcContext, i18n, doUseDefaultCss, Template, classes } = props;
   const { kcClsx } = getKcClsx({ doUseDefaultCss, classes });
   const { url } = kcContext;
   const { msg, msgStr } = i18n;
   const { submitting, markSubmitting, setSubmitting } = useSubmitting();
   const failed = kcContext.pageId === "webauthn-error.ftl";
+  const offer = kcContext.platformPasskeyOffer === "true";
   const register = useRef<Promise<RegisterModule> | null>(null);
 
   // Скрипт Keycloak грузим заранее: окно ключа браузер откроет только сразу после нажатия.
@@ -85,16 +90,16 @@ export default function PasskeyOffer(props: Props) {
           >
             ID
           </span>
-          {msg("platformPasskeyOfferTitle")}
+          {msg(offer ? "platformPasskeyOfferTitle" : "platformPasskeyAddTitle")}
         </span>
       }
     >
       <p id="platform-passkey-offer-text" className="mb-4 text-sm">
-        {msg("platformPasskeyOfferText")}
+        {msg(offer ? "platformPasskeyOfferText" : "platformPasskeyAddText")}
       </p>
       {failed && (
         <p id="input-error" role="alert" className={`mb-4 ${kcClsx("kcInputErrorMessageClass")}`}>
-          {msg("platformPasskeyOfferFailed")}
+          {msg(offer ? "platformPasskeyOfferFailed" : "platformPasskeyAddFailed")}
         </p>
       )}
       {failed ? (
@@ -138,21 +143,25 @@ export default function PasskeyOffer(props: Props) {
           </button>
         </form>
       )}
-      <form action={url.loginAction} method="post" className="mt-2" onSubmit={markSubmitting}>
-        <button
-          id="platform-passkey-skip"
-          name="skip"
-          value="true"
-          type="submit"
-          disabled={submitting}
-          className={kcClsx("kcButtonClass", "kcButtonSecondaryClass", "kcButtonBlockClass")}
-        >
-          {msgStr("platformPasskeyOfferSkip")}
-        </button>
-      </form>
-      <p className="mt-4 text-center text-sm text-muted-foreground">
-        {msg("platformPasskeyOfferLater")}
-      </p>
+      {(offer || kcContext.isAppInitiatedAction) && (
+        <form action={url.loginAction} method="post" className="mt-2" onSubmit={markSubmitting}>
+          <button
+            id="platform-passkey-skip"
+            name={offer ? "skip" : "cancel-aia"}
+            value="true"
+            type="submit"
+            disabled={submitting}
+            className={kcClsx("kcButtonClass", "kcButtonSecondaryClass", "kcButtonBlockClass")}
+          >
+            {offer ? msgStr("platformPasskeyOfferSkip") : msgStr("doCancel")}
+          </button>
+        </form>
+      )}
+      {offer && (
+        <p className="mt-4 text-center text-sm text-muted-foreground">
+          {msg("platformPasskeyOfferLater")}
+        </p>
+      )}
     </Template>
   );
 }

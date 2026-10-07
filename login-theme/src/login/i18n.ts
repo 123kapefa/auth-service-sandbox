@@ -44,6 +44,10 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
       platformPasskeyOfferFailed:
         "Не получилось добавить ключ. Попробуйте ещё раз или пропустите — войдёте по коду, как сегодня.",
       platformPasskeyLabel: "Ключ доступа",
+      platformPasskeyAddTitle: "Ключ доступа",
+      platformPasskeyAddText:
+        "Входите по Face ID, отпечатку или PIN этого устройства — без пароля и кода. Ключ хранится на устройстве, и его нельзя украсть вместе с номером.",
+      platformPasskeyAddFailed: "Не получилось добавить ключ. Попробуйте ещё раз.",
       platformCodeTitle: "Вход по коду",
       platformCodeSentToSms: "Отправили код в SMS на {0}.",
       platformCodeSentToEmail: "Отправили код письмом на {0}.",
@@ -190,6 +194,10 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
       platformPasskeyOfferFailed:
         "Couldn't add the passkey. Try again or skip and sign in with a code, as today.",
       platformPasskeyLabel: "Passkey",
+      platformPasskeyAddTitle: "Passkey",
+      platformPasskeyAddText:
+        "Sign in with Face ID, a fingerprint or this device's PIN, without a password or code. The passkey stays on your device and can't be stolen along with your number.",
+      platformPasskeyAddFailed: "Couldn't add the passkey. Please try again.",
       platformCodeTitle: "Sign in with a code",
       platformCodeSentToSms: "We sent a code by SMS to {0}.",
       platformCodeSentToEmail: "We sent a code by email to {0}.",

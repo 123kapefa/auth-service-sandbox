@@ -11,7 +11,7 @@ const UserProfileFormFields = lazy(() => import("keycloakify/login/UserProfileFo
 const CodeLogin = lazy(() => import("./pages/CodeLogin"));
 const Login = lazy(() => import("./pages/Login"));
 const LoginResetPassword = lazy(() => import("./pages/LoginResetPassword"));
-const PasskeyOffer = lazy(() => import("./pages/PasskeyOffer"));
+const PasskeyRegister = lazy(() => import("./pages/PasskeyRegister"));
 const UpdatePhone = lazy(() => import("./pages/UpdatePhone"));
 
 /** Страница по pageId Keycloak: свои — свёрстаны в pages/, остальные — стандартные Keycloakify в нашем каркасе. */
@@ -64,9 +64,14 @@ export default function KcPage({ kcContext }: { kcContext: KcContext }) {
             );
           case "webauthn-register.ftl":
           case "webauthn-error.ftl":
-            if (kcContext.platformPasskeyOffer === "true") {
+            // Ошибка ключа при входе (не добавление) — стандартная страница.
+            if (
+              kcContext.pageId === "webauthn-register.ftl" ||
+              kcContext.platformPasskeyOffer === "true" ||
+              kcContext.isAppInitiatedAction
+            ) {
               return (
-                <PasskeyOffer
+                <PasskeyRegister
                   kcContext={kcContext}
                   i18n={i18n}
                   classes={pageClasses}

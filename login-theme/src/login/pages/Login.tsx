@@ -137,7 +137,13 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
     </div>
   );
   const changeLoginForm = loginDisplay !== undefined && (
-    <form id="platform-login-change-form" action={url.loginAction} method="post" noValidate hidden />
+    <form
+      id="platform-login-change-form"
+      action={url.loginAction}
+      method="post"
+      noValidate
+      hidden
+    />
   );
 
   const codeButtons = (primary: boolean) =>
