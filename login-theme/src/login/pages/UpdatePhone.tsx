@@ -11,8 +11,9 @@ import CodeLogin from "./CodeLogin";
 type Props = PageProps<Extract<KcContext, { pageId: "platform-update-phone.ftl" }>, I18n>;
 
 /**
- * Смена номера (плагин code-login, действие platform-update-phone): новый номер → код на него (тот же экран, что у
- * входа по коду: звонок, затем SMS) → номер изменён. «Отмена» — назад в кабинет без изменений. Оформление — 10.8.
+ * Смена номера (плагин code-login, действие platform-update-phone), экран 13 этапа 10: новый номер → код на него (тот же
+ * экран, что у входа по коду: звонок, затем SMS; «Изменить» у номера — другой номер) → номер изменён. «Отмена» — назад
+ * в кабинет без изменений.
  */
 export default function UpdatePhone(props: Props) {
   const { kcContext, i18n } = props;
@@ -28,18 +29,8 @@ export default function UpdatePhone(props: Props) {
         >)}
         title={msg("platformPhoneTitle")}
         submitLabel={msgStr("platformPhoneConfirm")}
-        footer={
-          <form action={url.loginAction} method="post" className="mt-4 text-center text-sm">
-            <button
-              id="platform-phone-change"
-              name="changePhone"
-              type="submit"
-              className="underline underline-offset-4 hover:text-muted-foreground"
-            >
-              {msgStr("platformPhoneOther")}
-            </button>
-          </form>
-        }
+        changeName="changePhone"
+        footer={<CancelLink action={url.loginAction} label={msgStr("doCancel")} />}
       />
     );
   }
@@ -63,13 +54,17 @@ function PhoneStep(props: Props) {
       doUseDefaultCss={doUseDefaultCss}
       classes={classes}
       displayMessage={false}
-      headerNode={msg("platformPhoneTitle")}
+      headerNode={msg("platformPhoneNewTitle")}
     >
-      {phoneCurrent && (
-        <p id="platform-phone-current" className="mb-4 text-sm text-muted-foreground">
-          {msg("platformPhoneCurrent", phoneCurrent)}
-        </p>
-      )}
+      <p id="platform-phone-current" className="mb-4 text-sm leading-relaxed">
+        {phoneCurrent && (
+          <>
+            {msgStr("platformPhoneCurrentLabel")}{" "}
+            <span className="font-mono">{formatLogin(phoneCurrent)}</span>.{" "}
+          </>
+        )}
+        {msg("platformPhoneWhy")}
+      </p>
       <form
         id="platform-phone-form"
         className={kcClsx("kcFormClass")}
@@ -81,7 +76,7 @@ function PhoneStep(props: Props) {
         {!blocked && (
           <div className={kcClsx("kcFormGroupClass")}>
             <label htmlFor="phone" className={kcClsx("kcLabelClass")}>
-              {msg("platformPhoneNew")}
+              {msg("platformPhoneNewLabel")}
             </label>
             <input
               id="phone"
@@ -118,18 +113,31 @@ function PhoneStep(props: Props) {
               {msgStr("platformPhoneSend")}
             </button>
           )}
-          <button
-            id="platform-phone-cancel"
-            name="cancel-aia"
-            value="true"
-            type="submit"
-            formNoValidate
-            className={kcClsx("kcButtonClass", "kcButtonSecondaryClass")}
-          >
-            {msgStr("doCancel")}
-          </button>
         </div>
       </form>
+      {!blocked && (
+        <p className="mt-4 text-[13px] leading-relaxed text-muted-foreground">
+          {msg("platformPhoneNotice")}
+        </p>
+      )}
+      <CancelLink action={url.loginAction} label={msgStr("doCancel")} />
     </Template>
+  );
+}
+
+/** «Отмена» ссылкой внизу: назад в кабинет без изменений (cancel-aia — отмена действия Keycloak). */
+function CancelLink({ action, label }: { action: string; label: string }) {
+  return (
+    <form action={action} method="post" noValidate className="mt-3 text-center text-sm">
+      <button
+        id="platform-phone-cancel"
+        name="cancel-aia"
+        value="true"
+        type="submit"
+        className="underline underline-offset-4 hover:text-muted-foreground"
+      >
+        {label}
+      </button>
+    </form>
   );
 }

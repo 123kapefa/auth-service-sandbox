@@ -25,6 +25,8 @@ interface CaptchaVerifier {
      * плагина) — в бою её нет.
      */
     String STUB_TOKEN = "sandbox-captcha-ok";
+    /** Ключ сайта у заглушки: тема показывает галочку «Я не робот» стенда, которая ставит STUB_TOKEN. */
+    String STUB_SITE_KEY = "sandbox-stub";
     CaptchaVerifier STUB = (session, token, ip) -> STUB_TOKEN.equals(token);
 
     /** Яндекс SmartCaptcha: POST /validate с серверным ключом, токеном и IP человека. */

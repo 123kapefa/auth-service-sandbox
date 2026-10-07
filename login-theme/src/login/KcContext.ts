@@ -23,9 +23,11 @@ type CodeScreen = {
   codeResendAfter: string;
   /** Сколько цифр в коде (политика плагина). */
   codeLength: string;
-  /** "true" — следующий код уйдёт только с капчей (поле smart-token в форме). Экран капчи — 10.8. */
+  /** "true" — следующий код уйдёт только с капчей (поле smart-token в форме). */
   captchaRequired?: string;
-  /** Ключ клиента Яндекс SmartCaptcha (нет — капча не настроена). */
+  /** "true" — код не ушёл без капчи: экран «Проверка» (капча и та же отправка ещё раз). */
+  captchaStep?: string;
+  /** Ключ клиента Яндекс SmartCaptcha (нет — капча не настроена; sandbox-stub — галочка заглушки стенда). */
   captchaSiteKey?: string;
 };
 
@@ -51,6 +53,8 @@ export type KcContextExtensionPerPage = {
     loginPhoneHint?: string;
     /** Единственный способ — открыть сам (passkey). */
     loginAutoStart?: string;
+    /** Чем входят в проекте (10.7): «phone,email», «phone» или «email» — подпись поля логина. */
+    loginKinds?: string;
   };
   "platform-code-login.ftl": CodeScreen;
   /** Регистрация ключа доступа; platformPasskeyOffer "true" — это предложение после входа по коду (10.6). */

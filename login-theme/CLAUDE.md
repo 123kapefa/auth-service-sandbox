@@ -8,7 +8,8 @@
 ## Как устроено
 
 ```
-src/main.tsx           — точка входа: в Keycloak — window.kcContext, в npm run dev — макет (?page=login.ftl)
+src/main.tsx           — точка входа: в Keycloak — window.kcContext, в npm run dev — макет (?page=login.ftl,
+                         &overrides={JSON} — поля поверх макета, например {"captchaStep":"true"})
 src/kc.gen.tsx         — создаёт Keycloakify при сборке (не править)
 src/login/KcContext.ts — свои страницы плагина и их атрибуты (platform-code-login.ftl: codeChannel, codeTarget…)
 src/login/KcPage.tsx   — страница по pageId: свои — pages/, остальные — стандартные Keycloakify в нашем каркасе
@@ -16,9 +17,12 @@ src/login/Template.tsx — каркас: логотип и название, к�
 src/login/branding.ts  — оформление проекта (плагин platform-branding): логотип, цвет, тема — читается до показа
 src/login/classes.ts   — классы Keycloak → Tailwind (так стандартные страницы выглядят как наши)
 src/login/i18n.ts      — свои тексты и тексты realm для страниц входа (только литералы: читаются при сборке)
-src/login/pages/       — Login (телефон или почта, «Войти по коду», ключ доступа, «Или войдите через»: Госуслуги,
-                         Яндекс ID; при привязке к аккаунту — только пароль), CodeLogin (экран кода), UpdatePhone
-                         (смена номера), PasskeyRegister (добавление ключа доступа: из кабинета и «Входите без кода»)
+src/login/pages/       — Login (шаги: логин → пароль или способы входа; ключ доступа, Госуслуги, Яндекс ID; при
+                         привязке к аккаунту — только пароль), CodeLogin (экран кода: звонок, SMS, письмо, «Проверка» с
+                         капчей), UpdatePhone (смена номера), LoginOtp (код из приложения, 2FA), PasskeyRegister
+                         (добавление ключа доступа: из кабинета и «Входите без кода»); экраны — docs/keycloak/10-login-theme.md
+src/login/components/  — LoginBox (логин в рамке с «Изменить»), Divider («или»), CodeCells (ячейки кода), Captcha
+                         (SmartCaptcha; на стенде, ключ sandbox-stub, — галочка «Я не робот»)
 src/login/lib/phone.ts — «+» перед номером, логин цифрами
 src/email/            — тема писем (FreeMarker, без React): каркас html/template.ftl, сброс пароля, ссылка из админки,
                          подтверждение почты, код входа плагина (platform-login-code.ftl); тексты — messages/*.properties

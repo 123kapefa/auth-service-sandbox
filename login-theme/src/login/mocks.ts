@@ -9,7 +9,7 @@ export const { getKcContextMock } = createGetKcContextMock({
     properties: { ...kcEnvDefaults },
   } satisfies KcContextExtension,
   kcContextExtensionPerPage: {
-    "login.ftl": {},
+    "login.ftl": {} as { loginStep?: "login" | "password" | "methods"; loginKinds?: string },
     "platform-update-phone.ftl": { phoneStep: "phone" as "phone" | "code" },
     "webauthn-register.ftl": {} as { platformPasskeyOffer?: string },
     "webauthn-error.ftl": {} as { platformPasskeyOffer?: string },
@@ -20,6 +20,16 @@ export const { getKcContextMock } = createGetKcContextMock({
       codeTarget: "+7 999 *** ** 01",
       codeResendAfter: "42",
       codeLength: "6",
+    } as {
+      codeChannel: "SMS" | "EMAIL";
+      codeDelivery: "CALL" | "SMS" | "EMAIL";
+      codeSmsAvailable: string;
+      codeTarget: string;
+      codeResendAfter: string;
+      codeLength: string;
+      captchaRequired?: string;
+      captchaStep?: string;
+      captchaSiteKey?: string;
     },
   } satisfies KcContextExtensionPerPage,
   overrides: {

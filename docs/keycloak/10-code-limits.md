@@ -35,12 +35,14 @@
 Экран кода получает `captchaRequired` ("true" — следующий код уйдёт только с капчей) и `captchaSiteKey`. Браузер
 присылает ответ капчи полем `smart-token` вместе с «Отправить код ещё раз» (или «Войти по коду»); плагин проверяет его
 у Яндекс SmartCaptcha (`POST https://smartcaptcha.yandexcloud.net/validate`). Сбой сервиса капчи считается пройденной
-капчей (так советует Яндекс; лимиты при этом действуют). Сам виджет на странице — в 10.8.
+капчей (так советует Яндекс; лимиты при этом действуют). Код не ушёл без капчи — экран получает `captchaStep=true`, и
+тема показывает «Проверку» с виджетом ([10.8](10-login-theme.md#капча), там же — CSP для виджета).
 
 - Бой: `KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_SERVER_KEY` и `…__CAPTCHA_SITE_KEY` (в `deploy/compose.yaml`
   — из `AUTH_SMARTCAPTCHA_SERVER_KEY` и `AUTH_SMARTCAPTCHA_SITE_KEY`). Без ключа капчу пройти нельзя: после порога код
   не уходит, в логе при старте — предупреждение.
-- Стенд: `…__CAPTCHA_STUB=true` — заглушка, проходит токен `sandbox-captcha-ok`.
+- Стенд: `…__CAPTCHA_STUB=true` — заглушка, проходит токен `sandbox-captcha-ok`; ключ сайта — `sandbox-stub`, тема
+  рисует вместо виджета галочку «Я не робот».
 
 ## Оповещения и метрики
 

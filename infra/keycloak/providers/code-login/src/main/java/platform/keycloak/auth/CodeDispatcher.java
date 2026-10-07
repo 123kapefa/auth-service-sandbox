@@ -160,9 +160,10 @@ final class CodeDispatcher {
             ? 0
             : (Duration.between(now, state.resendAllowedAt()).toMillis() + 999) / 1000;
 
-        CodeDelivery delivery = delivery(target, state);
         // Нужна ли капча для следующей отправки: тема заранее показывает её у кнопки «Отправить ещё раз».
         CodeLimits limits = this.limits.apply(realm);
+        // Кода ещё не было (капча до первой отправки) — как он уйдёт: на телефон обычно звонком.
+        CodeDelivery delivery = state.delivery() != null ? state.delivery() : choose(target, limits, false);
         CodeLimitStore limitStore = new CodeLimitStore(session, realm);
         CodeLimits.Usage usage = limitStore.usage(target, ip, limits.range(target),
             LocalDate.ofInstant(now, limits.policy().zone()));

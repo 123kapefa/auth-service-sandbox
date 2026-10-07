@@ -13,6 +13,7 @@ const Login = lazy(() => import("./pages/Login"));
 const LoginResetPassword = lazy(() => import("./pages/LoginResetPassword"));
 const PasskeyRegister = lazy(() => import("./pages/PasskeyRegister"));
 const UpdatePhone = lazy(() => import("./pages/UpdatePhone"));
+const LoginOtp = lazy(() => import("./pages/LoginOtp"));
 
 /** Страница по pageId Keycloak: свои — свёрстаны в pages/, остальные — стандартные Keycloakify в нашем каркасе. */
 export default function KcPage({ kcContext }: { kcContext: KcContext }) {
@@ -25,6 +26,16 @@ export default function KcPage({ kcContext }: { kcContext: KcContext }) {
           case "login.ftl":
             return (
               <Login
+                kcContext={kcContext}
+                i18n={i18n}
+                classes={pageClasses}
+                Template={Template}
+                doUseDefaultCss={false}
+              />
+            );
+          case "login-otp.ftl":
+            return (
+              <LoginOtp
                 kcContext={kcContext}
                 i18n={i18n}
                 classes={pageClasses}
