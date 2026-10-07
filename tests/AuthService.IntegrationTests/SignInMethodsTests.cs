@@ -29,6 +29,7 @@ public sealed class SignInMethodsTests : IClassFixture<AuthServiceWebFactory>
         factory.AuditLog.Reset();
         factory.Notices.Reset();
         factory.Revocations.Reset();
+        factory.SignIn.Reset();
         _keycloak.Add(TestUser.Customer, [], email: "customer@sandbox.test");
         _keycloak.Add(TestUser.AdminInAdminMode, [AuthModes.ADMIN]);
         _keycloak.Add(TestUser.ManagerInManagerMode, [AuthModes.MANAGER]);
@@ -46,6 +47,26 @@ public sealed class SignInMethodsTests : IClassFixture<AuthServiceWebFactory>
             Methods(result));
         Assert.False(result.GetProperty("hasPasskey").GetBoolean());
         Assert.Empty(result.GetProperty("history").EnumerateArray());
+        Assert.Empty(result.GetProperty("projectDisabled").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Get_ProjectDisabled_OffAndEndedTransition_NotCurrentTransition()
+    {
+        Dictionary<string, ProjectSignInMethod> methods = new(FakeProjectSignIn.Default().Methods, StringComparer.Ordinal)
+        {
+            [ProjectSignInRules.PASSWORD] = new(ProjectSignInRules.OFF),
+            [ProjectSignInRules.PHONE] = new(ProjectSignInRules.TRANSITION, new DateOnly(2000, 1, 1)),
+            [ProjectSignInRules.EMAIL] = new(ProjectSignInRules.TRANSITION, new DateOnly(2999, 1, 1)),
+            [ProjectSignInRules.YANDEX] = new(ProjectSignInRules.OFF, Configured: true),
+        };
+        _factory.SignIn.Current = FakeProjectSignIn.Default() with { Methods = methods };
+
+        JsonElement result = await ResultAsync(await GetOwnAsync());
+
+        Assert.Equal(
+            ["phone", "password", "yandex"],
+            result.GetProperty("projectDisabled").EnumerateArray().Select(item => item.GetString()!).ToArray());
     }
 
     [Fact]

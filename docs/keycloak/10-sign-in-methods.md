@@ -1,6 +1,6 @@
 # Этап 10.3. Способы входа: человек выключает ненужные
 
-**Статус:** ✅ готово (API и плагин; экраны — 10.9 и 10.10) · **Задача:** [#131](https://github.com/123kapefa/auth-service-sandbox/issues/131) (этап 10 — [#128](https://github.com/123kapefa/auth-service-sandbox/issues/128))
+**Статус:** ✅ готово (API и плагин; кабинет — [10.9](10-account.md), админка — 10.10) · **Задача:** [#131](https://github.com/123kapefa/auth-service-sandbox/issues/131) (этап 10 — [#128](https://github.com/123kapefa/auth-service-sandbox/issues/128))
 
 Человек сам решает, как в его аккаунт можно войти: пароль, код на телефон и код на почту можно выключить, как у
 Microsoft. Кто перешёл на ключ доступа, выключает и пароль, и код на телефон: утёкший пароль и старый номер телефона
@@ -55,7 +55,8 @@ Microsoft. Кто перешёл на ключ доступа, выключае�
 GET /me/sign-in-methods
 → { methods: [ { method: "password", available, enabled, disableBlocker }, … phone-code, email-code ],
     hasPasskey, hasAuthenticator, hasRecoveryCodes, linkedProviders: ["yandex"],
-    history: [ { at, method, enabled, byAdmin }, … ] }      // до 20, новые сверху
+    history: [ { at, method, enabled, byAdmin }, … ],       // до 20, новые сверху
+    projectDisabled: ["password", "yandex"] }               // выключено в проекте (10.7) — кабинет не показывает
 
 PUT /me/sign-in-methods/{password | phone-code | email-code}
 { "enabled": false, "signOutOtherDevices": true }
@@ -87,7 +88,8 @@ PUT /me/sign-in-methods/{password | phone-code | email-code}
 
 ## Что дальше
 
-- Экраны: кабинет — блок «Способы входа» и окна (10.9), админка — способы входа в карточке пользователя (10.10).
+- Экраны: кабинет — блок «Способы входа» и окна ([10.9](10-account.md)), админка — способы входа в карточке
+  пользователя (10.10).
 - Вход в два шага ([10.4](10-two-step-login.md)): без пароля на втором шаге — только включённые способы.
 - Способы входа проекта (10.7): что выключено в проекте, не включит и человек.
 - Удаление кодов восстановления на странице Keycloak пока не запрещено, даже когда что-то выключено (правило 4

@@ -13,6 +13,7 @@ export const ACCOUNT_BASE = "/account";
 export type AccountAction =
   | "update-password"
   | "update-email"
+  | "update-phone"
   | "configure-totp"
   | "register-passkey"
   | "configure-recovery-codes"

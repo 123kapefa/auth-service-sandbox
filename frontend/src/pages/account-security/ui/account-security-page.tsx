@@ -1,18 +1,28 @@
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { type ReactNode } from "react";
+import { accountProfileQueries } from "@/entities/account-profile";
 import { type AccountCredential, accountSecurityQueries } from "@/entities/account-security";
 import { AccountActionLink, useActionStatus } from "@/features/account-action";
 import { formatDateTime } from "@/shared/lib/format";
 import { Card, CardTitle } from "@/shared/ui";
+import { SignInMethodsCard } from "./sign-in-methods-card";
 
 /**
- * Безопасность: приложение-аутентификатор (2FA), коды восстановления, ключи доступа. Подключить и удалить — на
- * страницах сервера входа: там же он спросит пароль, если вход был давно, и подтверждение удаления.
+ * Безопасность: способы входа (выключить пароль, коды; 10.9), приложение-аутентификатор (2FA), коды восстановления,
+ * ключи доступа. Подключить и удалить — на страницах сервера входа: там же он спросит пароль, если вход был давно, и
+ * подтверждение удаления.
  */
 export function AccountSecurityPage() {
   const queryClient = useQueryClient();
   const { data: security } = useSuspenseQuery(accountSecurityQueries.security());
-  useActionStatus(() => void queryClient.invalidateQueries(accountSecurityQueries.security()));
+  const { data: methods } = useSuspenseQuery(accountSecurityQueries.signInMethods());
+  const { data: profile } = useSuspenseQuery(accountProfileQueries.profile());
+  // Добавили ключ, подключили приложение — меняется и то, что можно выключить.
+  useActionStatus(() => {
+    void queryClient.invalidateQueries(accountSecurityQueries.security());
+    void queryClient.invalidateQueries(accountSecurityQueries.signInMethods());
+  });
+  const passkeysShown = !methods.projectDisabled.includes("passkey");
   const codes = security.recoveryCodes;
   const hasApp = security.authenticators.length > 0;
 
@@ -20,19 +30,7 @@ export function AccountSecurityPage() {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold tracking-tight">Безопасность</h1>
 
-      <Section
-        title="Пароль"
-        hint={
-          security.hasPassword
-            ? "Задан. Новый вводится на странице входа — сервис его не видит."
-            : "Не задан: входите по коду из SMS или письма либо ключом доступа."
-        }
-        action={
-          <AccountActionLink action="update-password">
-            {security.hasPassword ? "Сменить" : "Задать"}
-          </AccountActionLink>
-        }
-      />
+      <SignInMethodsCard methods={methods} security={security} profile={profile} />
 
       <Section
         title="Вход с кодом из приложения (2FA)"
@@ -95,13 +93,15 @@ export function AccountSecurityPage() {
         )}
       </Section>
 
-      <Section
-        title="Ключи доступа"
-        hint="Вход без пароля — отпечатком пальца, лицом или PIN-кодом устройства."
-        action={<AccountActionLink action="register-passkey">Добавить</AccountActionLink>}
-      >
-        <CredentialList items={security.passkeys} fallback="Ключ доступа" empty="Нет ключей" />
-      </Section>
+      {passkeysShown && (
+        <Section
+          title="Ключи доступа"
+          hint="Вход без пароля — отпечатком пальца, лицом или PIN-кодом устройства."
+          action={<AccountActionLink action="register-passkey">Добавить</AccountActionLink>}
+        >
+          <CredentialList items={security.passkeys} fallback="Ключ доступа" empty="Нет ключей" />
+        </Section>
+      )}
     </div>
   );
 }

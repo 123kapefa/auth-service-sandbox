@@ -22,6 +22,7 @@ public sealed record SignInMethodsActor(Guid Id, DateTimeOffset? AuthenticatedAt
 /// </summary>
 public sealed partial class SignInMethodsHandler(
     IIdentityAdmin identityAdmin,
+    IProjectSignIn projectSignIn,
     IAccountNotices notices,
     IAuditLog auditLog,
     AdminAudit audit,
@@ -44,7 +45,10 @@ public sealed partial class SignInMethodsHandler(
             return account.Error;
         }
 
-        return ToResponse(account.Value, await HistoryAsync(userId, cancellationToken));
+        return ToResponse(
+            account.Value,
+            await HistoryAsync(userId, cancellationToken),
+            await ProjectDisabledAsync(cancellationToken));
     }
 
     /// <summary>Выключенный ли способ у пользователя (на самом деле, с учётом правил).</summary>
@@ -264,7 +268,30 @@ public sealed partial class SignInMethodsHandler(
         return new SignInMethodChangeResponse(entry.OccurredAt, method, enabled, entry.ActorId != userId);
     }
 
-    private static SignInMethodsResponse ToResponse(Account account, IReadOnlyList<SignInMethodChangeResponse> history)
+    // Что выключено в проекте — «по возможности»: без плагина способов входа кабинет показывает всё, как до 10.7.
+    private async Task<IReadOnlyList<string>> ProjectDisabledAsync(CancellationToken cancellationToken)
+    {
+        Result<ProjectSignInSettings, Error> settings = await projectSignIn.GetAsync(cancellationToken);
+        if (settings.IsFailure)
+        {
+            LogProjectSignInFailed(logger, settings.Error.GetMessage());
+            return [];
+        }
+
+        DateOnly today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        return
+        [
+            .. ProjectSignInRules.Methods.Where(method =>
+                settings.Value.Methods.TryGetValue(method, out ProjectSignInMethod? state)
+                && (string.Equals(state.Status, ProjectSignInRules.OFF, StringComparison.Ordinal)
+                    || (string.Equals(state.Status, ProjectSignInRules.TRANSITION, StringComparison.Ordinal) && state.Until < today))),
+        ];
+    }
+
+    private static SignInMethodsResponse ToResponse(
+        Account account,
+        IReadOnlyList<SignInMethodChangeResponse> history,
+        IReadOnlyList<string> projectDisabled)
     {
         IReadOnlySet<string> disabled = SignInMethodRules.EffectiveDisabled(account.Facts);
         return new SignInMethodsResponse(
@@ -279,11 +306,15 @@ public sealed partial class SignInMethodsHandler(
             account.Facts.HasAuthenticator,
             account.Facts.HasRecoveryCodes,
             account.LinkedProviders,
-            history);
+            history,
+            projectDisabled);
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Sign-in methods notice {Event} for user {UserId} was not sent: {Error}")]
     private static partial void LogNoticeFailed(ILogger logger, Guid userId, string @event, string error);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Project sign-in methods were not read for the account page: {Error}")]
+    private static partial void LogProjectSignInFailed(ILogger logger, string error);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Other sessions of user {UserId} were not ended after a sign-in method change: {Error}")]
     private static partial void LogSignOutFailed(ILogger logger, Guid userId, string error);

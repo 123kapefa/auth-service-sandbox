@@ -32,6 +32,6 @@ public sealed class GetProfileEndpoint : IEndpoint
         }
 
         Result<IdentityUser, Error> found = await identityAdmin.GetUserAsync(id, cancellationToken);
-        return found.Map(account => new ProfileResponse(account.Id, account.Phone, account.Email, account.EmailVerified, account.CreatedAt));
+        return found.Map(account => new ProfileResponse(account.Id, account.Phone, account.Email, account.EmailVerified, account.CreatedAt, account.PhoneChangedAt));
     }
 }

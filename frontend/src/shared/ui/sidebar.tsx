@@ -1,10 +1,11 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { NavLink } from "react-router";
 import { cn } from "@/shared/lib/cn";
 
 /**
  * Каркас с боковым меню: каркас ровно в экран, прокручивается только содержимое (меню на месте и не тянется за
- * длинной страницей, края не оттягиваются); на узком экране меню — над содержимым, прокручивается вся страница.
+ * длинной страницей, края не оттягиваются); на узком экране — шапка с кнопкой «☰», меню раскрывается над
+ * содержимым, прокручивается вся страница.
  */
 export function SidebarLayout({ sidebar, children }: { sidebar: ReactNode; children: ReactNode }) {
   return (
@@ -32,6 +33,9 @@ export function Sidebar({
   footer: ReactNode;
   children: ReactNode;
 }) {
+  // На узком экране меню свёрнуто под «☰»; выбрали раздел — сворачивается.
+  const [open, setOpen] = useState(false);
+  const folded = open ? "flex" : "hidden md:flex";
   return (
     <aside
       aria-label="Меню"
@@ -51,11 +55,35 @@ export function Sidebar({
             </span>
           )}
         </div>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls="sidebar-menu"
+          aria-label={open ? "Свернуть меню" : "Меню"}
+          onClick={() => setOpen(!open)}
+          className="ml-auto grid size-10 shrink-0 place-content-center border border-primary text-lg hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:hidden"
+        >
+          <span aria-hidden>{open ? "×" : "☰"}</span>
+        </button>
       </div>
-      <nav aria-label="Разделы" className="flex flex-col gap-5">
+      <nav
+        id="sidebar-menu"
+        aria-label="Разделы"
+        className={cn("flex-col gap-5", folded)}
+        onClick={(event) => {
+          if ((event.target as HTMLElement).closest("a")) {
+            setOpen(false);
+          }
+        }}
+      >
         {children}
       </nav>
-      <div className="mt-auto flex flex-col gap-3 border-t border-dotted border-border px-3 pt-4">
+      <div
+        className={cn(
+          "mt-auto flex-col gap-3 border-t border-dotted border-border px-3 pt-4",
+          folded,
+        )}
+      >
         {footer}
       </div>
     </aside>

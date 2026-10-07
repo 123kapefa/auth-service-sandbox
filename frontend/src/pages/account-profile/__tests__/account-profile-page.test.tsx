@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type AccountProfile, accountProfileQueries } from "@/entities/account-profile";
+import { accountSecurityQueries } from "@/entities/account-security";
 import { appModeQueries } from "@/entities/app-mode";
 import { renderWithProviders } from "@/test/render";
 import { AccountProfilePage } from "../ui/account-profile-page";
@@ -29,9 +30,18 @@ function linkUrl(name: string): URL {
   return new URL(screen.getByRole("link", { name }).getAttribute("href") ?? "", "http://x");
 }
 
-function renderPage(data: AccountProfile, route = "/") {
+function renderPage(data: AccountProfile, route = "/", projectDisabled: string[] = []) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   queryClient.setQueryData(accountProfileQueries.profile().queryKey, data);
+  queryClient.setQueryData(accountSecurityQueries.signInMethods().queryKey, {
+    methods: [],
+    hasPasskey: false,
+    hasAuthenticator: false,
+    hasRecoveryCodes: false,
+    linkedProviders: [],
+    history: [],
+    projectDisabled,
+  });
   queryClient.setQueryData(appModeQueries.list().queryKey, []);
   return renderWithProviders(
     <Suspense>
@@ -52,11 +62,12 @@ describe("AccountProfilePage", () => {
   it("телефон, почта со статусом, ссылка на смену почты — через вход с действием", () => {
     renderPage(profile);
 
-    expect(screen.getByText("+79990000001")).toBeInTheDocument();
+    expect(screen.getByText("+7 999 000-00-01")).toBeInTheDocument();
+    expect(screen.getByText("с 01.10.2026")).toBeInTheDocument();
     expect(screen.getByText("customer@sandbox.test")).toBeInTheDocument();
     expect(screen.getByText("подтверждена")).toBeInTheDocument();
 
-    const email = linkUrl("Сменить почту");
+    const email = linkUrl("Сменить");
     expect(email.pathname).toBe("/auth/login");
     expect(email.searchParams.get("action")).toBe("update-email");
     expect(email.searchParams.get("return_to")).toBe("/account/?action=update-email");
@@ -71,7 +82,22 @@ describe("AccountProfilePage", () => {
   it("почта не подтверждена — так и сказано", () => {
     renderPage({ ...profile, emailVerified: false });
     expect(screen.getByText("не подтверждена")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Сменить почту" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Сменить" })).toBeInTheDocument();
+  });
+
+  it("«Сменить номер» — через вход с действием update-phone; дата — смены номера", () => {
+    renderPage({ ...profile, phoneChangedAt: "2026-10-06T12:00:00Z" });
+
+    const phone = linkUrl("Сменить номер");
+    expect(phone.pathname).toBe("/auth/login");
+    expect(phone.searchParams.get("action")).toBe("update-phone");
+    expect(phone.searchParams.get("return_to")).toBe("/account/?action=update-phone");
+    expect(screen.getByText("с 06.10.2026")).toBeInTheDocument();
+  });
+
+  it("вход по телефону выключен в проекте — смены номера нет", () => {
+    renderPage(profile, "/", ["phone"]);
+    expect(screen.queryByRole("link", { name: "Сменить номер" })).toBeNull();
   });
 
   it("возврат после смены пароля — уведомление, профиль перечитан, адрес очищен", async () => {

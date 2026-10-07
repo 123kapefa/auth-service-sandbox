@@ -7,13 +7,18 @@ namespace AuthService.Contracts.Me;
 /// <param name="HasRecoveryCodes">Созданы коды восстановления.</param>
 /// <param name="LinkedProviders">Привязанные внешние входы: yandex, esia.</param>
 /// <param name="History">Изменения способов входа, новые сверху (до 20).</param>
+/// <param name="ProjectDisabled">
+/// Способы, выключенные в проекте (10.7): phone, email, password, passkey, yandex, esia. Кабинет их не показывает.
+/// Переходный период — ещё не выключен.
+/// </param>
 public sealed record SignInMethodsResponse(
     IReadOnlyList<SignInMethodResponse> Methods,
     bool HasPasskey,
     bool HasAuthenticator,
     bool HasRecoveryCodes,
     IReadOnlyList<string> LinkedProviders,
-    IReadOnlyList<SignInMethodChangeResponse> History);
+    IReadOnlyList<SignInMethodChangeResponse> History,
+    IReadOnlyList<string> ProjectDisabled);
 
 /// <summary>Один способ входа.</summary>
 /// <param name="Method">password, phone-code или email-code.</param>
