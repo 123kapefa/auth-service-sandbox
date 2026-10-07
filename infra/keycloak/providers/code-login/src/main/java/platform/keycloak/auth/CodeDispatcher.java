@@ -4,7 +4,9 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -104,31 +106,57 @@ final class CodeDispatcher {
                 if (!(decision instanceof CodeLimits.Decision.Allow)) {
                     yield refuse(request, current, limits, limitStore, today, decision);
                 }
+                // Одна отправка на номер за раз: одновременные «Отправить ещё раз» не проходят паузу все вместе.
+                if (!request.store().claimSend(target, current)) {
+                    yield new Outcome.TooEarly(current, Math.max(1, limits.cooldown(usage.target(), now).toSeconds()));
+                }
+                // Лимиты — атомарно, до отправки: и одновременные запросы, и неудачные отправки (таймаут провайдера
+                // после звонка) их расходуют.
+                CodeLimits.Decision.Limited limited = limitStore.reserve(target, request.ip(), range, limits.policy(), now);
+                if (limited != null) {
+                    request.store().releaseSend(target, current);
+                    yield refuse(request, current, limits, limitStore, today, limited);
+                }
                 if (methodDisabled) {
                     yield pretendSent(request, sent, delivery, limitStore, range, today, now);
                 }
+                // Расход — тоже атомарно: одновременные SMS не уйдут за бюджет; не ушёл код — расход возвращаем.
+                List<Map.Entry<String, Integer>> spend = new ArrayList<>();
+                if (!limitStore.reserveSpend(delivery, limits.policy(), today, spend)) {
+                    request.store().releaseSend(target, current);
+                    yield refuse(request, current, limits, limitStore, today, new CodeLimits.Decision.BudgetExhausted());
+                }
                 Optional<String> code = deliver(request, delivery, sent.code(), email);
+                if (code.isEmpty()) {
+                    limitStore.release(spend);
+                }
                 // Звонок не удался (провайдер недоступен) — сразу запасная SMS, если она у проекта есть и в бюджете.
                 // Капча и лимиты уже пройдены этим запросом.
                 if (code.isEmpty() && delivery == CodeDelivery.CALL && limits.policy().allows(CodeDelivery.SMS)) {
                     delivery = CodeDelivery.SMS;
-                    decision = limits.check(target, delivery, usage, true, now);
-                    if (!(decision instanceof CodeLimits.Decision.Allow)) {
-                        yield refuse(request, current, limits, limitStore, today, decision);
+                    if (!limitStore.reserveSpend(delivery, limits.policy(), today, spend)) {
+                        request.store().releaseSend(target, current);
+                        yield refuse(request, current, limits, limitStore, today, new CodeLimits.Decision.BudgetExhausted());
                     }
                     code = deliver(request, delivery, sent.code(), email);
+                    if (code.isEmpty()) {
+                        limitStore.release(spend);
+                    }
                 }
                 // Сохраняем только отправленный код: иначе пауза перед повтором началась бы без письма.
                 if (code.isEmpty()) {
+                    request.store().releaseSend(target, current);
                     yield new Outcome.Failed(current);
                 }
                 CodeState state = sent.state().sentAs(code.get(), delivery);
                 long cost = limits.cost(delivery);
                 request.store().save(target, state, now);
-                int alert = limitStore.recordSend(target, request.ip(), range, delivery, cost, today, now, limits::alertPercent);
+                long spent = limitStore.spent(today, limits.policy());
+                int alert = limitStore.recordSend(target, request.ip(), range, delivery, cost, spent, today, now,
+                    limits::alertPercent);
                 metrics.sent(realm.getName(), delivery, cost);
                 if (alert > 0) {
-                    alertBudget(request.session(), realm, limits, alert, usage.spentToday() + cost);
+                    alertBudget(request.session(), realm, limits, alert, Math.max(spent, usage.spentToday() + cost));
                 }
                 yield new Outcome.Sent(state);
             }
@@ -140,7 +168,9 @@ final class CodeDispatcher {
     /** Проверка введённого кода (сохраняет новое состояние, кроме «нет кода» и «заблокирован»). */
     CodeRules.VerifyResult verify(CodeStore store, CodeTarget target, String input) {
         CodeState current = store.load(target);
-        CodeRules.VerifyResult result = rules.verify(current, input);
+        Instant now = clock.instant();
+        CodeRules.VerifyResult result = rules.verify(current, input,
+            () -> store.claimAttempt(target, current, rules.maxAttempts(), now));
         switch (result) {
             case CodeRules.VerifyResult.Success success -> store.save(target, success.state(), clock.instant());
             case CodeRules.VerifyResult.Wrong wrong -> store.save(target, wrong.state(), clock.instant());
@@ -199,7 +229,7 @@ final class CodeDispatcher {
                                 CodeLimitStore limitStore, String range, LocalDate today, Instant now) {
         CodeState state = sent.state().sentAs(sent.code(), delivery);
         request.store().save(request.target(), state, now);
-        limitStore.recordSend(request.target(), request.ip(), range, null, 0, today, now, spent -> 0);
+        limitStore.recordSend(request.target(), request.ip(), range, null, 0, 0, today, now, spent -> 0);
         metrics.refused(request.realm().getName(), "method-disabled");
         LOG.infof("Код на %s не отправлен: способ входа выключен у пользователя", request.target().value());
         return new Outcome.Sent(state);

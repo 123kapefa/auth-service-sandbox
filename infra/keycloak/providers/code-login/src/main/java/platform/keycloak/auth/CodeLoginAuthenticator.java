@@ -108,6 +108,10 @@ public final class CodeLoginAuthenticator implements Authenticator {
                     // Код не ушёл: экран «Проверка» — капча и та же отправка ещё раз.
                     form.setAttribute("captchaRequired", "true");
                     form.setAttribute("captchaStep", "true");
+                    if (smsRequested) {
+                        // Просили SMS, а код ещё по звонку: после капчи — снова «Прислать SMS», а не второй звонок.
+                        form.setAttribute("codeDelivery", CodeDelivery.SMS.name());
+                    }
                 }
                 form.setError(refused.message(), refused.parameters());
             }

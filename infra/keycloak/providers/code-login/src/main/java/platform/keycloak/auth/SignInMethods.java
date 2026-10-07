@@ -1,9 +1,11 @@
 package platform.keycloak.auth;
 
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -29,6 +31,9 @@ import org.keycloak.models.UserModel;
  *   <li>если не осталось ни одного способа (нет ключа доступа и внешнего входа, а всё доступное выключено) —
  *       выключенного нет совсем.</li>
  * </ul>
+ * «Есть» — значит, этим можно войти: ключ доступа и внешний вход, выключенные в проекте, не в счёт, способы, выключенные
+ * в проекте, — тоже; телефон — только у входа по номеру (код на телефон находит человека по логину-номеру, атрибут
+ * phone у входа по почте войти не даёт).
  */
 final class SignInMethods {
 
@@ -56,11 +61,17 @@ final class SignInMethods {
      * @param hasEmail         есть почта (код на почту)
      * @param hasPasskey       есть ключ доступа
      * @param hasAuthenticator есть приложение-аутентификатор (2FA)
-     * @param hasExternal      привязан внешний вход (Яндекс ID, Госуслуги)
+     * @param hasExternal      привязан внешний вход (Яндекс ID, Госуслуги), не выключенный в проекте
      * @param disabled         выключенные в атрибуте способы
+     * @param offInProject     способы человека (пароль, коды), выключенные в проекте
      */
     record Facts(boolean hasPassword, boolean hasPhone, boolean hasEmail, boolean hasPasskey, boolean hasAuthenticator,
-                 boolean hasExternal, Set<String> disabled) {
+                 boolean hasExternal, Set<String> disabled, Set<String> offInProject) {
+
+        Facts(boolean hasPassword, boolean hasPhone, boolean hasEmail, boolean hasPasskey, boolean hasAuthenticator,
+              boolean hasExternal, Set<String> disabled) {
+            this(hasPassword, hasPhone, hasEmail, hasPasskey, hasAuthenticator, hasExternal, disabled, Set.of());
+        }
     }
 
     /** Способы из атрибута; незнакомые значения пропускаются. */
@@ -94,7 +105,9 @@ final class SignInMethods {
             }
         }
         boolean nothingLeft = !facts.hasPasskey() && !facts.hasExternal()
-            && ALL.stream().filter(method -> available(facts, method)).allMatch(result::contains);
+            && ALL.stream()
+                .filter(method -> available(facts, method) && !facts.offInProject().contains(method))
+                .allMatch(result::contains);
         return nothingLeft ? Set.of() : result;
     }
 
@@ -160,23 +173,34 @@ final class SignInMethods {
     }
 
     private static Facts facts(KeycloakSession session, RealmModel realm, UserModel user, Set<String> disabled) {
+        ProjectSignIn.Settings project = ProjectSignInRealm.settings(session, realm);
+        LocalDate today = ProjectSignInRealm.today();
+        Predicate<ProjectSignIn.Method> off = method -> project.effective(method, today) instanceof ProjectSignIn.Status.Off;
+        Set<String> offInProject = ALL.stream()
+            .filter(method -> off.test(ProjectSignInRealm.method(method)))
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+        // Внешний вход, которого в проекте нет (выключен или не настроен), войти не даст; незнакомый провайдер — даст.
+        boolean external = session.users().getFederatedIdentitiesStream(realm, user)
+            .map(link -> ProjectSignIn.Method.of(link.getIdentityProvider()))
+            .anyMatch(method -> method == null || !off.test(method));
         return new Facts(
             has(user, PASSWORD),
             hasPhone(user),
             user.getEmail() != null && !user.getEmail().isBlank(),
-            has(user, PASSKEY),
+            has(user, PASSKEY) && !off.test(ProjectSignIn.Method.PASSKEY),
             has(user, OTP),
-            session.users().getFederatedIdentitiesStream(realm, user).findAny().isPresent(),
-            disabled);
+            external,
+            disabled,
+            offInProject);
     }
 
     private static boolean has(UserModel user, String type) {
         return user.credentialManager().getStoredCredentialsByTypeStream(type).findAny().isPresent();
     }
 
-    // Телефон — атрибут phone; у входа по номеру логин — сам номер цифрами.
+    // Войти кодом на телефон можно только с логином-номером (CodeLoginAuthenticator ищет по логину): атрибут phone у
+    // входа по почте (добавил номер в кабинете) — не способ входа.
     private static boolean hasPhone(UserModel user) {
-        String phone = user.getFirstAttribute("phone");
-        return (phone != null && !phone.isBlank()) || user.getUsername().matches("\\d{10,15}");
+        return user.getUsername().matches("\\d{10,15}");
     }
 }

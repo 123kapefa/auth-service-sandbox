@@ -5,6 +5,7 @@ import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.function.IntSupplier;
 import java.util.random.RandomGenerator;
 
 /**
@@ -78,6 +79,15 @@ public final class CodeRules {
     }
 
     public VerifyResult verify(CodeState current, String input) {
+        return verify(current, input, () -> current.failedAttempts() + 1);
+    }
+
+    /**
+     * Как verify(current, input), но номер попытки к действующему коду выдаёт claimAttempt (CodeStore — атомарно, общий
+     * для одновременных запросов): 1..maxAttempts, 0 — попытки к этому коду кончились. Так параллельные вводы не
+     * читают одно и то же «неверных: 0» и не перебирают код сверх maxAttempts.
+     */
+    public VerifyResult verify(CodeState current, String input, IntSupplier claimAttempt) {
         Instant now = clock.instant();
 
         if (isLocked(current, now)) {
@@ -88,21 +98,36 @@ public final class CodeRules {
             return new VerifyResult.NoActiveCode();
         }
 
+        int attempt = claimAttempt.getAsInt();
+        if (attempt <= 0) {
+            return lockNow(current, now, policy.maxAttempts());
+        }
+
         if (input != null && constantTimeEquals(current.code(), input.trim())) {
             return new VerifyResult.Success(new CodeState(null, null, current.resendAllowedAt(), 0, null, current.delivery()));
         }
 
-        int failed = current.failedAttempts() + 1;
+        int failed = Math.max(current.failedAttempts(), attempt - 1) + 1;
         if (failed >= policy.maxAttempts()) {
-            Instant lockedUntil = now.plus(policy.lockout());
-            return new VerifyResult.LockedNow(
-                new CodeState(null, null, current.resendAllowedAt(), failed, lockedUntil),
-                policy.lockout().toSeconds());
+            return lockNow(current, now, failed);
         }
 
         return new VerifyResult.Wrong(
             new CodeState(current.code(), current.expiresAt(), current.resendAllowedAt(), failed, null, current.delivery()),
             policy.maxAttempts() - failed);
+    }
+
+    /** Сколько неверных вводов до блокировки. */
+    public int maxAttempts() {
+        return policy.maxAttempts();
+    }
+
+    // Код сгорел, номер заблокирован.
+    private VerifyResult lockNow(CodeState current, Instant now, int failed) {
+        Instant lockedUntil = now.plus(policy.lockout());
+        return new VerifyResult.LockedNow(
+            new CodeState(null, null, current.resendAllowedAt(), failed, lockedUntil),
+            policy.lockout().toSeconds());
     }
 
     private String generate() {

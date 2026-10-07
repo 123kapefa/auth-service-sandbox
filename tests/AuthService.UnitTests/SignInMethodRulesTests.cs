@@ -43,6 +43,18 @@ public sealed class SignInMethodRulesTests
         Assert.Equal(3, SignInMethodRules.EffectiveDisabled(Facts(passkey: true, disabled: [PASSWORD, PHONE, EMAIL])).Count);
     }
 
+    [Fact]
+    public void EffectiveDisabled_MethodOffInProject_DoesNotCountAsLeft()
+    {
+        // Аутентификатор держит выключенные пароль и телефон, а почту проект выключил: войти нечем — не выключено ничего.
+        HashSet<string> emailOff = [EMAIL];
+        SignInFacts facts = Facts(authenticator: true, disabled: [PASSWORD, PHONE]) with { OffInProject = emailOff };
+        SignInFacts passwordOff = Facts(authenticator: true, recoveryCodes: true, disabled: [PASSWORD]) with { OffInProject = emailOff };
+
+        Assert.Empty(SignInMethodRules.EffectiveDisabled(facts));
+        Assert.Equal(SignInMethodRules.LAST_METHOD, SignInMethodRules.DisableBlocker(passwordOff, PHONE));
+    }
+
     [Theory]
     [InlineData(PASSWORD, SignInMethodRules.NEEDS_PASSKEY_OR_AUTHENTICATOR)]
     [InlineData(PHONE, SignInMethodRules.NEEDS_PASSKEY_OR_AUTHENTICATOR)]
