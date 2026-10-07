@@ -88,7 +88,8 @@ describe("вход в два шага", () => {
     );
 
     expect(await screen.findByLabelText("Пароль")).toBeInTheDocument();
-    expect(screen.getByText("+79990000001")).toBeInTheDocument();
+    expect(screen.getByText("Введите пароль")).toBeInTheDocument();
+    expect(screen.getByText("+7 (999) 000-00-01")).toBeInTheDocument();
     const change = screen.getByRole("button", { name: "Изменить" });
     expect(change).toHaveAttribute("name", "changeLogin");
     // Enter в поле пароля жмёт первую кнопку формы пароля: «Войти», а «Изменить» — в своей форме.
@@ -100,11 +101,32 @@ describe("вход в два шага", () => {
     );
     expect(submits[0]).toHaveAttribute("name", "login");
     expect(screen.queryByLabelText("Телефон или почта")).not.toBeInTheDocument();
-    const code = screen.getByRole("button", { name: "Войти по коду" });
+    // Ввели номер — «Звонок»: код уходит из формы пароля, но пароль не нужен.
+    const code = screen.getByRole("button", { name: "Звонок" });
     expect(code).toHaveAttribute("name", "codeLogin");
     expect(code).toHaveAttribute("value", "phone-code");
+    expect((code as HTMLButtonElement).form).toBe(passwordForm);
     expect(screen.getByRole("link", { name: "Забыли пароль?" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Яндекс ID" })).not.toBeInTheDocument();
+  });
+
+  it("шаг 2 с паролем, ввели почту — «Код на почту»", async () => {
+    render(
+      page({ loginStep: "password", loginMethods: "email-code", loginDisplay: "a@sandbox.test" }),
+    );
+
+    const code = await screen.findByRole("button", { name: "Код на почту" });
+    expect(code).toHaveAttribute("value", "email-code");
+    expect(screen.queryByRole("button", { name: "Звонок" })).not.toBeInTheDocument();
+  });
+
+  it("в проекте только телефон или только почта — подпись поля", async () => {
+    const { unmount } = render(page({ loginStep: "login", loginKinds: "phone" }));
+    expect(await screen.findByLabelText("Номер телефона")).toBeInTheDocument();
+    unmount();
+
+    render(page({ loginStep: "login", loginKinds: "email" }));
+    expect(await screen.findByLabelText("Почта")).toBeInTheDocument();
   });
 
   it("шаг 2 без пароля: способы по цене, почта и номер скрыты частично", async () => {
@@ -120,10 +142,10 @@ describe("вход в два шага", () => {
 
     expect(await screen.findByText("Как войти?")).toBeInTheDocument();
     expect(screen.queryByLabelText("Пароль")).not.toBeInTheDocument();
-    const buttons = screen.getAllByRole("button", { name: /^(Код на почту|Звонок на)/ });
+    const buttons = screen.getAllByRole("button", { name: /^(Код на почту|Звонок)/ });
     expect(buttons.map((button) => button.textContent)).toEqual([
-      "Код на почту s***@sandbox.test",
-      "Звонок на +7 *** ***-**-01",
+      "@Код на почтуна s***@sandbox.test",
+      "☎Звонокна +7 *** ***-**-01 — код в номере звонящего",
     ]);
     expect(buttons.map((button) => button.getAttribute("value"))).toEqual([
       "email-code",
@@ -140,10 +162,21 @@ describe("вход в два шага", () => {
 });
 
 describe("внешний вход", () => {
-  it("«Или войдите через»: Госуслуги и Яндекс ID — ссылки на вход через провайдера", async () => {
-    render(<KcPage kcContext={getKcContextMock({ pageId: "login.ftl", overrides: {} })} />);
+  it("после «или»: ключ доступа, Госуслуги и Яндекс ID — ссылки на вход через провайдера", async () => {
+    render(
+      <KcPage
+        kcContext={getKcContextMock({
+          pageId: "login.ftl",
+          overrides: { loginStep: "login", enableWebAuthnConditionalUI: true } as Record<
+            string,
+            unknown
+          >,
+        })}
+      />,
+    );
 
-    expect(await screen.findByText("Или войдите через")).toBeInTheDocument();
+    expect(await screen.findByText("или")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Войти с ключом доступа" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Госуслуги" })).toHaveAttribute("href", "#esia");
     expect(screen.getByRole("link", { name: "Яндекс ID" })).toHaveAttribute("href", "#yandex");
   });
@@ -177,21 +210,28 @@ describe("вход по коду", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByText("Отправили код в SMS на +7 999 *** ** 01.")).toBeInTheDocument(),
+      expect(
+        screen.getByText("Отправили SMS с 6 цифрами на +7 999 *** ** 01."),
+      ).toBeInTheDocument(),
     );
+    expect(screen.getByRole("heading", { name: "Код из SMS" })).toBeInTheDocument();
     expect(screen.getByLabelText("Код из SMS")).toHaveAttribute("autocomplete", "one-time-code");
-    expect(screen.getByText("Новый код можно запросить через 2 с.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Отправить код ещё раз" })).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Изменить" })).toBeInTheDocument();
+    expect(screen.getByText("Отправить ещё раз — через 0:02")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Отправить ещё раз" })).toBeNull();
 
     await act(() => vi.advanceTimersByTimeAsync(1000));
-    expect(screen.getByText("Новый код можно запросить через 1 с.")).toBeInTheDocument();
+    expect(screen.getByText("Отправить ещё раз — через 0:01")).toBeInTheDocument();
 
     await act(() => vi.advanceTimersByTimeAsync(1000));
-    expect(screen.queryByText(/Новый код можно запросить/)).toBeNull();
-    expect(screen.getByRole("button", { name: "Отправить код ещё раз" })).toBeEnabled();
+    expect(screen.queryByText(/через 0:0/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Отправить ещё раз" })).toHaveAttribute(
+      "name",
+      "resend",
+    );
   });
 
-  it("звонок: «Вам звонят», 4 цифры, «Позвонить ещё раз» и «Прислать SMS» после паузы", async () => {
+  it("звонок: «Вам звонят», 4 цифры; после паузы — «Звонок не пришёл?», «Прислать SMS» и «Позвонить ещё раз»", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     render(
       <KcPage
@@ -207,21 +247,19 @@ describe("вход по коду", () => {
       />,
     );
 
-    await waitFor(() =>
-      expect(
-        screen.getByText(
-          "Вам звонят на +7 999 *** ** 01. Отвечать не нужно — введите последние 4 цифры номера, с которого звонят.",
-        ),
-      ).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("Вам звонят")).toBeInTheDocument();
+    expect(screen.getByText(/последние 4 цифры/)).toBeInTheDocument();
     expect(screen.getByLabelText("Последние 4 цифры номера")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Прислать SMS" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Позвонить ещё раз" })).toBeDisabled();
+    expect(screen.getByText("Позвонить ещё раз или прислать SMS — через 0:01")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Прислать SMS" })).toBeNull();
 
     await act(() => vi.advanceTimersByTimeAsync(1000));
-    expect(screen.getByRole("button", { name: "Прислать SMS" })).toBeEnabled();
+    expect(screen.getByText("Звонок не пришёл?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Прислать SMS" })).toHaveAttribute("name", "sendSms");
-    expect(screen.getByRole("button", { name: "Позвонить ещё раз" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Позвонить ещё раз" })).toHaveAttribute(
+      "name",
+      "resend",
+    );
   });
 
   it("SMS у проекта выключены — на экране звонка нет «Прислать SMS»", async () => {
@@ -229,11 +267,17 @@ describe("вход по коду", () => {
       <KcPage
         kcContext={getKcContextMock({
           pageId: "platform-code-login.ftl",
-          overrides: { codeDelivery: "CALL", codeSmsAvailable: "false", codeLength: "4" },
+          overrides: {
+            codeDelivery: "CALL",
+            codeSmsAvailable: "false",
+            codeLength: "4",
+            codeResendAfter: "0",
+          },
         })}
       />,
     );
     await screen.findByRole("button", { name: "Позвонить ещё раз" });
+    expect(screen.getByText(/не блокирует незнакомые номера\.$/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Прислать SMS" })).toBeNull();
   });
 
@@ -248,7 +292,7 @@ describe("вход по коду", () => {
 
     await userEvent.type(code, "12a3");
     expect(code).toHaveValue("123");
-    expect(screen.getByRole("button", { name: "Вход" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Войти" })).toBeDisabled();
     expect(submit).not.toHaveBeenCalled();
 
     await userEvent.type(code, "45678");
@@ -290,11 +334,46 @@ describe("вход по коду", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByText("Отправили код письмом на c***@sandbox.test.")).toBeInTheDocument(),
+      expect(screen.getByText(/Письмо может прийти в «Спам»/)).toBeInTheDocument(),
     );
+    expect(screen.getByRole("heading", { name: "Код из письма" })).toBeInTheDocument();
     expect(screen.getByLabelText("Код из письма")).toBeInTheDocument();
-    expect(screen.queryByText(/Новый код можно запросить/)).toBeNull();
-    expect(screen.getByRole("button", { name: "Отправить код ещё раз" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Отправить ещё раз" })).toBeEnabled();
+  });
+});
+
+describe("капча перед кодом", () => {
+  it("«Проверка»: галочка заглушки стенда даёт smart-token, без неё «Позвонить» недоступна", async () => {
+    const { container } = render(
+      <KcPage
+        kcContext={getKcContextMock({
+          pageId: "platform-code-login.ftl",
+          overrides: {
+            codeDelivery: "CALL",
+            codeLength: "4",
+            captchaRequired: "true",
+            captchaStep: "true",
+            captchaSiteKey: "sandbox-stub",
+            message: { type: "error", summary: "Подтвердите, что вы не робот" },
+          },
+        })}
+      />,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Проверка" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+    const call = screen.getByRole("button", { name: "Позвонить" });
+    expect(call).toBeDisabled();
+    expect(call).toHaveAttribute("name", "resend");
+
+    await userEvent.click(screen.getByLabelText(/Я не робот/));
+    expect(call).toBeEnabled();
+    expect(container.querySelector<HTMLInputElement>('input[name="smart-token"]')?.value).toBe(
+      "sandbox-captcha-ok",
+    );
+    expect((call as HTMLButtonElement).form).toBe(
+      container.querySelector('input[name="smart-token"]')?.closest("form"),
+    );
   });
 });
 
@@ -335,7 +414,7 @@ describe("отправка формы", () => {
         })}
       />,
     );
-    const resend = await screen.findByRole("button", { name: "Отправить код ещё раз" });
+    const resend = await screen.findByRole("button", { name: "Отправить ещё раз" });
 
     act(() => resend.click());
     expect(resend).toBeEnabled();
@@ -344,9 +423,11 @@ describe("отправка формы", () => {
 });
 
 describe("стандартные страницы в нашем каркасе", () => {
-  it("2FA: «Одноразовый код» и кнопка входа по-русски", async () => {
+  it("2FA: «Код из приложения», ячейки кода и «Подтвердить»", async () => {
     render(<KcPage kcContext={getKcContextMock({ pageId: "login-otp.ftl", overrides: {} })} />);
-    expect(await screen.findByLabelText("Одноразовый код")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Код из приложения" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Одноразовый код")).toHaveAttribute("name", "otp");
+    expect(screen.getByRole("button", { name: "Подтвердить" })).toBeDisabled();
   });
 
   it("выбор способа входа — по-русски, без английских названий", async () => {
@@ -381,8 +462,9 @@ describe("смена номера", () => {
   it("новый номер: нынешний номер, поле, «Получить код» и «Отмена»", async () => {
     render(page({ phoneStep: "phone", phoneCurrent: "+79990000001" }));
 
-    expect(await screen.findByText("Сейчас: +79990000001")).toBeInTheDocument();
-    const phone = screen.getByLabelText("Новый номер");
+    expect(await screen.findByText("Новый номер")).toBeInTheDocument();
+    expect(screen.getByText("+7 (999) 000-00-01")).toBeInTheDocument();
+    const phone = screen.getByLabelText("Новый номер телефона");
     expect(phone).toHaveAttribute("name", "phone");
     expect(screen.getByRole("button", { name: "Получить код" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Отмена" })).toHaveAttribute("name", "cancel-aia");
@@ -404,11 +486,11 @@ describe("смена номера", () => {
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent("раз в сутки");
-    expect(screen.queryByLabelText("Новый номер")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Новый номер телефона")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Получить код" })).not.toBeInTheDocument();
   });
 
-  it("код: экран звонка, «Сменить номер» и «Другой номер»", async () => {
+  it("код: экран звонка, «Сменить номер», «Изменить» — другой номер, «Отмена»", async () => {
     render(
       page({
         phoneStep: "code",
@@ -416,18 +498,16 @@ describe("смена номера", () => {
         codeDelivery: "CALL",
         codeSmsAvailable: "true",
         codeTarget: "+79990000002",
-        codeResendAfter: "0",
+        codeResendAfter: "30",
         codeLength: "4",
       }),
     );
 
-    expect(await screen.findByText(/Вам звонят на \+79990000002/)).toBeInTheDocument();
+    expect(await screen.findByText("+7 (999) 000-00-02")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Сменить номер" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Другой номер" })).toHaveAttribute(
-      "name",
-      "changePhone",
-    );
-    expect(screen.queryByText("Войти по паролю")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Изменить" })).toHaveAttribute("name", "changePhone");
+    expect(screen.getByRole("button", { name: "Отмена" })).toHaveAttribute("name", "cancel-aia");
+    expect(screen.queryByText("Выбрать другой способ")).not.toBeInTheDocument();
   });
 });
 

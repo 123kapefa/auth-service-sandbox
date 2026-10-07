@@ -4,7 +4,10 @@ import jakarta.ws.rs.core.MultivaluedHashMap;
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
@@ -264,6 +267,19 @@ public final class PasswordLoginForm extends UsernamePasswordForm {
         return method == ProjectSignIn.Method.PHONE ? "platformLoginPhoneOff" : "platformLoginEmailOff";
     }
 
+    /** Чем входят в проекте — для подписи поля логина: «phone,email», «phone» или «email» (выключенное — нет). */
+    private static String loginKinds(AuthenticationFlowContext context) {
+        ProjectSignIn.Settings settings = ProjectSignInRealm.settings(context.getSession(), context.getRealm());
+        LocalDate today = ProjectSignInRealm.today();
+        List<String> kinds = new ArrayList<>();
+        for (ProjectSignIn.Method method : List.of(ProjectSignIn.Method.PHONE, ProjectSignIn.Method.EMAIL)) {
+            if (!(settings.effective(method, today) instanceof ProjectSignIn.Status.Off)) {
+                kinds.add(method.key());
+            }
+        }
+        return String.join(",", kinds);
+    }
+
     private static String login(AuthenticationFlowContext context) {
         return context.getAuthenticationSession().getAuthNote(NOTE_LOGIN);
     }
@@ -272,6 +288,7 @@ public final class PasswordLoginForm extends UsernamePasswordForm {
     private void decorate(AuthenticationFlowContext context, LoginFormsProvider form) {
         boolean preset = isUserAlreadySetBeforeUsernamePasswordAuth(context);
         String login = login(context);
+        form.setAttribute("loginKinds", loginKinds(context));
         if (!preset && login == null) {
             form.setAttribute("loginStep", STEP_LOGIN);
             return;

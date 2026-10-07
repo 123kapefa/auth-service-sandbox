@@ -15,6 +15,16 @@
   "maxFailureWaitSeconds": 900,
   "maxDeltaTimeSeconds": 43200,
   "passwordPolicy": "length(8) and maxLength(128) and notUsername",
+  "browserSecurityHeaders": {
+    "contentSecurityPolicyReportOnly": "",
+    "xContentTypeOptions": "nosniff",
+    "referrerPolicy": "no-referrer",
+    "xRobotsTag": "none",
+    "xFrameOptions": "SAMEORIGIN",
+    "contentSecurityPolicy": "frame-src 'self' https://smartcaptcha.yandexcloud.net; frame-ancestors 'self'; object-src 'none';",
+    "xXSSProtection": "1; mode=block",
+    "strictTransportSecurity": "max-age=31536000; includeSubDomains"
+  },
   "accessTokenLifespan": 900,
   "ssoSessionIdleTimeout": 2592000,
   "ssoSessionMaxLifespan": 2592000,

@@ -6,19 +6,22 @@ import { useIsPasswordRevealed } from "keycloakify/tools/useIsPasswordRevealed";
 import { useEffect, type ReactNode } from "react";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../KcContext";
+import { Divider } from "../components/Divider";
+import { LoginBox } from "../components/LoginBox";
 import { LoginInput } from "../components/LoginInput";
 import { ProviderIcon } from "../components/ProviderIcon";
 import { useSubmitting } from "../lib/use-submitting";
 
 /**
- * Вход (login.ftl) в два шага (плагин code-login, PasswordLoginForm, атрибут loginStep):
- * - login — телефон или почта → «Продолжить»; тут же ключ доступа и внешний вход;
- * - password — что ввели и «Изменить», пароль сразу, ниже код на то, что ввели, и ключ доступа (так и для незнакомого
- *   логина — по экрану не понять, есть ли аккаунт);
- * - methods — человек выключил пароль: включённые способы по цене (ключ доступа → код на почту → звонок).
- * Оформление шагов — 10.8. Без loginStep — прежняя форма в один шаг:
- * телефон или почта и пароль; «Войти по коду» — тот же логин, без пароля;
- * «Войти с ключом доступа» — passkey; ниже — «Или войдите через»: значки Госуслуг и Яндекс ID в ряд (провайдеры realm). Номер
+ * Вход (login.ftl) в два шага (плагин code-login, PasswordLoginForm, атрибут loginStep) — экраны 05, 06, 16 этапа 10:
+ * - login — «Телефон или почта» (в проекте только одно — «Номер телефона» или «Почта», loginKinds) → «Продолжить»;
+ *   ниже «или»: ключ доступа, Яндекс ID и Госуслуги;
+ * - password — «Введите пароль»: что ввели в рамке с «Изменить», пароль сразу; ниже «или»: код на то, что ввели
+ *   (номер — «Звонок», почта — «Код на почту») и ключ доступа (так и для незнакомого логина — по экрану не понять,
+ *   есть ли аккаунт);
+ * - methods — «Как войти?» (пароль выключен): способы карточками по цене (ключ доступа → код на почту → звонок),
+ *   первый — основной.
+ * Без loginStep — прежняя форма в один шаг (подтверждение пароля при привязке Госуслуг или Яндекс ID). Номер
  * показывается как +7 (999) 000-00-01 (с 8 и 10 цифр — тоже +7), уходит цифрами скрытым полем username.
  */
 export default function Login(props: PageProps<Extract<KcContext, { pageId: "login.ftl" }>, I18n>) {
@@ -41,6 +44,7 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
     loginEmailHint,
     loginPhoneHint,
     loginAutoStart,
+    loginKinds,
   } = kcContext;
   const { msg, msgStr } = i18n;
   const { submitting, markSubmitting } = useSubmitting();
@@ -73,7 +77,9 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
     return () => window.clearInterval(timer);
   }, [loginAutoStart]);
 
-  const passkeyNode = enableWebAuthnConditionalUI && (
+  // Ключ доступа: скрытые формы (их заполняет скрипт Keycloak) и кнопка с webAuthnButtonId — где угодно на странице.
+  const passkeyOn = !!enableWebAuthnConditionalUI;
+  const passkeyForms = passkeyOn && (
     <>
       <form id="webauth" action={url.loginAction} method="post">
         <input type="hidden" id="clientDataJSON" name="clientDataJSON" />
@@ -96,14 +102,35 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
           ))}
         </form>
       )}
-      <button
-        id={webAuthnButtonId}
-        type="button"
-        className={`mt-2 ${kcClsx("kcButtonClass", "kcButtonDefaultClass")}`}
-      >
-        {msgStr("passkey-doAuthenticate")}
-      </button>
     </>
+  );
+  const passkeyButton = (label: ReactNode) => (
+    <button
+      id={webAuthnButtonId}
+      type="button"
+      className={kcClsx("kcButtonClass", "kcButtonDefaultClass")}
+    >
+      {label}
+    </button>
+  );
+  // Госуслуги и Яндекс ID — кнопками в ряд: значок и название.
+  const providersNode = externalProviders.length > 0 && (
+    <ul id="kc-social-providers" className="grid grid-cols-2 gap-2">
+      {externalProviders.map((provider) => (
+        <li key={provider.alias} className={externalProviders.length === 1 ? "col-span-2" : ""}>
+          <a
+            id={`social-${provider.alias}`}
+            href={provider.loginUrl}
+            className={kcClsx("kcButtonClass", "kcButtonDefaultClass")}
+          >
+            <span className="flex size-5 items-center justify-center [&_svg]:size-5">
+              <ProviderIcon alias={provider.alias} name={provider.displayName} />
+            </span>
+            {provider.displayName}
+          </a>
+        </li>
+      ))}
+    </ul>
   );
 
   const errorNode = hasError && (
@@ -120,21 +147,11 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
   // Что ввели на шаге 1 и «Изменить» — назад к шагу 1. Кнопка стоит в форме входа, но отправляет свою пустую форму:
   // Enter в поле пароля (и менеджер паролей) жмёт первую кнопку своей формы — это должна быть «Войти», не «Изменить».
   const shownLogin = loginDisplay !== undefined && (
-    <div className="flex items-center justify-between gap-3 text-sm">
-      <span id="platform-login-display" className="font-medium">
-        {loginDisplay}
-      </span>
-      <button
-        id="platform-login-change"
-        name="changeLogin"
-        type="submit"
-        form="platform-login-change-form"
-        formNoValidate
-        className="underline underline-offset-4 hover:text-muted-foreground"
-      >
-        {msgStr("platformLoginChange")}
-      </button>
-    </div>
+    <LoginBox
+      login={loginDisplay}
+      label={msgStr("platformLoginChange")}
+      formId="platform-login-change-form"
+    />
   );
   const changeLoginForm = loginDisplay !== undefined && (
     <form
@@ -145,32 +162,17 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
       hidden
     />
   );
+  // Ввели почту — код письмом, номер — звонок (на шаге пароля — на то, что ввели).
+  const typedEmail = (loginDisplay ?? "").includes("@");
+  const kinds = (loginKinds ?? "phone,email").split(",").filter(Boolean);
+  const loginLabel =
+    kinds.length === 1 && kinds[0] === "phone"
+      ? msg("platformLoginPhoneLabel")
+      : kinds.length === 1 && kinds[0] === "email"
+        ? msg("platformLoginEmailLabel")
+        : msg("usernameOrEmail");
 
-  const codeButtons = (primary: boolean) =>
-    methods
-      .filter((method) => method === "email-code" || method === "phone-code")
-      .map((method) => (
-        <button
-          key={method}
-          id={`platform-code-login-${method}`}
-          name="codeLogin"
-          value={method}
-          type="submit"
-          disabled={submitting}
-          className={kcClsx(
-            "kcButtonClass",
-            primary ? "kcButtonPrimaryClass" : "kcButtonSecondaryClass",
-          )}
-        >
-          {loginStep === "methods"
-            ? msgStr(
-                method === "email-code" ? "platformLoginEmailCode" : "platformLoginPhoneCall",
-                (method === "email-code" ? loginEmailHint : loginPhoneHint) ?? "",
-              )
-            : msgStr("platformCodeLoginDo")}
-        </button>
-      ));
-
+  let header: ReactNode = msg("loginAccountTitle");
   let body: ReactNode;
   if (loginStep === "login") {
     body = (
@@ -185,12 +187,12 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
         >
           <div className={kcClsx("kcFormGroupClass")}>
             <label htmlFor="username" className={kcClsx("kcLabelClass")}>
-              {msg("usernameOrEmail")}
+              {loginLabel}
             </label>
             <LoginInput
               className={kcClsx("kcInputClass")}
               defaultValue={login.username ?? ""}
-              autoComplete={enableWebAuthnConditionalUI ? "username webauthn" : "username"}
+              autoComplete={passkeyOn ? "username webauthn" : "username"}
               invalid={hasError}
               describedBy="input-error"
             />
@@ -208,10 +210,22 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
             </button>
           </div>
         </form>
-        {passkeyNode}
+        {(passkeyOn || providersNode) && (
+          <>
+            <Divider label={msgStr("platformLoginOr")} />
+            <div className="grid gap-2">
+              {passkeyOn && passkeyButton(msgStr("passkey-doAuthenticate"))}
+              {providersNode}
+            </div>
+          </>
+        )}
+        {passkeyForms}
       </>
     );
   } else if (loginStep === "password") {
+    header = msg("platformLoginPasswordTitle");
+    const code = methods.find((method) => method === "email-code" || method === "phone-code");
+    const passkey = passkeyOn && methods.includes("passkey");
     body = (
       <>
         <form
@@ -268,15 +282,63 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
             >
               {msgStr("doLogIn")}
             </button>
-            {codeButtons(false)}
           </div>
         </form>
         {changeLoginForm}
-        {methods.includes("passkey") && passkeyNode}
+        {(code || passkey) && (
+          <>
+            <Divider label={msgStr("platformLoginOr")} />
+            <div className={`grid gap-2 ${code && passkey ? "grid-cols-2" : ""}`}>
+              {code && (
+                <button
+                  id={`platform-code-login-${code}`}
+                  name="codeLogin"
+                  value={code}
+                  type="submit"
+                  form="kc-form-login"
+                  formNoValidate
+                  disabled={submitting}
+                  className={kcClsx("kcButtonClass", "kcButtonSecondaryClass")}
+                >
+                  {msgStr(typedEmail ? "platformLoginEmailCodeShort" : "platformLoginCall")}
+                </button>
+              )}
+              {passkey && passkeyButton(msgStr("platformLoginPasskey"))}
+            </div>
+          </>
+        )}
+        {passkey && passkeyForms}
       </>
     );
   } else if (loginStep === "methods") {
-    const codes = codeButtons(!methods.includes("passkey"));
+    header = msg("platformLoginChooseMethod");
+    const passkey = passkeyOn && methods.includes("passkey");
+    const codes = methods.filter((method) => method === "email-code" || method === "phone-code");
+    // По цене: ключ доступа, затем коды; первый — основной (залит).
+    const card = (primary: boolean) =>
+      `flex w-full items-center gap-3.5 border p-3.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50 ${
+        primary
+          ? "border-accent bg-accent text-accent-foreground shadow-hard hover:bg-accent/90"
+          : "border-primary bg-transparent hover:bg-muted"
+      }`;
+    const cardBody = (icon: string, title: ReactNode, hint: ReactNode, primary: boolean) => (
+      <>
+        <span
+          aria-hidden
+          className={`flex size-[30px] shrink-0 items-center justify-center border font-mono text-[11px] font-medium ${
+            primary ? "border-accent-foreground" : "border-primary"
+          }`}
+        >
+          {icon}
+        </span>
+        <span className="grid gap-0.5">
+          <span className="text-[15px] font-semibold">{title}</span>
+          <span className={`text-[13px] ${primary ? "opacity-80" : "text-muted-foreground"}`}>
+            {hint}
+          </span>
+        </span>
+      </>
+    );
     body = (
       <>
         <form
@@ -288,7 +350,6 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
           onSubmit={markSubmitting}
         >
           {shownLogin}
-          <p className="text-sm font-medium">{msg("platformLoginChooseMethod")}</p>
           {errorNode}
           {methods.length === 0 && (
             <p id="platform-login-no-methods" className="text-sm">
@@ -297,20 +358,51 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
           )}
         </form>
         {changeLoginForm}
-        {/* По цене: ключ доступа, затем коды. */}
-        {methods.includes("passkey") && passkeyNode}
-        {codes.length > 0 && (
-          <form
-            id="platform-login-methods"
-            className={`mt-2 ${kcClsx("kcFormButtonsClass")}`}
-            action={url.loginAction}
-            method="post"
-            noValidate
-            onSubmit={markSubmitting}
-          >
-            {codes}
-          </form>
-        )}
+        <div className="mt-4 grid gap-2.5">
+          {passkey && (
+            <button id={webAuthnButtonId} type="button" className={card(true)}>
+              {cardBody("ID", msg("platformLoginPasskey"), msg("platformLoginPasskeyHint"), true)}
+            </button>
+          )}
+          {codes.length > 0 && (
+            <form
+              id="platform-login-methods"
+              className="grid gap-2.5"
+              action={url.loginAction}
+              method="post"
+              noValidate
+              onSubmit={markSubmitting}
+            >
+              {codes.map((method, index) => {
+                const primary = !passkey && index === 0;
+                const email = method === "email-code";
+                return (
+                  <button
+                    key={method}
+                    id={`platform-code-login-${method}`}
+                    name="codeLogin"
+                    value={method}
+                    type="submit"
+                    disabled={submitting}
+                    className={card(primary)}
+                  >
+                    {cardBody(
+                      email ? "@" : "☎",
+                      msg(email ? "platformLoginEmailCodeShort" : "platformLoginCall"),
+                      msg(
+                        email ? "platformLoginEmailHintTo" : "platformLoginCallHintTo",
+                        (email ? loginEmailHint : loginPhoneHint) ?? "",
+                      ),
+                      primary,
+                    )}
+                  </button>
+                );
+              })}
+            </form>
+          )}
+          {methods.length === 0 && providersNode}
+        </div>
+        {passkey && passkeyForms}
       </>
     );
   }
@@ -322,33 +414,8 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
       doUseDefaultCss={doUseDefaultCss}
       classes={classes}
       displayMessage={!hasError}
-      headerNode={msg("loginAccountTitle")}
+      headerNode={header}
       displayInfo={realm.password && realm.registrationAllowed && !registrationDisabled}
-      socialProvidersNode={
-        externalProviders.length > 0 && (
-          <div id="kc-social-providers" className="mt-6 grid gap-3">
-            <p className="flex items-center gap-3 font-mono text-[11px] tracking-[0.1em] text-muted-foreground uppercase before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
-              {msg("identity-provider-login-label")}
-            </p>
-            {/* В один ряд, значками; название — подсказка и имя кнопки для экранного диктора. */}
-            <ul className="flex justify-center gap-3">
-              {externalProviders.map((provider) => (
-                <li key={provider.alias}>
-                  <a
-                    id={`social-${provider.alias}`}
-                    href={provider.loginUrl}
-                    aria-label={provider.displayName}
-                    title={provider.displayName}
-                    className="flex size-12 items-center justify-center border border-primary bg-transparent transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                  >
-                    <ProviderIcon alias={provider.alias} name={provider.displayName} />
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )
-      }
       infoNode={
         <span>
           {msg("noAccount")}{" "}
@@ -380,7 +447,7 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
                   <LoginInput
                     className={kcClsx("kcInputClass")}
                     defaultValue={login.username ?? ""}
-                    autoComplete={enableWebAuthnConditionalUI ? "username webauthn" : "username"}
+                    autoComplete={passkeyOn ? "username webauthn" : "username"}
                     invalid={hasError}
                     describedBy="input-error"
                   />
@@ -455,7 +522,11 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
               </div>
             </form>
           )}
-          {passkeyNode}
+          {passkeyForms}
+          {passkeyOn && (
+            <div className="mt-2">{passkeyButton(msgStr("passkey-doAuthenticate"))}</div>
+          )}
+          {providersNode && <div className="mt-4">{providersNode}</div>}
         </>
       )}
     </Template>

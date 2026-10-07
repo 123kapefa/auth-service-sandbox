@@ -175,7 +175,9 @@ public final class UpdatePhoneAction implements RequiredActionProvider {
             case CodeDispatcher.Outcome.Locked locked -> form.setError("platformCodeLocked", locked.retryAfter());
             case CodeDispatcher.Outcome.Refused refused -> {
                 if (refused.captcha()) {
+                    // Код не ушёл: экран «Проверка» — капча и та же отправка ещё раз.
                     form.setAttribute("captchaRequired", "true");
+                    form.setAttribute("captchaStep", "true");
                 }
                 form.setError(refused.message(), refused.parameters());
             }

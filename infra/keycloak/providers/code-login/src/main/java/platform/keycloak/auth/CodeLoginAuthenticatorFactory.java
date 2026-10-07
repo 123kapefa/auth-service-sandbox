@@ -120,6 +120,10 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
         }
         String siteKey = config.get("captcha-site-key");
         captchaSiteKey = siteKey == null || siteKey.isBlank() ? null : siteKey;
+        if (captchaSiteKey == null && captcha == CaptchaVerifier.STUB) {
+            // Тема рисует вместо виджета Яндекса галочку заглушки (её токен — STUB_TOKEN).
+            captchaSiteKey = CaptchaVerifier.STUB_SITE_KEY;
+        }
         metrics = CodeMetrics.global();
         String phoneUrl = config.get("phone-provider-url");
         if (phoneUrl != null && !phoneUrl.isBlank()) {

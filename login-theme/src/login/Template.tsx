@@ -125,16 +125,19 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
           aria-label={msgStr("languages")}
           className="flex justify-center gap-3 text-xs text-muted-foreground"
         >
-          {enabledLanguages.map(({ languageTag, label, href }) => (
-            <a
-              key={languageTag}
-              href={href}
-              aria-current={label === currentLanguage.label ? "true" : undefined}
-              className="hover:text-foreground aria-[current=true]:font-semibold aria-[current=true]:text-foreground"
-            >
-              {label}
-            </a>
-          ))}
+          {/* Русский первым; названия — с заглавной (Keycloak отдаёт «русский»). */}
+          {[...enabledLanguages]
+            .sort((a, b) => Number(b.languageTag === "ru") - Number(a.languageTag === "ru"))
+            .map(({ languageTag, label, href }) => (
+              <a
+                key={languageTag}
+                href={href}
+                aria-current={label === currentLanguage.label ? "true" : undefined}
+                className="hover:text-foreground aria-[current=true]:font-semibold aria-[current=true]:text-foreground"
+              >
+                {label.charAt(0).toUpperCase() + label.slice(1)}
+              </a>
+            ))}
         </nav>
       )}
     </div>
