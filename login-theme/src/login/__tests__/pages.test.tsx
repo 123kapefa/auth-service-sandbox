@@ -456,6 +456,28 @@ describe("предложение ключа доступа", () => {
     );
   });
 
+  it("переходный период: какой способ выключат и когда, спросим при следующем входе", async () => {
+    render(
+      <KcPage
+        kcContext={getKcContextMock({
+          pageId: "webauthn-register.ftl",
+          overrides: {
+            platformPasskeyOffer: "true",
+            platformSignInTransition: "phone:2026-11-05",
+          } as { platformPasskeyOffer?: string; platformSignInTransition?: string },
+        })}
+      />,
+    );
+
+    expect(await screen.findByText("Добавьте другой способ входа")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Вход по телефону в проекте выключится после 05\.11\.2026/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Не сейчас" })).toHaveAttribute("name", "skip");
+    expect(screen.getByText(/Спросим при следующем входе/)).toBeInTheDocument();
+    expect(screen.queryByText(/через 30 дней/)).not.toBeInTheDocument();
+  });
+
   it("не получилось: «Попробовать ещё раз» и «Не сейчас»", async () => {
     render(
       <KcPage

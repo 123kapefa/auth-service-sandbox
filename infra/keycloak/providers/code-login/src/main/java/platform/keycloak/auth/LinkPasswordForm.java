@@ -30,7 +30,9 @@ public final class LinkPasswordForm extends IdpUsernamePasswordForm {
     @Override
     public boolean validatePassword(AuthenticationFlowContext context, UserModel user,
                                     MultivaluedMap<String, String> inputData, boolean clearUser) {
-        return super.validatePassword(context, user, inputData, clearUser)
+        return !SignInMethods.rejectPasswordOff(context, user,
+                () -> challenge(context, "platformPasswordOff", Validation.FIELD_PASSWORD), clearUser)
+            && super.validatePassword(context, user, inputData, clearUser)
             && !SignInMethods.rejectPassword(context, user,
                 () -> challenge(context, getDefaultChallengeMessage(context), Validation.FIELD_PASSWORD), clearUser);
     }

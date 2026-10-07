@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.Properties;
 
 import jakarta.ws.rs.core.MultivaluedMap;
+import jakarta.ws.rs.core.Response;
 
 import org.jboss.logging.Logger;
 import org.keycloak.authentication.InitiatedActionSupport;
@@ -67,6 +68,9 @@ public final class UpdatePhoneAction implements RequiredActionProvider {
 
     @Override
     public void requiredActionChallenge(RequiredActionContext context) {
+        if (phoneOff(context)) {
+            return;
+        }
         context.getAuthenticationSession().removeAuthNote(NOTE_TARGET);
         LoginFormsProvider form = phoneForm(context);
         PhoneChangeRules.nextAllowed(context.getUser().getFirstAttribute(PhoneChangeRules.CHANGED_AT), clock.instant())
@@ -76,6 +80,9 @@ public final class UpdatePhoneAction implements RequiredActionProvider {
 
     @Override
     public void processAction(RequiredActionContext context) {
+        if (phoneOff(context)) {
+            return;
+        }
         MultivaluedMap<String, String> formData = context.getHttpRequest().getDecodedFormParameters();
         String target = context.getAuthenticationSession().getAuthNote(NOTE_TARGET);
         if (formData.containsKey(BUTTON_CHANGE_PHONE)) {
@@ -105,6 +112,15 @@ public final class UpdatePhoneAction implements RequiredActionProvider {
                 codeError(context, phone, current, "platformCodeLocked", locked.retryAfterSeconds());
             case CodeRules.VerifyResult.NoActiveCode ignored -> codeError(context, phone, current, "platformCodeExpired");
         }
+    }
+
+    // Вход по телефону не включён в проекте (ProjectSignIn) — смены номера нет: страница «недоступно». true — показали.
+    private static boolean phoneOff(RequiredActionContext context) {
+        if (ProjectSignInRealm.on(context.getSession(), context.getRealm(), ProjectSignIn.Method.PHONE)) {
+            return false;
+        }
+        context.challenge(context.form().setError("platformPhoneChangeOff").createErrorPage(Response.Status.FORBIDDEN));
+        return true;
     }
 
     // Шаг 1: новый номер → проверки → код на него.

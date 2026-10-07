@@ -98,13 +98,24 @@ final class SignInMethods {
         return nothingLeft ? Set.of() : result;
     }
 
-    /** Выключен ли способ у пользователя. Пустой атрибут — сразу нет, без чтения учётных данных. */
+    /** Выключен ли способ у пользователя — им самим или в проекте (ProjectSignIn). */
     static boolean isDisabled(KeycloakSession session, RealmModel realm, UserModel user, String method) {
+        return disabledByUser(session, realm, user, method) || offInProject(session, realm, user, method);
+    }
+
+    /** Выключил ли способ сам человек. Пустой атрибут — сразу нет, без чтения учётных данных. */
+    static boolean disabledByUser(KeycloakSession session, RealmModel realm, UserModel user, String method) {
         Set<String> disabled = parse(user.getFirstAttribute(ATTRIBUTE));
         if (!disabled.contains(method)) {
             return false;
         }
         return effectiveDisabled(facts(session, realm, user, disabled)).contains(method);
+    }
+
+    /** Способ выключен в проекте — для всех или у человека нет права переходного периода. */
+    static boolean offInProject(KeycloakSession session, RealmModel realm, UserModel user, String method) {
+        ProjectSignIn.Method project = ProjectSignInRealm.method(method);
+        return project != null && ProjectSignInRealm.blocked(session, realm, user).contains(project);
     }
 
     /**
@@ -113,10 +124,28 @@ final class SignInMethods {
      */
     static boolean rejectPassword(AuthenticationFlowContext context, UserModel user, Supplier<Response> challenge,
                                   boolean clearUser) {
-        if (!isDisabled(context.getSession(), context.getRealm(), user, PASSWORD)) {
+        if (!disabledByUser(context.getSession(), context.getRealm(), user, PASSWORD)) {
             return false;
         }
         context.getEvent().user(user).detail(EVENT_REASON, "password_disabled");
+        context.getEvent().error(Errors.INVALID_USER_CREDENTIALS);
+        context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challenge.get());
+        if (clearUser) {
+            context.clearUser();
+        }
+        return true;
+    }
+
+    /**
+     * Вход по паролю выключен в проекте (ProjectSignIn): отказ с понятным сообщением platformPasswordOff — до проверки
+     * пароля, чтобы по ответу не понять, подошёл ли он. true — отказали.
+     */
+    static boolean rejectPasswordOff(AuthenticationFlowContext context, UserModel user, Supplier<Response> challenge,
+                                     boolean clearUser) {
+        if (!offInProject(context.getSession(), context.getRealm(), user, PASSWORD)) {
+            return false;
+        }
+        context.getEvent().user(user).detail(EVENT_REASON, "password_off_in_project");
         context.getEvent().error(Errors.INVALID_USER_CREDENTIALS);
         context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challenge.get());
         if (clearUser) {

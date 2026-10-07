@@ -39,6 +39,8 @@
 | `GET/PUT /auth/admin/apps/{clientId}/branding` | `branding.manage` | оформление приложения поверх проекта (6б.5) |
 | `GET/PUT /auth/admin/codes/settings` | `sign-in.manage` | коды проекта: звонки и SMS, страны, бюджет, лимиты (10.7) |
 | `GET /auth/admin/codes/usage` | `sign-in.manage` | расход кодов за сегодня: звонки, SMS, письма, бюджет, доля введённых (10.7) |
+| `GET/PUT /auth/admin/sign-in/methods` | `sign-in.manage` | способы входа проекта, переходный период, обязательная 2FA (10.7) |
+| `GET /auth/admin/sign-in/methods/{method}/affected` | `sign-in.manage` | сколько людей входит способом и сколько — только им (10.7) |
 | `GET /me/branding?app={clientId}` | вошёл | оформление для кабинета: проект, поверх — приложение (6б.5) |
 | `POST /auth/backchannel-logout` | подпись `logout_token` | Keycloak сообщает о сессиях, завершённых у него |
 
@@ -70,7 +72,7 @@
 Права учётки — минимальные: `view-users`, `manage-users`, `view-events`, `query-clients` и **точечные права
 (FGAP v2)** — `view` и `map-roles` только на клиенты приложений (`sandbox-api`, `sandbox-bff`, `account-console`).
 С 6б.4 — ещё роль realm `manage-branding`: оформление проекта через плагин `platform-branding`, без `manage-realm`;
-с 10.7 — `manage-sign-in`: настройки входа и кодов через плагин `platform-codes`.
+с 10.7 — `manage-sign-in`: настройки входа и кодов через плагины `platform-codes` и `platform-sign-in`.
 `view-clients` целиком не выдан: он открывает секреты всех клиентов (проверено). `check-stand.sh` проверяет: учётка
 видит только клиенты приложений, чужой клиент (`broker`) не находит, его секрет — 403, настройки realm не меняет.
 

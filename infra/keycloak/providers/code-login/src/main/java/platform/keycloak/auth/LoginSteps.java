@@ -56,13 +56,23 @@ final class LoginSteps {
      * @param passkeysEnabled  ключи доступа включены в realm
      */
     static View view(Optional<CodeTarget.Channel> typed, Account account, boolean passkeysEnabled) {
+        return view(typed, account, passkeysEnabled, true);
+    }
+
+    /**
+     * @param passwordOn вход по паролю включён в проекте (ProjectSignIn) — для незнакомого логина; у знакомого
+     *                   выключенный в проекте пароль — в account.disabled
+     */
+    static View view(Optional<CodeTarget.Channel> typed, Account account, boolean passkeysEnabled, boolean passwordOn) {
         List<String> methods = new ArrayList<>();
         if (account == null || !account.enabled() || !account.disabled().contains(SignInMethods.PASSWORD)) {
             if (passkeysEnabled) {
                 methods.add(PASSKEY);
             }
             typed.map(LoginSteps::codeMethod).ifPresent(methods::add);
-            return new View(true, List.copyOf(methods));
+            // Пароль выключен в проекте: незнакомому — код на то, что ввели (и ключ доступа), без поля пароля.
+            boolean password = passwordOn || account != null || methods.isEmpty();
+            return new View(password, List.copyOf(methods));
         }
         if (passkeysEnabled && account.hasPasskey()) {
             methods.add(PASSKEY);

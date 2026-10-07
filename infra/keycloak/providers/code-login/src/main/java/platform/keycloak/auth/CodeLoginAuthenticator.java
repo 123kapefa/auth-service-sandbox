@@ -114,9 +114,13 @@ public final class CodeLoginAuthenticator implements Authenticator {
         context.challenge(form.createForm(FORM));
     }
 
+    // Незнакомый адрес — регистрация: только если способ включён в проекте (ProjectSignIn), без переходного периода.
     private static boolean methodDisabled(AuthenticationFlowContext context, CodeTarget target) {
         UserModel user = findUser(context.getSession(), context.getRealm(), target);
-        return user != null && SignInMethods.isDisabled(context.getSession(), context.getRealm(), user, signInMethod(target.channel()));
+        if (user == null) {
+            return !ProjectSignInRealm.on(context.getSession(), context.getRealm(), ProjectSignInRealm.method(target.channel()));
+        }
+        return SignInMethods.isDisabled(context.getSession(), context.getRealm(), user, signInMethod(target.channel()));
     }
 
     private static String signInMethod(CodeTarget.Channel channel) {
@@ -126,6 +130,12 @@ public final class CodeLoginAuthenticator implements Authenticator {
     private void signIn(AuthenticationFlowContext context, CodeTarget target, CodeState state) {
         UserModel user = findUser(context.getSession(), context.getRealm(), target);
         if (user == null) {
+            if (!ProjectSignInRealm.on(context.getSession(), context.getRealm(), ProjectSignInRealm.method(target.channel()))) {
+                // Код не уходил (methodDisabled), но запрос мог прийти в обход формы — нового пользователя нет.
+                context.getEvent().detail(SignInMethods.EVENT_REASON, "sign_up_off_in_project");
+                fail(context, target, state, "platformCodeExpired");
+                return;
+            }
             user = createCustomer(context, target);
         }
 

@@ -31,6 +31,7 @@ export default function PasskeyRegister(props: Props) {
   const { submitting, markSubmitting, setSubmitting } = useSubmitting();
   const failed = kcContext.pageId === "webauthn-error.ftl";
   const offer = kcContext.platformPasskeyOffer === "true";
+  const transition = offer ? parseTransition(kcContext.platformSignInTransition) : undefined;
   const register = useRef<Promise<RegisterModule> | null>(null);
 
   // Скрипт Keycloak грузим заранее: окно ключа браузер откроет только сразу после нажатия.
@@ -91,12 +92,16 @@ export default function PasskeyRegister(props: Props) {
           >
             ID
           </span>
-          {msg(offer ? "platformPasskeyOfferTitle" : "platformPasskeyAddTitle")}
+          {transition
+            ? msg("platformSignInTransitionTitle")
+            : msg(offer ? "platformPasskeyOfferTitle" : "platformPasskeyAddTitle")}
         </span>
       }
     >
       <p id="platform-passkey-offer-text" className="mb-4 text-sm">
-        {msg(offer ? "platformPasskeyOfferText" : "platformPasskeyAddText")}
+        {transition
+          ? msg("platformSignInTransitionText", msgStr(transition.method), transition.until)
+          : msg(offer ? "platformPasskeyOfferText" : "platformPasskeyAddText")}
       </p>
       {failed && (
         <p id="input-error" role="alert" className={`mb-4 ${kcClsx("kcInputErrorMessageClass")}`}>
@@ -173,9 +178,28 @@ export default function PasskeyRegister(props: Props) {
       )}
       {offer && (
         <p className="mt-4 text-center text-sm text-muted-foreground">
-          {msg("platformPasskeyOfferLater")}
+          {msg(transition ? "platformSignInTransitionLater" : "platformPasskeyOfferLater")}
         </p>
       )}
     </Template>
   );
+}
+
+const TRANSITION_METHODS = {
+  phone: "platformSignInTransitionPhone",
+  email: "platformSignInTransitionEmail",
+  password: "platformSignInTransitionPassword",
+} as const;
+
+/** «phone:2026-11-05» → какой способ и до какого числа (05.11.2026); непонятное — без переходного текста. */
+function parseTransition(value: string | undefined) {
+  const [method, until] = value?.split(":") ?? [];
+  const date = /^(\d{4})-(\d{2})-(\d{2})$/.exec(until ?? "");
+  if (!date || !method || !(method in TRANSITION_METHODS)) {
+    return undefined;
+  }
+  return {
+    method: TRANSITION_METHODS[method as keyof typeof TRANSITION_METHODS],
+    until: `${date[3]}.${date[2]}.${date[1]}`,
+  };
 }

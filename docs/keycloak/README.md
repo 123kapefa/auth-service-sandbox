@@ -34,7 +34,7 @@ scripts/keycloak/check-stand.sh
 весь этап 6б — `check-6b.sh` 138 (кабинет, устройства, оформление, новый проект), магазин из двух сервисов (этап 6а.4) —
 `check-shop.sh` 61, вход через Госуслуги и Яндекс ID (на заглушке) — `check-external-login.sh` 41, защита от накрутки
 кодов (этап 10.1) — `check-code-limits.sh` 40, код на телефон звонком и запасной SMS (10.2) — `check-phone-code.sh` 24, способы входа человека (10.3) —
-`check-sign-in-methods.sh` 43, вход в два шага (10.4) — `check-two-step-login.sh` 35, смена номера самим человеком (10.5) — `check-phone-change.sh` 27, предложение ключа доступа после входа по коду (10.6) — `check-passkey-offer.sh` 12, коды проекта в API админки (10.7) — `check-code-settings.sh` 19. Тестов: .NET — 623, плагина Keycloak (Java, в сборке образа) — 156, админки и кабинета (Vitest) — 87, темы входа (Vitest) — 44.
+`check-sign-in-methods.sh` 43, вход в два шага (10.4) — `check-two-step-login.sh` 35, смена номера самим человеком (10.5) — `check-phone-change.sh` 27, предложение ключа доступа после входа по коду (10.6) — `check-passkey-offer.sh` 12, коды и способы входа проекта в API админки (10.7) — `check-code-settings.sh` 19 и `check-project-sign-in.sh` 43. Тестов: .NET — 643, плагина Keycloak (Java, в сборке образа) — 167, админки и кабинета (Vitest) — 87, темы входа (Vitest) — 46.
 
 Стенд, поднятый до этапа 6б, после `git pull` и `docker compose up -d --build --wait` — `scripts/project/upgrade-6b.py
 sandbox` (realm импортируется только в пустую базу; подробнее — [06b](06b-account-branding.md#проекты-созданные-до-6б)),
@@ -87,7 +87,7 @@ sandbox` (realm импортируется только в пустую базу
 | 7 | Документация | идёт по ходу | — |
 | 8 | Выводы и ADR: брать ли Keycloak, чего стоит, что своё | ✅ (решения приняты) | [08-conclusions.md](08-conclusions.md), [ADR](../adr/README.md) |
 | 9 | Вход через Госуслуги и Яндекс ID (на заглушке; ключи — подставить) | ✅ | [09-external-login.md](09-external-login.md) |
-| 10 | Вход: способы входа и коды подешевле (10.1 — защита от накрутки кодов, 10.2 — звонок вместо SMS, 10.3 — способы входа человека, 10.4 — вход в два шага, 10.5 — смена номера самим человеком, 10.6 — предложение ключа доступа после входа по коду, 10.7 — коды проекта в API админки) | 🔄 | [10-code-limits.md](10-code-limits.md), [10-phone-code.md](10-phone-code.md), [10-sign-in-methods.md](10-sign-in-methods.md), [10-two-step-login.md](10-two-step-login.md), [10-phone-change.md](10-phone-change.md), [10-passkey-offer.md](10-passkey-offer.md), [10-code-settings.md](10-code-settings.md), задача [#128](https://github.com/123kapefa/auth-service-sandbox/issues/128) |
+| 10 | Вход: способы входа и коды подешевле (10.1 — защита от накрутки кодов, 10.2 — звонок вместо SMS, 10.3 — способы входа человека, 10.4 — вход в два шага, 10.5 — смена номера самим человеком, 10.6 — предложение ключа доступа после входа по коду, 10.7 — коды и способы входа проекта в API админки) | 🔄 | [10-code-limits.md](10-code-limits.md), [10-phone-code.md](10-phone-code.md), [10-sign-in-methods.md](10-sign-in-methods.md), [10-two-step-login.md](10-two-step-login.md), [10-phone-change.md](10-phone-change.md), [10-passkey-offer.md](10-passkey-offer.md), [10-code-settings.md](10-code-settings.md), задача [#128](https://github.com/123kapefa/auth-service-sandbox/issues/128) |
 
 Каждый этап — отдельная ветка `stage-N/...`. План, шаги и статусы — в
 [задачах GitHub](https://github.com/123kapefa/auth-service-sandbox/issues) и на

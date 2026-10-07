@@ -17,6 +17,7 @@ export const ACTION_LABELS: Record<string, string> = {
   ProjectBrandingChanged: "Оформление проекта",
   AppBrandingChanged: "Оформление приложения",
   ProjectCodesChanged: "Коды подтверждения",
+  ProjectSignInChanged: "Способы входа",
 };
 
 export const actionLabel = (action: string) => ACTION_LABELS[action] ?? action;

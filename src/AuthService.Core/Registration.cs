@@ -85,6 +85,7 @@ public static class Registration
         services.AddScoped<BrandingHandler>();
         services.AddScoped<AppBrandingHandler>();
         services.AddScoped<CodeSettingsHandler>();
+        services.AddScoped<ProjectSignInHandler>();
 
         return services;
     }

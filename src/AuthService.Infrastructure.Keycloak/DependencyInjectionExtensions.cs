@@ -28,6 +28,7 @@ public static class DependencyInjectionExtensions
         services.AddHttpClient<IServiceRegistry, KeycloakServiceRegistry>();
         services.AddHttpClient<IProjectBranding, KeycloakBranding>();
         services.AddHttpClient<IProjectCodes, KeycloakCodes>();
+        services.AddHttpClient<IProjectSignIn, KeycloakSignIn>();
         services.AddHttpClient<IAccountNotices, KeycloakAccountNotices>();
 
         // Discovery кэшируется и сам обновляется; адрес — тот же, по которому сервис берёт ключи для проверки токенов.

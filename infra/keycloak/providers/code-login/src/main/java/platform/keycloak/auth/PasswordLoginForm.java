@@ -4,8 +4,10 @@ import jakarta.ws.rs.core.MultivaluedHashMap;
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
 
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 
 import org.keycloak.WebAuthnConstants;
 import org.keycloak.authentication.AuthenticationFlowContext;
@@ -111,13 +113,25 @@ public final class PasswordLoginForm extends UsernamePasswordForm {
             return;
         }
         String login = PhoneNormalizer.normalizeLogin(typed);
+        String off = loginOff(context, login);
+        if (off != null) {
+            context.getEvent().detail(Details.USERNAME, login).detail(SignInMethods.EVENT_REASON, "login_off_in_project");
+            context.getEvent().error(Errors.INVALID_USER);
+            context.challenge(challenge(context, off, Validation.FIELD_USERNAME));
+            return;
+        }
         context.getAuthenticationSession().setAuthNote(NOTE_LOGIN, login);
         context.getAuthenticationSession().setAuthNote(ATTEMPTED_USERNAME, login);
 
         Step step = step(context);
         Optional<String> auto = step.view().autoStart();
         if (auto.isPresent() && !LoginSteps.PASSKEY.equals(auto.get())) {
-            startCode(context, accountTarget(step.user(), auto.get()), true);
+            if (step.user() == null) {
+                // Незнакомый логин, пароль выключен в проекте: код на то, что ввели.
+                startCode(context, CodeTarget.parse(login).orElseThrow(), false);
+            } else {
+                startCode(context, accountTarget(step.user(), auto.get()), true);
+            }
             return;
         }
         MultivaluedMap<String, String> rememberMe = new MultivaluedHashMap<>();
@@ -147,6 +161,12 @@ public final class PasswordLoginForm extends UsernamePasswordForm {
                     challenge(context, "platformCodeLoginTargetRequired", Validation.FIELD_USERNAME));
                 return;
             }
+            String off = loginOff(context, target.get().value());
+            if (off != null) {
+                context.getEvent().error(Errors.INVALID_USER);
+                context.failureChallenge(AuthenticationFlowError.INVALID_USER, challenge(context, off, Validation.FIELD_USERNAME));
+                return;
+            }
             startCode(context, target.get(), false);
             return;
         }
@@ -160,7 +180,7 @@ public final class PasswordLoginForm extends UsernamePasswordForm {
             context.challenge(challenge(context, "platformLoginMethodUnavailable", null));
             return;
         }
-        if (step.view().password()) {
+        if (step.view().password() || step.user() == null) {
             // Код на то, что ввели: на экране — как ввели, есть аккаунт или нет.
             startCode(context, typed.orElseThrow(), false);
         } else {
@@ -203,10 +223,17 @@ public final class PasswordLoginForm extends UsernamePasswordForm {
         LoginSteps.Account account = null;
         if (user != null) {
             SignInMethods.Facts facts = SignInMethods.facts(context.getSession(), context.getRealm(), user);
-            account = new LoginSteps.Account(user.isEnabled(), SignInMethods.effectiveDisabled(facts), facts.hasPasskey(),
+            Set<String> disabled = new HashSet<>(SignInMethods.effectiveDisabled(facts));
+            for (String method : SignInMethods.ALL) {
+                if (SignInMethods.offInProject(context.getSession(), context.getRealm(), user, method)) {
+                    disabled.add(method);
+                }
+            }
+            account = new LoginSteps.Account(user.isEnabled(), disabled, facts.hasPasskey(),
                 facts.hasEmail(), user.getUsername().matches(PHONE_LOGIN));
         }
-        return new Step(user, LoginSteps.view(typed, account, webauthnAuth != null && webauthnAuth.isPasskeysEnabled()));
+        boolean passwordOn = ProjectSignInRealm.on(context.getSession(), context.getRealm(), ProjectSignIn.Method.PASSWORD);
+        return new Step(user, LoginSteps.view(typed, account, webauthnAuth != null && webauthnAuth.isPasskeysEnabled(), passwordOn));
     }
 
     private static UserModel findUser(AuthenticationFlowContext context, String login) {
@@ -215,6 +242,26 @@ public final class PasswordLoginForm extends UsernamePasswordForm {
         } catch (ModelDuplicateException e) {
             return null;
         }
+    }
+
+    /**
+     * Вход по номеру или по почте выключен в проекте (ProjectSignIn): ключ сообщения или null. Незнакомый логин —
+     * если способ не включён совсем (регистрации им нет); знакомый — если у человека нет права переходного периода.
+     */
+    private static String loginOff(AuthenticationFlowContext context, String login) {
+        Optional<CodeTarget> typed = CodeTarget.parse(login);
+        if (typed.isEmpty()) {
+            return null;
+        }
+        ProjectSignIn.Method method = ProjectSignInRealm.method(typed.get().channel());
+        UserModel user = findUser(context, typed.get().value());
+        boolean off = user == null
+            ? !ProjectSignInRealm.on(context.getSession(), context.getRealm(), method)
+            : ProjectSignInRealm.blocked(context.getSession(), context.getRealm(), user).contains(method);
+        if (!off) {
+            return null;
+        }
+        return method == ProjectSignIn.Method.PHONE ? "platformLoginPhoneOff" : "platformLoginEmailOff";
     }
 
     private static String login(AuthenticationFlowContext context) {
@@ -268,14 +315,24 @@ public final class PasswordLoginForm extends UsernamePasswordForm {
     @Override
     public boolean validatePassword(AuthenticationFlowContext context, UserModel user,
                                     MultivaluedMap<String, String> inputData, boolean clearUser) {
-        return super.validatePassword(context, user, inputData, clearUser)
+        return !SignInMethods.rejectPasswordOff(context, user,
+                () -> challenge(context, "platformPasswordOff", Validation.FIELD_PASSWORD), clearUser)
+            && super.validatePassword(context, user, inputData, clearUser)
             && !SignInMethods.rejectPassword(context, user,
                 () -> challenge(context, getDefaultChallengeMessage(context), Validation.FIELD_PASSWORD), clearUser);
     }
 
     @Override
     protected boolean validateForm(AuthenticationFlowContext context, MultivaluedMap<String, String> formData) {
-        return validateUserAndPassword(context, withLogin(context, formData));
+        MultivaluedMap<String, String> data = withLogin(context, formData);
+        String username = data.getFirst(AuthenticationManager.FORM_USERNAME);
+        String off = username == null || isUserAlreadySetBeforeUsernamePasswordAuth(context) ? null : loginOff(context, username);
+        if (off != null) {
+            context.getEvent().error(Errors.INVALID_USER);
+            context.failureChallenge(AuthenticationFlowError.INVALID_USER, challenge(context, off, Validation.FIELD_USERNAME));
+            return false;
+        }
+        return validateUserAndPassword(context, data);
     }
 
     // Копия данных формы с логином шага 1 (или приведённым введённым — запрос в один шаг); остальные поля — как пришли.

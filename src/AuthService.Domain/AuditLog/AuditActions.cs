@@ -35,6 +35,7 @@ public static class AuditActions
     public const string APP_BRANDING_CHANGED = "AppBrandingChanged";
 
     public const string PROJECT_CODES_CHANGED = "ProjectCodesChanged";
+    public const string PROJECT_SIGN_IN_CHANGED = "ProjectSignInChanged";
 
     public const string USER_OBJECT = "user";
     public const string ROLE_OBJECT = "role";
