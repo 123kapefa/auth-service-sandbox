@@ -450,6 +450,7 @@ describe("предложение ключа доступа", () => {
     );
     expect(screen.getByRole("button", { name: "Не сейчас" })).toHaveAttribute("name", "skip");
     expect(screen.getByText(/Спросим снова через 30 дней/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Выполнить выход/)).not.toBeInTheDocument();
     expect(document.getElementById("register")).toContainElement(
       document.getElementById("clientDataJSON"),
     );
@@ -486,7 +487,10 @@ describe("предложение ключа доступа", () => {
     expect(screen.getByRole("button", { name: "Отмена" })).toHaveAttribute("name", "cancel-aia");
     expect(screen.queryByRole("button", { name: "Не сейчас" })).not.toBeInTheDocument();
     expect(screen.queryByText(/Спросим снова/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/Выполнить выход/)).not.toBeInTheDocument();
+    const logout = screen.getByLabelText("Выполнить выход на других устройствах");
+    expect(logout).toHaveAttribute("name", "logout-sessions");
+    expect(logout).not.toBeChecked();
+    expect(logout.closest("form")?.id).toBe("register");
   });
 
   it("ошибка ключа при входе — стандартная страница", async () => {

@@ -19,7 +19,8 @@ type RegisterModule = { registerByWebAuthn: (input: Record<string, unknown>) => 
  * <ul>
  *   <li>«Входите без кода» (атрибут platformPasskeyOffer, действие platform-passkey-offer, 10.6) — после входа по
  *       коду; «Не сейчас» — дальше без ключа (сервер запомнит и 30 дней не спросит);</li>
- *   <li>из кабинета (kc_action=webauthn-register-passwordless) — «Отмена» возвращает в кабинет.</li>
+ *   <li>из кабинета (kc_action=webauthn-register-passwordless) — «Выполнить выход на других устройствах» и «Отмена»
+ *       (назад в кабинет).</li>
  * </ul>
  */
 export default function PasskeyRegister(props: Props) {
@@ -132,6 +133,19 @@ export default function PasskeyRegister(props: Props) {
           ].map((name) => (
             <input key={name} type="hidden" id={name} name={name} />
           ))}
+          {!offer && (
+            // Как у стандартной страницы Keycloak: ключ добавлен — завершить остальные сеансы.
+            <label className="mb-4 flex items-center text-sm">
+              <input
+                id="logout-sessions"
+                name="logout-sessions"
+                value="on"
+                type="checkbox"
+                className={`${kcClsx("kcCheckboxInputClass")} accent-primary`}
+              />
+              {msg("logoutOtherSessions")}
+            </label>
+          )}
           <button
             id="platform-passkey-add"
             type="button"
