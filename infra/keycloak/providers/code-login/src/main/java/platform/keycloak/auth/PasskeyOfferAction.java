@@ -33,6 +33,14 @@ public final class PasskeyOfferAction implements RequiredActionProvider {
 
     /** Заметка входа: вошли по коду (ставит CodeLoginAuthenticator). */
     static final String NOTE_CODE_LOGIN = "platform.passkey-offer.code-login";
+    /**
+     * Заметка входа: человек вошёл способом в переходном периоде проекта (ProjectSignIn) — «телефон:2026-11-05».
+     * Предлагаем при каждом входе, без паузы после «Не сейчас»; на странице — атрибут platformSignInTransition.
+     */
+    static final String NOTE_TRANSITION = "platform.passkey-offer.transition";
+    static final String ATTRIBUTE_TRANSITION = "platformSignInTransition";
+    /** Заметка входа: в этом входе уже предложили (триггеры проверяются после каждого действия — не по кругу). */
+    private static final String NOTE_OFFERED = "platform.passkey-offer.offered";
     /** Атрибут страницы: это предложение, а не регистрация ключа из кабинета. */
     static final String ATTRIBUTE = "platformPasskeyOffer";
     static final String BUTTON_SKIP = "skip";
@@ -49,7 +57,8 @@ public final class PasskeyOfferAction implements RequiredActionProvider {
     @Override
     public void evaluateTriggers(RequiredActionContext context) {
         AuthenticationSessionModel auth = context.getAuthenticationSession();
-        if (auth.getAuthNote(NOTE_CODE_LOGIN) == null) {
+        boolean transition = auth.getAuthNote(NOTE_TRANSITION) != null && auth.getAuthNote(NOTE_OFFERED) == null;
+        if (auth.getAuthNote(NOTE_CODE_LOGIN) == null && !transition) {
             return;
         }
         auth.removeAuthNote(NOTE_CODE_LOGIN);
@@ -58,6 +67,11 @@ public final class PasskeyOfferAction implements RequiredActionProvider {
         }
         UserModel user = context.getUser();
         boolean hasPasskey = user.credentialManager().getStoredCredentialsByTypeStream(PASSKEY).findAny().isPresent();
+        if (transition && passkeysEnabled(context.getRealm()) && !hasPasskey) {
+            auth.setAuthNote(NOTE_OFFERED, "true");
+            auth.addRequiredAction(PasskeyOfferActionFactory.PROVIDER_ID);
+            return;
+        }
         if (PasskeyOfferRules.shouldOffer(passkeysEnabled(context.getRealm()), hasPasskey,
                 user.getFirstAttribute(PasskeyOfferRules.SKIPPED_AT), clock.instant())) {
             auth.addRequiredAction(PasskeyOfferActionFactory.PROVIDER_ID);
@@ -109,7 +123,9 @@ public final class PasskeyOfferAction implements RequiredActionProvider {
 
         @Override
         public LoginFormsProvider form() {
-            return context.form().setAttribute(ATTRIBUTE, "true");
+            LoginFormsProvider form = context.form().setAttribute(ATTRIBUTE, "true");
+            String transition = context.getAuthenticationSession().getAuthNote(NOTE_TRANSITION);
+            return transition == null ? form : form.setAttribute(ATTRIBUTE_TRANSITION, transition);
         }
 
         @Override

@@ -41,7 +41,7 @@ public record CodeLimitPolicy(
     int budgetAlertPercent,
     ZoneId zone) {
 
-    /** Значения по умолчанию (план этапа 10). Настройки проекта подключаются в 10.7. */
+    /** Значения по умолчанию (план этапа 10); поверх — настройки сервера и проекта (CodeSettings). */
     public static final CodeLimitPolicy DEFAULTS = new CodeLimitPolicy(
         List.of(Duration.ofSeconds(60), Duration.ofMinutes(2), Duration.ofMinutes(5), Duration.ofMinutes(15)),
         5,          // на номер за час
@@ -58,7 +58,7 @@ public record CodeLimitPolicy(
         80,
         ZoneId.of("Europe/Moscow"));
 
-    /** Атрибуты realm с настройками проекта — их пишет API админки (10.7), имена — как у ключей ниже. */
+    /** Атрибуты realm с настройками проекта — их пишет API админки (CodeSettingsResource), имена — как у ключей ниже. */
     public static final String REALM_ATTRIBUTE_PREFIX = "platform.codes.";
 
     public CodeLimitPolicy {

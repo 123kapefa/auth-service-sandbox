@@ -33,6 +33,7 @@ public static class RealmPermissions
                 AuthServicePermissions.Roles.MANAGE,
                 AuthServicePermissions.ProjectServices.MANAGE,
                 AuthServicePermissions.Branding.MANAGE,
+                AuthServicePermissions.SignIn.MANAGE,
             ],
             _ => [],
         };

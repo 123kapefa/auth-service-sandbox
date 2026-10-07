@@ -1,2 +1,4 @@
 platform.keycloak.auth.BrandingResourceFactory
 platform.keycloak.auth.AccountNoticeResourceFactory
+platform.keycloak.auth.CodeSettingsResourceFactory
+platform.keycloak.auth.SignInSettingsResourceFactory

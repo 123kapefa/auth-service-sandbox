@@ -44,6 +44,17 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
       platformPasskeyOfferFailed:
         "Не получилось добавить ключ. Попробуйте ещё раз или пропустите — войдёте по коду, как сегодня.",
       platformPasskeyLabel: "Ключ доступа",
+      platformSignInTransitionTitle: "Добавьте другой способ входа",
+      platformSignInTransitionText:
+        "{0} в проекте выключится после {1}. Добавьте ключ доступа — войдёте по Face ID, отпечатку или PIN этого устройства, и вход не пропадёт.",
+      platformSignInTransitionLater: "Спросим при следующем входе. Почту можно добавить в кабинете.",
+      platformSignInTransitionPhone: "Вход по телефону",
+      platformSignInTransitionEmail: "Вход по почте",
+      platformSignInTransitionPassword: "Вход по паролю",
+      platformLoginPhoneOff: "Вход по номеру телефона в проекте выключен. Войдите по почте.",
+      platformLoginEmailOff: "Вход по почте в проекте выключен. Войдите по номеру телефона.",
+      platformPasswordOff: "Вход по паролю в проекте выключен. Войдите по коду или ключом доступа.",
+      platformPhoneChangeOff: "Вход по телефону в проекте выключен — номер не поменять.",
       platformPasskeyAddTitle: "Ключ доступа",
       platformPasskeyAddText:
         "Входите по Face ID, отпечатку или PIN этого устройства — без пароля и кода. Ключ хранится на устройстве, и его нельзя украсть вместе с номером.",
@@ -194,6 +205,17 @@ const { useI18n, ofTypeI18n: _ofTypeI18n } = i18nBuilder
       platformPasskeyOfferFailed:
         "Couldn't add the passkey. Try again or skip and sign in with a code, as today.",
       platformPasskeyLabel: "Passkey",
+      platformSignInTransitionTitle: "Add another way to sign in",
+      platformSignInTransitionText:
+        "{0} will be turned off in this project after {1}. Add a passkey to sign in with Face ID, a fingerprint or this device's PIN and keep access.",
+      platformSignInTransitionLater: "We'll ask again next time. You can add an email in your account.",
+      platformSignInTransitionPhone: "Signing in by phone",
+      platformSignInTransitionEmail: "Signing in by email",
+      platformSignInTransitionPassword: "Signing in with a password",
+      platformLoginPhoneOff: "Signing in by phone number is turned off in this project. Use your email.",
+      platformLoginEmailOff: "Signing in by email is turned off in this project. Use your phone number.",
+      platformPasswordOff: "Signing in with a password is turned off in this project. Use a code or a passkey.",
+      platformPhoneChangeOff: "Signing in by phone is turned off in this project, so the number can't be changed.",
       platformPasskeyAddTitle: "Passkey",
       platformPasskeyAddText:
         "Sign in with Face ID, a fingerprint or this device's PIN, without a password or code. The passkey stays on your device and can't be stolen along with your number.",

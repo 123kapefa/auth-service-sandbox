@@ -34,13 +34,14 @@ scripts/keycloak/check-stand.sh
 весь этап 6б — `check-6b.sh` 138 (кабинет, устройства, оформление, новый проект), магазин из двух сервисов (этап 6а.4) —
 `check-shop.sh` 61, вход через Госуслуги и Яндекс ID (на заглушке) — `check-external-login.sh` 41, защита от накрутки
 кодов (этап 10.1) — `check-code-limits.sh` 40, код на телефон звонком и запасной SMS (10.2) — `check-phone-code.sh` 24, способы входа человека (10.3) —
-`check-sign-in-methods.sh` 43, вход в два шага (10.4) — `check-two-step-login.sh` 35, смена номера самим человеком (10.5) — `check-phone-change.sh` 27, предложение ключа доступа после входа по коду (10.6) — `check-passkey-offer.sh` 12. Тестов: .NET — 593, плагина Keycloak (Java, в сборке образа) — 149, админки и кабинета (Vitest) — 87, темы входа (Vitest) — 44.
+`check-sign-in-methods.sh` 43, вход в два шага (10.4) — `check-two-step-login.sh` 35, смена номера самим человеком (10.5) — `check-phone-change.sh` 27, предложение ключа доступа после входа по коду (10.6) — `check-passkey-offer.sh` 12, коды и способы входа проекта в API админки (10.7) — `check-code-settings.sh` 19 и `check-project-sign-in.sh` 43. Тестов: .NET — 643, плагина Keycloak (Java, в сборке образа) — 167, админки и кабинета (Vitest) — 87, темы входа (Vitest) — 46.
 
 Стенд, поднятый до этапа 6б, после `git pull` и `docker compose up -d --build --wait` — `scripts/project/upgrade-6b.py
 sandbox` (realm импортируется только в пустую базу; подробнее — [06b](06b-account-branding.md#проекты-созданные-до-6б)),
 вход через Госуслуги и Яндекс ID — `scripts/project/enable-external-login.py sandbox --stub`, смена номера самим
 человеком (10.5) — `scripts/project/enable-phone-change.py sandbox`, предложение ключа доступа (10.6) —
-`scripts/project/enable-passkey-offer.py sandbox`.
+`scripts/project/enable-passkey-offer.py sandbox`, настройки входа и кодов в админке (10.7) —
+`scripts/project/enable-sign-in-settings.py sandbox`.
 
 | Что | Адрес | Доступ |
 |---|---|---|---|
@@ -86,7 +87,7 @@ sandbox` (realm импортируется только в пустую базу
 | 7 | Документация | идёт по ходу | — |
 | 8 | Выводы и ADR: брать ли Keycloak, чего стоит, что своё | ✅ (решения приняты) | [08-conclusions.md](08-conclusions.md), [ADR](../adr/README.md) |
 | 9 | Вход через Госуслуги и Яндекс ID (на заглушке; ключи — подставить) | ✅ | [09-external-login.md](09-external-login.md) |
-| 10 | Вход: способы входа и коды подешевле (10.1 — защита от накрутки кодов, 10.2 — звонок вместо SMS, 10.3 — способы входа человека, 10.4 — вход в два шага, 10.5 — смена номера самим человеком, 10.6 — предложение ключа доступа после входа по коду) | 🔄 | [10-code-limits.md](10-code-limits.md), [10-phone-code.md](10-phone-code.md), [10-sign-in-methods.md](10-sign-in-methods.md), [10-two-step-login.md](10-two-step-login.md), [10-phone-change.md](10-phone-change.md), [10-passkey-offer.md](10-passkey-offer.md), задача [#128](https://github.com/123kapefa/auth-service-sandbox/issues/128) |
+| 10 | Вход: способы входа и коды подешевле (10.1 — защита от накрутки кодов, 10.2 — звонок вместо SMS, 10.3 — способы входа человека, 10.4 — вход в два шага, 10.5 — смена номера самим человеком, 10.6 — предложение ключа доступа после входа по коду, 10.7 — коды и способы входа проекта в API админки) | 🔄 | [10-code-limits.md](10-code-limits.md), [10-phone-code.md](10-phone-code.md), [10-sign-in-methods.md](10-sign-in-methods.md), [10-two-step-login.md](10-two-step-login.md), [10-phone-change.md](10-phone-change.md), [10-passkey-offer.md](10-passkey-offer.md), [10-code-settings.md](10-code-settings.md), задача [#128](https://github.com/123kapefa/auth-service-sandbox/issues/128) |
 
 Каждый этап — отдельная ветка `stage-N/...`. План, шаги и статусы — в
 [задачах GitHub](https://github.com/123kapefa/auth-service-sandbox/issues) и на
@@ -108,7 +109,7 @@ Keycloak; проекты друг друга не видят. **Приложен
 | `scripts/keycloak/` | `check-stand.sh` — стенд, `check-api.sh` — матрица доступа, `check-login.sh` — вход через страницу Keycloak, `check-login-methods.sh` — вход по почте, сброс пароля и 2FA; `check-code-login.sh` — вход по коду из SMS и письма (код — из лога Keycloak и Mailpit); `check-admin.sh` — режимы, администрирование, сессии, мгновенный отзыв, журнал, пароль и 2FA; `check-roles.sh` — роли и права приложений, роли пользователей, умный рефреш, «Менеджер 1С» (этап 4а); `check-admin-ui.sh` — своя админка: раздача, CSP, путь админов (этап 4б); `check-migration.sh` — перенос пользователей с BCrypt-паролями (этап 6); `check-service-keys.sh`, `check-new-project.sh`, `check-deploy.sh`, `check-shop.sh` — ключи сервисов, проект с нуля, поставка, магазин из двух сервисов (этап 6а); `check-account.sh`, `check-devices.sh`, `check-branding.sh`, `check-app-branding.sh` — кабинет, устройства, оформление проекта и приложения, `check-6b.sh` — весь этап 6б (этап 6б); `check-external-login.sh` — вход через Госуслуги и Яндекс ID (этап 9); `lib.sh` — общие помощники, `master-token.sh` — токен мастер-админки изнутри контейнера |
 | `login-theme/` | страницы входа Keycloak на React (Keycloakify) и письма (`src/email/`, FreeMarker) — тема `platform`, см. `login-theme/CLAUDE.md`; jar собирается в образе Keycloak |
 | `frontend/` | админка доступа на `/admin` и личный кабинет на `/account` (React, FSD) — см. `frontend/CLAUDE.md`; в образ сервиса попадает сборка |
-| `scripts/project/` | новый проект и его обслуживание: `create-project.sh`, `add-admin.py`, `add-app.py`; `upgrade-6b.py` — кабинет и оформление в проекте, созданном до 6б; `enable-external-login.py` — Госуслуги и Яндекс ID с ключами проекта; `enable-phone-change.py` — смена номера (10.5); `enable-passkey-offer.py` — предложение ключа доступа (10.6) |
+| `scripts/project/` | новый проект и его обслуживание: `create-project.sh`, `add-admin.py`, `add-app.py`; `upgrade-6b.py` — кабинет и оформление в проекте, созданном до 6б; `enable-external-login.py` — Госуслуги и Яндекс ID с ключами проекта; `enable-phone-change.py` — смена номера (10.5); `enable-passkey-offer.py` — предложение ключа доступа (10.6); `enable-sign-in-settings.py` — настройки входа и кодов в админке (10.7) |
 | `samples/shop/` | новый проект на сервисе входа (этап 6а.4): «Заказы» со страницей и «Уведомления» на пакетах `Platform.*`, `setup.sh` — поднять с нуля; что мешало — [06a-friction.md](06a-friction.md) |
 | `src/Shared/Authentication` | проверка токенов, политики «роль + режим», права из токена, хук мгновенного отзыва и умного рефреша (`access_changed`) — переиспользуемая библиотека |
 | `src/Shared/Authentication.Redis` | отметки отзыва и версии доступа в Redis, кэш проверки, `AddPlatformTokenRevocation` |

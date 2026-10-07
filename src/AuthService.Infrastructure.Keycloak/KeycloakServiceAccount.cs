@@ -12,8 +12,8 @@ namespace AuthService.Infrastructure.Keycloak;
 
 /// <summary>
 /// Токен служебной учётки клиента (client_credentials) для Admin API Keycloak. Права учётки — роли realm-management
-/// в realm JSON (view-users, manage-users, view-events) и роль realm manage-branding (оформление проекта, плагин
-/// platform-branding). Токен кэшируется до истечения: Admin API зовётся часто.
+/// в realm JSON (view-users, manage-users, view-events) и роли realm manage-branding (оформление проекта, плагин
+/// platform-branding) и manage-sign-in (настройки входа и кодов, плагин platform-codes). Токен кэшируется до истечения: Admin API зовётся часто.
 /// </summary>
 internal sealed partial class KeycloakServiceAccount(
     IHttpClientFactory httpClientFactory,

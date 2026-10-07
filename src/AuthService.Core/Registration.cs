@@ -12,6 +12,7 @@ using AuthService.Core.Features.Admin.UseCases.RoleCatalog;
 using AuthService.Core.Features.Admin.UseCases.SetRestriction;
 using AuthService.Core.Features.Admin.UseCases.ServiceKeys;
 using AuthService.Core.Features.Admin.UseCases.SetRole;
+using AuthService.Core.Features.Admin.UseCases.SignInCodes;
 using AuthService.Core.Features.Admin.UseCases.UserCredentials;
 using AuthService.Core.Features.Auth.Cookies;
 using AuthService.Core.Features.Auth.UseCases.BackchannelLogout;
@@ -83,6 +84,8 @@ public static class Registration
         services.AddScoped<AppCatalogHandler>();
         services.AddScoped<BrandingHandler>();
         services.AddScoped<AppBrandingHandler>();
+        services.AddScoped<CodeSettingsHandler>();
+        services.AddScoped<ProjectSignInHandler>();
 
         return services;
     }

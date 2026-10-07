@@ -61,6 +61,8 @@ export type KcContextExtensionPerPage = {
 type PasskeyOffer = {
   /** "true" — экран «Входите без кода» (действие platform-passkey-offer) с «Не сейчас». */
   platformPasskeyOffer?: string;
+  /** Способ входа в переходном периоде проекта (10.7): «phone:2026-11-05» — предложение при каждом входе. */
+  platformSignInTransition?: string;
 };
 
 export type KcContext = ExtendKcContext<KcContextExtension, KcContextExtensionPerPage>;
