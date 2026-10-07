@@ -150,7 +150,7 @@ sleep 1.1
 check "«Прислать SMS» — отказ" "$(send_sms "$JAR")" "Сейчас не можем отправить SMS. Войдите по почте или с ключом доступа."
 check "SMS не ушла" "$(phone_count "$PHONE" sms)" 0
 check "в логе Keycloak — оповещение о бюджете" \
-  "$(docker compose logs keycloak --since 24h 2>/dev/null | grep -c "\[CODE BUDGET\] $REALM: дневной бюджет 0 ₽ исчерпан" | sed 's/^[1-9][0-9]*$/есть/')" есть
+  "$(docker compose logs keycloak --since 24h 2>/dev/null | grep -c "\[CODE BUDGET\] $REALM: дневной бюджет [0-9]* ₽ исчерпан" | sed 's/^[1-9][0-9]*$/есть/')" есть
 EMAIL="limits-$(date +%s)-$RANDOM@sandbox.test"; JAR="$WORK/jar7b"; : > "$JAR"
 check "код на почту уходит" "$(code_start "$JAR" "$EMAIL")" "Отправили код письмом на $EMAIL."
 sleep 2

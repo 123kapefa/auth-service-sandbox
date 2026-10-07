@@ -128,7 +128,7 @@ final class CodeDispatcher {
                 int alert = limitStore.recordSend(target, request.ip(), range, delivery, cost, today, now, limits::alertPercent);
                 metrics.sent(realm.getName(), delivery, cost);
                 if (alert > 0) {
-                    alertBudget(realm, limits, alert);
+                    alertBudget(request.session(), realm, limits, alert, usage.spentToday() + cost);
                 }
                 yield new Outcome.Sent(state);
             }
@@ -262,7 +262,7 @@ final class CodeDispatcher {
             case CodeLimits.Decision.BudgetExhausted ignored -> {
                 metrics.refused(realm.getName(), "budget");
                 if (limitStore.markAlerted(today, 100)) {
-                    alertBudget(realm, limits, 100);
+                    alertBudget(request.session(), realm, limits, 100, limitStore.budget(today).spent());
                 }
                 yield new Outcome.Refused(current, "platformCodeSmsUnavailable", new Object[0], false);
             }
@@ -270,17 +270,19 @@ final class CodeDispatcher {
         };
     }
 
-    // Оповещение о расходе — один раз на каждый порог за сутки. Пока — в лог Keycloak (WARN, «[CODE BUDGET]»);
-    // кому ещё слать (почта админам проекта), решает 10.7.
-    private void alertBudget(RealmModel realm, CodeLimits limits, int percent) {
+    // Оповещение о расходе — один раз на каждый порог за сутки (отметка в CodeLimitStore): строка в логе Keycloak
+    // (WARN, «[CODE BUDGET]»), метрика и письмо админам проекта (BudgetAlerts).
+    private void alertBudget(KeycloakSession session, RealmModel realm, CodeLimits limits, int percent, long spent) {
         metrics.budgetAlert(realm.getName(), percent);
-        long budgetRub = limits.policy().dailyBudget() / 100;
+        CodeLimitPolicy policy = limits.policy();
+        long budgetRub = policy.dailyBudget() / 100;
         if (percent >= 100) {
             LOG.warnf("[CODE BUDGET] %s: дневной бюджет %d ₽ исчерпан — SMS выключены до полуночи (%s)",
-                realm.getName(), budgetRub, limits.policy().zone());
+                realm.getName(), budgetRub, policy.zone());
         } else {
             LOG.warnf("[CODE BUDGET] %s: израсходовано %d %% дневного бюджета %d ₽", realm.getName(), percent, budgetRub);
         }
+        BudgetAlerts.send(session, realm, percent, spent, policy.dailyBudget(), policy.zone());
     }
 
     /** Код введён верно: метрика и счётчик суток проекта (доля введённых). */
