@@ -3,7 +3,6 @@ package platform.keycloak.auth;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.util.List;
-import java.util.function.Function;
 
 import org.jboss.logging.Logger;
 import org.keycloak.Config;
@@ -86,10 +85,17 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
     /** Отправка кодов с настройками кодов (лимиты, капча, телефония) — и для смены номера (UpdatePhoneAction). */
     CodeDispatcher dispatcher() {
         Clock clock = Clock.systemUTC();
-        Function<RealmModel, CodeLimits> limits = realm -> new CodeLimits(CodeLimitPolicy.from(
-            key -> setting(realm, key), CodeLimitPolicy.DEFAULTS));
-        return new CodeDispatcher(new CodeRules(CodePolicy.PRODUCTION, clock, new SecureRandom()), limits,
+        return new CodeDispatcher(new CodeRules(CodePolicy.PRODUCTION, clock, new SecureRandom()), this::limits,
             captcha, captchaSiteKey, metrics, phone, clock);
+    }
+
+    /** Защита от накрутки проекта: настройки проекта (атрибуты realm) поверх настроек сервера и значений по умолчанию. */
+    CodeLimits limits(RealmModel realm) {
+        return new CodeLimits(policy(realm));
+    }
+
+    CodeLimitPolicy policy(RealmModel realm) {
+        return CodeLimitPolicy.from(key -> setting(realm, key), CodeLimitPolicy.DEFAULTS);
     }
 
     private String setting(RealmModel realm, String key) {

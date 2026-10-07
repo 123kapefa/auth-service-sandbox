@@ -125,7 +125,7 @@ final class CodeDispatcher {
                 CodeState state = sent.state().sentAs(code.get(), delivery);
                 long cost = limits.cost(delivery);
                 request.store().save(target, state, now);
-                int alert = limitStore.recordSend(target, request.ip(), range, cost, today, now, limits::alertPercent);
+                int alert = limitStore.recordSend(target, request.ip(), range, delivery, cost, today, now, limits::alertPercent);
                 metrics.sent(realm.getName(), delivery, cost);
                 if (alert > 0) {
                     alertBudget(realm, limits, alert);
@@ -198,7 +198,7 @@ final class CodeDispatcher {
                                 CodeLimitStore limitStore, String range, LocalDate today, Instant now) {
         CodeState state = sent.state().sentAs(sent.code(), delivery);
         request.store().save(request.target(), state, now);
-        limitStore.recordSend(request.target(), request.ip(), range, 0, today, now, spent -> 0);
+        limitStore.recordSend(request.target(), request.ip(), range, null, 0, today, now, spent -> 0);
         metrics.refused(request.realm().getName(), "method-disabled");
         LOG.infof("Код на %s не отправлен: способ входа выключен у пользователя", request.target().value());
         return new Outcome.Sent(state);
@@ -282,7 +282,9 @@ final class CodeDispatcher {
         }
     }
 
-    CodeMetrics metrics() {
-        return metrics;
+    /** Код введён верно: метрика и счётчик суток проекта (доля введённых). */
+    void verified(KeycloakSession session, RealmModel realm, CodeDelivery delivery) {
+        metrics.verified(realm.getName(), delivery);
+        new CodeLimitStore(session, realm).recordVerified(LocalDate.ofInstant(clock.instant(), limits.apply(realm).policy().zone()));
     }
 }

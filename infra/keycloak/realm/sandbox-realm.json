@@ -540,6 +540,12 @@
         "description": "Служебная: менять оформление проекта (плагин platform-branding) — у учётки сервиса входа",
         "composite": false,
         "clientRole": false
+      },
+      {
+        "name": "manage-sign-in",
+        "description": "Служебная: менять настройки входа и кодов проекта (плагин platform-codes) — у учётки сервиса входа",
+        "composite": false,
+        "clientRole": false
       }
     ],
     "client": {
@@ -605,7 +611,8 @@
                 "audit.view",
                 "roles.manage",
                 "services.manage",
-                "branding.manage"
+                "branding.manage",
+                "sign-in.manage"
               ]
             }
           },
@@ -747,6 +754,20 @@
         {
           "name": "branding.manage",
           "description": "Оформление проекта: название, логотип, цвет, тема",
+          "composite": false,
+          "clientRole": true,
+          "attributes": {
+            "kind": [
+              "permission"
+            ],
+            "source": [
+              "code"
+            ]
+          }
+        },
+        {
+          "name": "sign-in.manage",
+          "description": "Вход и коды: каналы, страны, лимиты, бюджет и расход",
           "composite": false,
           "clientRole": true,
           "attributes": {
@@ -2094,7 +2115,8 @@
         ]
       },
       "realmRoles": [
-        "manage-branding"
+        "manage-branding",
+        "manage-sign-in"
       ]
     },
     {

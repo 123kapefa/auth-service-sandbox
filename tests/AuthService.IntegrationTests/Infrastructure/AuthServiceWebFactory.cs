@@ -63,6 +63,9 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
     /// <summary>Оформление проекта в памяти вместо плагина Keycloak.</summary>
     public FakeProjectBranding Branding { get; } = new();
 
+    /// <summary>Настройки кодов проекта в памяти вместо плагина Keycloak.</summary>
+    public FakeProjectCodes Codes { get; } = new();
+
     /// <summary>Уведомления человеку в памяти вместо плагина Keycloak.</summary>
     public FakeAccountNotices Notices { get; } = new();
 
@@ -187,6 +190,8 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
             services.AddSingleton<ILoginDeviceStore>(LoginDevices);
             services.RemoveAll<IProjectBranding>();
             services.AddSingleton<IProjectBranding>(Branding);
+            services.RemoveAll<IProjectCodes>();
+            services.AddSingleton<IProjectCodes>(Codes);
             services.RemoveAll<IAccountNotices>();
             services.AddSingleton<IAccountNotices>(Notices);
             // Ключи шифрования — в памяти: база в тестах недоступна.

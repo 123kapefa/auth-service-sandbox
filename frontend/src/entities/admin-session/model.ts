@@ -11,6 +11,7 @@ export const Permissions = {
   rolesManage: "roles.manage",
   servicesManage: "services.manage",
   brandingManage: "branding.manage",
+  signInManage: "sign-in.manage",
 } as const;
 
 /** Что вызвавшему видно в админке. Только для интерфейса — доступ проверяет сервер. */

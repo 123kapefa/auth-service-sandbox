@@ -76,7 +76,7 @@ public final class CodeLoginAuthenticator implements Authenticator {
 
         switch (codes.verify(store, target, formData.getFirst(FIELD_CODE))) {
             case CodeRules.VerifyResult.Success success -> {
-                codes.metrics().verified(context.getRealm().getName(), CodeDispatcher.delivery(target, current));
+                codes.verified(context.getSession(), context.getRealm(), CodeDispatcher.delivery(target, current));
                 signIn(context, target, success.state());
             }
             case CodeRules.VerifyResult.Wrong wrong ->

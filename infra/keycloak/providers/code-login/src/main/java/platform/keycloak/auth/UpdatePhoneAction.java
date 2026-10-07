@@ -94,7 +94,10 @@ public final class UpdatePhoneAction implements RequiredActionProvider {
         CodeStore store = store(context);
         CodeState current = store.load(phone);
         switch (codes.verify(store, phone, formData.getFirst(CodeLoginAuthenticator.FIELD_CODE))) {
-            case CodeRules.VerifyResult.Success ignored -> change(context, phone);
+            case CodeRules.VerifyResult.Success ignored -> {
+                codes.verified(context.getSession(), context.getRealm(), CodeDispatcher.delivery(phone, current));
+                change(context, phone);
+            }
             case CodeRules.VerifyResult.Wrong wrong -> codeError(context, phone, wrong.state(), "platformCodeWrong", wrong.attemptsLeft());
             case CodeRules.VerifyResult.LockedNow locked ->
                 codeError(context, phone, locked.state(), "platformCodeLocked", locked.retryAfterSeconds());

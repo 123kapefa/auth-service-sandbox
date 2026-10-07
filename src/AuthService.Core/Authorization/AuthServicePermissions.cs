@@ -43,6 +43,12 @@ public static class AuthServicePermissions
         public const string MANAGE = "branding.manage";
     }
 
+    public static class SignIn
+    {
+        /// <summary>Вход и коды проекта: каналы, страны, лимиты, бюджет и расход — только админ проекта.</summary>
+        public const string MANAGE = "sign-in.manage";
+    }
+
     /// <summary>
     /// Права сервисов проекта (по ключу доступа) в сервисе входа. Выдаются ключу при выдаче или позже; людям — не нужны:
     /// эндпоинты с ними пускают только сервисы (RequireService).
@@ -82,6 +88,7 @@ public static class AuthServicePermissions
         new(Roles.MANAGE, "Роли и права приложения"),
         new(ProjectServices.MANAGE, "Сервисы проекта и их ключи доступа"),
         new(Branding.MANAGE, "Оформление проекта: название, логотип, цвет, тема"),
+        new(SignIn.MANAGE, "Вход и коды: каналы, страны, лимиты, бюджет и расход"),
         new(ServiceAccess.USERS_READ, "Сервис: читать пользователя"),
         new(ServiceAccess.ACCESS_CHECK, "Сервис: проверить доступ пользователя"),
         new(ServiceAccess.CATALOG_DECLARE, "Сервис: объявить права и роли своего приложения"),
