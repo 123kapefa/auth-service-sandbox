@@ -3,8 +3,17 @@ import { type UserDetail } from "@/entities/user";
 import { Button, ConfirmDialog } from "@/shared/ui";
 import { useDisableTwoFactor, useSendPasswordReset } from "../model/use-credentials";
 
-/** Пароль и 2FA: пароль админ не видит и не задаёт — пользователь получает ссылку на почту. */
-export function CredentialsActions({ user }: { user: UserDetail }) {
+/**
+ * Пароль и 2FA: пароль админ не видит и не задаёт — пользователь получает ссылку на почту. Вход по паролю человек
+ * выключил сам (passwordDisabled) — ссылку не шлём: сервис ответит 409, сначала — вернуть способы по умолчанию.
+ */
+export function CredentialsActions({
+  user,
+  passwordDisabled = false,
+}: {
+  user: UserDetail;
+  passwordDisabled?: boolean;
+}) {
   const [confirm, setConfirm] = useState<"reset" | "twoFactor" | null>(null);
   const reset = useSendPasswordReset(user.id);
   const twoFactor = useDisableTwoFactor(user.id);
@@ -14,7 +23,7 @@ export function CredentialsActions({ user }: { user: UserDetail }) {
       <Button
         size="sm"
         variant="outline"
-        disabled={!user.email}
+        disabled={!user.email || passwordDisabled}
         onClick={() => setConfirm("reset")}
       >
         Отправить ссылку для смены пароля
@@ -27,8 +36,16 @@ export function CredentialsActions({ user }: { user: UserDetail }) {
       >
         Отключить 2FA
       </Button>
-      {!user.email && (
-        <p className="w-full text-xs text-muted-foreground">Почты нет — ссылку отправить некуда.</p>
+      {passwordDisabled ? (
+        <p className="w-full text-sm text-muted-foreground">
+          Ссылка не отправляется: вход по паролю у человека выключен.
+        </p>
+      ) : (
+        !user.email && (
+          <p className="w-full text-xs text-muted-foreground">
+            Почты нет — ссылку отправить некуда.
+          </p>
+        )
       )}
       <ConfirmDialog
         open={confirm === "reset"}

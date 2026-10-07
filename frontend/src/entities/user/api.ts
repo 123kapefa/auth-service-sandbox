@@ -1,4 +1,5 @@
 import { keepPreviousData, queryOptions } from "@tanstack/react-query";
+import { type SignInMethods } from "@/entities/account-security";
 import { apiClient, type Envelope, unwrap } from "@/shared/api";
 import { type AppAccess, type UserDetail, type UserSession, type UsersPage } from "./types";
 
@@ -24,6 +25,18 @@ export const userApi = {
         `/auth/admin/users/${userId}/sessions`,
       ),
     ).items,
+  /** Способы входа человека — как в кабинете (/me/sign-in-methods). */
+  signInMethods: async (userId: string) =>
+    unwrap(
+      await apiClient.get<Envelope<SignInMethods>>(`/auth/admin/users/${userId}/sign-in-methods`),
+    ),
+  /** Вернуть способы по умолчанию: всё включено, человеку — письмо. */
+  resetSignInMethods: async (userId: string) =>
+    unwrap(
+      await apiClient.post<Envelope<SignInMethods>>(
+        `/auth/admin/users/${userId}/sign-in-methods/reset`,
+      ),
+    ),
 };
 
 export const userQueries = {
@@ -48,5 +61,10 @@ export const userQueries = {
     queryOptions({
       queryKey: [...userQueries.all(), userId, "sessions"],
       queryFn: () => userApi.sessions(userId),
+    }),
+  signInMethods: (userId: string) =>
+    queryOptions({
+      queryKey: [...userQueries.all(), userId, "sign-in-methods"],
+      queryFn: () => userApi.signInMethods(userId),
     }),
 };

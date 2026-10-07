@@ -9,6 +9,7 @@ import { JournalPage } from "@/pages/journal";
 import { NotFoundPage } from "@/pages/not-found";
 import { OverviewPage } from "@/pages/overview";
 import { ServicesPage } from "@/pages/services";
+import { SignInSettingsPage } from "@/pages/sign-in-settings";
 import { UserPage } from "@/pages/user";
 import { UsersPage } from "@/pages/users";
 import { ADMIN_BASE } from "@/shared/config/routes";
@@ -26,6 +27,7 @@ export const router = createBrowserRouter(
         { path: "journal", element: <JournalPage /> },
         { path: "services", element: <ServicesPage /> },
         { path: "branding", element: <BrandingPage /> },
+        { path: "sign-in", element: <SignInSettingsPage /> },
         {
           path: "apps/:clientId",
           element: <AppSection />,

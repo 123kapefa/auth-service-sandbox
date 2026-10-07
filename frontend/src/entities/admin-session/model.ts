@@ -26,6 +26,8 @@ export function accessOf(session: AdminSession) {
     projectServices: project.has(Permissions.servicesManage),
     /** Оформление страниц входа — только админ проекта. */
     projectBranding: project.has(Permissions.brandingManage),
+    /** Вход и коды: способы входа проекта, каналы и лимиты кодов — только админ проекта. */
+    projectSignIn: project.has(Permissions.signInManage),
     /** Приложения под управлением (у админа приложения — только своё). */
     apps: session.apps,
     /** Есть ли что делать в админке вообще. */
@@ -34,6 +36,7 @@ export function accessOf(session: AdminSession) {
       project.has(Permissions.auditView) ||
       project.has(Permissions.servicesManage) ||
       project.has(Permissions.brandingManage) ||
+      project.has(Permissions.signInManage) ||
       session.apps.length > 0,
   };
 }
