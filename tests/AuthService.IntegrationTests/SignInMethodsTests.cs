@@ -89,6 +89,22 @@ public sealed class SignInMethodsTests : IClassFixture<AuthServiceWebFactory>
     }
 
     [Fact]
+    public async Task DisablePassword_PasskeyOffInProject_Conflict_NothingSaved()
+    {
+        // Ключ доступа есть, но в проекте ключи выключены: войти им нельзя, опорой он не считается.
+        AddPasskey();
+        Dictionary<string, ProjectSignInMethod> methods = new(FakeProjectSignIn.Default().Methods, StringComparer.Ordinal)
+        {
+            [ProjectSignInRules.PASSKEY] = new(ProjectSignInRules.OFF),
+        };
+        _factory.SignIn.Current = FakeProjectSignIn.Default() with { Methods = methods };
+
+        await AssertErrorAsync(await SetAsync("password", enabled: false), HttpStatusCode.Conflict, "sign_in_methods.needs_passkey_or_authenticator");
+
+        Assert.Empty(_keycloak.AttributeChanges);
+    }
+
+    [Fact]
     public async Task DisablePassword_WithPasskey_Saved_Audited_Notified_OtherDevicesSignedOut()
     {
         AddPasskey();

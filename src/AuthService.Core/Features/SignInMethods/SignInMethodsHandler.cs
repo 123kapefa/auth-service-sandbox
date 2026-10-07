@@ -45,10 +45,7 @@ public sealed partial class SignInMethodsHandler(
             return account.Error;
         }
 
-        return ToResponse(
-            account.Value,
-            await HistoryAsync(userId, cancellationToken),
-            await ProjectDisabledAsync(cancellationToken));
+        return ToResponse(account.Value, await HistoryAsync(userId, cancellationToken));
     }
 
     /// <summary>Выключенный ли способ у пользователя (на самом деле, с учётом правил).</summary>
@@ -213,21 +210,31 @@ public sealed partial class SignInMethodsHandler(
             return linked.Error;
         }
 
+        IReadOnlyList<string> projectDisabled = await ProjectDisabledAsync(cancellationToken);
         HashSet<string> types = [.. credentials.Value.Select(credential => credential.Type)];
         IdentityUser found = user.Value;
         var facts = new SignInFacts(
             types.Contains(Credentials.PASSWORD),
-            !string.IsNullOrWhiteSpace(found.Phone) || IsPhoneLogin(found.Username),
+            IsPhoneLogin(found.Username),
             !string.IsNullOrWhiteSpace(found.Email),
-            types.Contains(Credentials.PASSKEY),
+            types.Contains(Credentials.PASSKEY) && !projectDisabled.Contains(ProjectSignInRules.PASSKEY),
             types.Contains(Credentials.OTP),
             types.Contains(Credentials.RECOVERY_CODES),
-            linked.Value.Count > 0,
-            SignInMethodRules.Parse(found.DisabledSignInMethods));
-        return new Account(found, facts, linked.Value);
+            linked.Value.Any(provider => !projectDisabled.Contains(provider)),
+            SignInMethodRules.Parse(found.DisabledSignInMethods),
+            SignInMethodRules.All.Where(method => projectDisabled.Contains(ProjectMethod(method))).ToHashSet(StringComparer.Ordinal));
+        return new Account(found, facts, linked.Value, projectDisabled, types.Contains(Credentials.PASSKEY));
     }
 
-    // У входа по номеру логин — сам номер цифрами (как в плагине).
+    private static string ProjectMethod(string method) => method switch
+    {
+        SignInMethodRules.PASSWORD => ProjectSignInRules.PASSWORD,
+        SignInMethodRules.PHONE_CODE => ProjectSignInRules.PHONE,
+        _ => ProjectSignInRules.EMAIL,
+    };
+
+    // Код на телефон находит человека по логину-номеру (как в плагине): номер в профиле у входа по почте — не способ
+    // входа. У входа по номеру логин — сам номер цифрами.
     private static bool IsPhoneLogin(string username) => username.Length is >= 10 and <= 15 && username.All(char.IsAsciiDigit);
 
     private async Task<IReadOnlyList<SignInMethodChangeResponse>> HistoryAsync(Guid userId, CancellationToken cancellationToken)
@@ -288,10 +295,7 @@ public sealed partial class SignInMethodsHandler(
         ];
     }
 
-    private static SignInMethodsResponse ToResponse(
-        Account account,
-        IReadOnlyList<SignInMethodChangeResponse> history,
-        IReadOnlyList<string> projectDisabled)
+    private static SignInMethodsResponse ToResponse(Account account, IReadOnlyList<SignInMethodChangeResponse> history)
     {
         IReadOnlySet<string> disabled = SignInMethodRules.EffectiveDisabled(account.Facts);
         return new SignInMethodsResponse(
@@ -302,12 +306,12 @@ public sealed partial class SignInMethodsHandler(
                     !disabled.Contains(method),
                     SignInMethodRules.DisableBlocker(account.Facts, method))),
             ],
-            account.Facts.HasPasskey,
+            account.HasPasskeyCredential,
             account.Facts.HasAuthenticator,
             account.Facts.HasRecoveryCodes,
             account.LinkedProviders,
             history,
-            projectDisabled);
+            account.ProjectDisabled);
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Sign-in methods notice {Event} for user {UserId} was not sent: {Error}")]
@@ -319,5 +323,10 @@ public sealed partial class SignInMethodsHandler(
     [LoggerMessage(Level = LogLevel.Warning, Message = "Other sessions of user {UserId} were not ended after a sign-in method change: {Error}")]
     private static partial void LogSignOutFailed(ILogger logger, Guid userId, string error);
 
-    private sealed record Account(IdentityUser User, SignInFacts Facts, IReadOnlyList<string> LinkedProviders);
+    private sealed record Account(
+        IdentityUser User,
+        SignInFacts Facts,
+        IReadOnlyList<string> LinkedProviders,
+        IReadOnlyList<string> ProjectDisabled,
+        bool HasPasskeyCredential);
 }

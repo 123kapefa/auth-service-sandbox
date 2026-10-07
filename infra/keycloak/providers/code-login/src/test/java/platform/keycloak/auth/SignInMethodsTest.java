@@ -27,6 +27,23 @@ class SignInMethodsTest {
     }
 
     @Test
+    void methodsOffInProject_doNotCountAsLeft_nothingIsDisabled() {
+        // Аутентификатор держит выключенные пароль и телефон, а почту проект выключил: войти нечем — страховка снимает всё.
+        SignInMethods.Facts facts = new SignInMethods.Facts(true, true, true, false, true, false,
+            Set.of(PASSWORD, PHONE), Set.of(EMAIL));
+
+        assertEquals(Set.of(), SignInMethods.effectiveDisabled(facts));
+    }
+
+    @Test
+    void methodOffInProject_otherLeft_disabledStays() {
+        SignInMethods.Facts facts = new SignInMethods.Facts(true, true, true, false, true, false,
+            Set.of(PASSWORD), Set.of(EMAIL));
+
+        assertEquals(Set.of(PASSWORD), SignInMethods.effectiveDisabled(facts));
+    }
+
+    @Test
     void passwordAndPhone_disabled_whilePasskeyExists() {
         assertEquals(Set.of(PASSWORD, PHONE),
             SignInMethods.effectiveDisabled(facts(true, false, false, Set.of(PASSWORD, PHONE))));

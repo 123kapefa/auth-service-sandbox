@@ -135,6 +135,33 @@ class CodeRulesTest {
     }
 
     /** Часы, которые тест двигает вперёд: 5 минут проверяются мгновенно. */
+    @Test
+    void verify_parallelGuesses_shareAttempts_codeBurnsAfterMax() {
+        // Одновременные вводы читают одно состояние (неверных: 0), но номера попыток им выдаёт общий счётчик.
+        CodeRules.SendResult.Sent sent = sent(CodeState.EMPTY);
+        AtomicSlots slots = new AtomicSlots(new MemorySingleUseObjects());
+        String wrong = sent.code().equals("000000") ? "111111" : "000000";
+        int max = CodePolicy.PRODUCTION.maxAttempts();
+        for (int i = 1; i < max; i++) {
+            assertInstanceOf(CodeRules.VerifyResult.Wrong.class,
+                rules.verify(sent.state(), wrong, () -> slots.claim("attempts", 300, max)));
+        }
+        assertInstanceOf(CodeRules.VerifyResult.LockedNow.class,
+            rules.verify(sent.state(), wrong, () -> slots.claim("attempts", 300, max)));
+
+        // Попытки к этому коду кончились: даже верный код из «старого» состояния не входит.
+        assertInstanceOf(CodeRules.VerifyResult.LockedNow.class,
+            rules.verify(sent.state(), sent.code(), () -> slots.claim("attempts", 300, max)));
+    }
+
+    @Test
+    void verify_rightCodeOnLastAttempt_succeeds() {
+        CodeRules.SendResult.Sent sent = sent(CodeState.EMPTY);
+        int max = CodePolicy.PRODUCTION.maxAttempts();
+
+        assertInstanceOf(CodeRules.VerifyResult.Success.class, rules.verify(sent.state(), sent.code(), () -> max));
+    }
+
     private static final class MovableClock extends Clock {
         private Instant now;
 

@@ -63,7 +63,7 @@ public static class SignInMethodRules
         }
 
         bool nothingLeft = !facts.HasPasskey && !facts.HasExternal
-            && All.Where(method => Available(facts, method)).All(result.Contains);
+            && All.Where(method => Available(facts, method) && facts.OffInProject?.Contains(method) != true).All(result.Contains);
         return nothingLeft ? new HashSet<string>(StringComparer.Ordinal) : result;
     }
 
@@ -105,11 +105,16 @@ public static class SignInMethodRules
 /// <param name="HasPassword">Задан пароль.</param>
 /// <param name="HasPhone">Есть телефон.</param>
 /// <param name="HasEmail">Есть почта.</param>
-/// <param name="HasPasskey">Есть ключ доступа.</param>
+/// <param name="HasPasskey">Есть ключ доступа, и ключи не выключены в проекте.</param>
 /// <param name="HasAuthenticator">Есть приложение-аутентификатор.</param>
 /// <param name="HasRecoveryCodes">Созданы коды восстановления.</param>
-/// <param name="HasExternal">Привязан внешний вход.</param>
+/// <param name="HasExternal">Привязан внешний вход, не выключенный в проекте.</param>
 /// <param name="Disabled">Выключенные в атрибуте способы.</param>
+/// <param name="OffInProject">Способы человека (пароль, коды), выключенные в проекте: войти ими нельзя.</param>
+/// <remarks>
+/// «Есть» — значит, этим можно войти (как в плагине): телефон — только у входа по номеру, ключ доступа и внешний вход,
+/// выключенные в проекте, не в счёт. Иначе человек выключил бы последнее, чем на самом деле входит.
+/// </remarks>
 public sealed record SignInFacts(
     bool HasPassword,
     bool HasPhone,
@@ -118,4 +123,5 @@ public sealed record SignInFacts(
     bool HasAuthenticator,
     bool HasRecoveryCodes,
     bool HasExternal,
-    IReadOnlySet<string> Disabled);
+    IReadOnlySet<string> Disabled,
+    IReadOnlySet<string>? OffInProject = null);
