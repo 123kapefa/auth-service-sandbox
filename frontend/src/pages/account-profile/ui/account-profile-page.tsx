@@ -1,18 +1,24 @@
-import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { accountProfileQueries } from "@/entities/account-profile";
+import { accountSecurityQueries } from "@/entities/account-security";
 import { AccountActionLink, useActionStatus } from "@/features/account-action";
 import { AppModesCard } from "@/features/account-mode-switch";
-import { formatDateTime } from "@/shared/lib/format";
+import { formatDate, formatDateTime, formatPhone } from "@/shared/lib/format";
 import { Badge, Card, CardTitle } from "@/shared/ui";
 
 /**
- * Профиль: телефон (логин), почта и режим в приложениях проекта. Смена почты — на странице сервера входа; пароль — в
+ * Профиль (экран 14 этапа 10): телефон (логин), почта и режим в приложениях проекта. Смена номера и почты — на страницах
+ * сервера входа (номер — кодом на новый); вход по телефону выключен в проекте — смены номера нет. Пароль — в
  * «Безопасности».
  */
 export function AccountProfilePage() {
   const queryClient = useQueryClient();
   const { data: profile } = useSuspenseQuery(accountProfileQueries.profile());
   useActionStatus(() => void queryClient.invalidateQueries(accountProfileQueries.profile()));
+  // Не дождались способов проекта — кнопку показываем: сервер входа всё равно проверит.
+  const { data: methods } = useQuery(accountSecurityQueries.signInMethods());
+  const phoneChangeable = !methods?.projectDisabled.includes("phone");
+  const phoneSince = formatDate(profile.phoneChangedAt ?? profile.createdAt);
   // У пользователей из импорта дата создания неизвестна — строку не показываем.
   const createdAt = formatDateTime(profile.createdAt);
 
@@ -20,20 +26,56 @@ export function AccountProfilePage() {
     <div className="space-y-4">
       <h1 className="text-3xl font-bold tracking-tight">Профиль</h1>
 
-      <Card>
-        <CardTitle>Телефон</CardTitle>
-        <p className="font-medium">{profile.phone ?? "не указан"}</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Это ваш логин. Сменить номер можно через поддержку.
+      <Card aria-label="Телефон">
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="min-w-0 flex-[1_1_16rem]">
+            <CardTitle className="mb-1">Телефон</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Им вы входите и на него приходят коды. Сменили SIM-карту — смените и здесь, иначе
+              новый владелец старого номера сможет войти в ваш аккаунт.
+            </p>
+          </div>
+          {phoneChangeable && (
+            <div className="ml-auto">
+              <AccountActionLink action="update-phone">
+                {profile.phone ? "Сменить номер" : "Указать номер"}
+              </AccountActionLink>
+            </div>
+          )}
+        </div>
+        <p className="mt-3 flex flex-wrap items-baseline gap-3">
+          {profile.phone ? (
+            <>
+              <span className="font-mono font-semibold">{formatPhone(profile.phone)}</span>
+              {phoneSince !== "—" && (
+                <span className="text-sm text-muted-foreground">с {phoneSince}</span>
+              )}
+            </>
+          ) : (
+            <span className="text-muted-foreground">не указан</span>
+          )}
         </p>
       </Card>
 
-      <Card>
-        <CardTitle>Почта</CardTitle>
-        <div className="flex flex-wrap items-center gap-3">
+      <Card aria-label="Почта">
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="min-w-0 flex-[1_1_16rem]">
+            <CardTitle className="mb-1">Почта</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Для кодов входа и уведомлений безопасности. Новая почта заменит прежнюю после перехода
+              по ссылке из письма.
+            </p>
+          </div>
+          <div className="ml-auto">
+            <AccountActionLink action="update-email">
+              {profile.email ? "Сменить" : "Добавить почту"}
+            </AccountActionLink>
+          </div>
+        </div>
+        <p className="mt-3 flex flex-wrap items-center gap-3">
           {profile.email ? (
             <>
-              <span className="font-medium">{profile.email}</span>
+              <span className="font-semibold">{profile.email}</span>
               {profile.emailVerified ? (
                 <Badge variant="solid">подтверждена</Badge>
               ) : (
@@ -43,15 +85,6 @@ export function AccountProfilePage() {
           ) : (
             <span className="text-muted-foreground">не указана</span>
           )}
-          <div className="ml-auto">
-            <AccountActionLink action="update-email">
-              {profile.email ? "Сменить почту" : "Добавить почту"}
-            </AccountActionLink>
-          </div>
-        </div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          На почту приходят коды входа и ссылка для сброса пароля. Новая почта заменит прежнюю после
-          перехода по ссылке из письма.
         </p>
       </Card>
 

@@ -33,6 +33,21 @@ public sealed class ProfileTests : IClassFixture<AuthServiceWebFactory>
         Assert.Equal(TestUser.Customer.Phone, profile.GetProperty("phone").GetString());
         Assert.Equal("customer@sandbox.test", profile.GetProperty("email").GetString());
         Assert.True(profile.GetProperty("emailVerified").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, profile.GetProperty("phoneChangedAt").ValueKind);
+    }
+
+    [Fact]
+    public async Task Profile_PhoneChanged_WhenShown()
+    {
+        var at = new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero);
+        _factory.IdentityAdmin.SetPhoneChanged(TestUser.Customer, TestUser.Customer.Phone, "+79990001122", at);
+        using HttpClient client = _factory.CreateClientFor(TestUser.Customer);
+
+        using JsonDocument body = JsonDocument.Parse(await client.GetStringAsync(new Uri("/me/profile", UriKind.Relative)));
+
+        JsonElement profile = body.RootElement.GetProperty("result");
+        Assert.Equal("+79990001122", profile.GetProperty("phone").GetString());
+        Assert.Equal(at, profile.GetProperty("phoneChangedAt").GetDateTimeOffset());
     }
 
     [Fact]

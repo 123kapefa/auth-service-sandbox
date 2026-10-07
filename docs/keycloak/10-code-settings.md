@@ -98,8 +98,8 @@
 шаг входа (`AppAccessAuthenticator`). Сервис: `ProjectSignInHandler` и `KeycloakSignIn`; ошибки — `sign_in.*`
 (`no_registration`, `transition_not_allowed`, `transition_date`, `not_permitted`, `not_installed`).
 
-Пока не сделано: в кабинете и в способах входа человека (`/me/sign-in-methods`) выключенные в проекте способы ещё
-видны — уберём в 10.9 и 10.10. Подпись поля логина по способам проекта — в [10.8](10-login-theme.md).
+Выключенные в проекте способы кабинет не показывает: `/me/sign-in-methods` отдаёт их полем `projectDisabled`
+([10.9](10-account.md)); в админке — 10.10. Подпись поля логина по способам проекта — в [10.8](10-login-theme.md).
 
 ## Старый стенд
 
