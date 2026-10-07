@@ -57,10 +57,11 @@ Keycloak. Миграций базы сервиса этап не добавил.
 scripts/keycloak/check-10.sh
 ```
 
-Ожидается `Итого: 294 ✓, 0 ✗`:
+Ожидается `Итого: 299 ✓, 0 ✗`:
 
 | Скрипт | Что | ✓ |
 |---|---|---|
+| `check-budget-alerts.sh` | письма админам при 80 % и 100 % бюджета | 14 |
 | `check-code-limits.sh` | пауза, капча, лимиты на номер, IP и диапазон, страна, бюджет, метрики | 40 |
 | `check-phone-code.sh` | вход звонком, повторный звонок, запасная SMS, каналы проекта | 24 |
 | `check-sign-in-methods.sh` | выключить и включить способы, правила, письмо, журнал, сброс админом | 43 |
@@ -69,14 +70,15 @@ scripts/keycloak/check-10.sh
 | `check-passkey-offer.sh` | когда предлагать ключ и когда нет | 12 |
 | `check-code-settings.sh` | каналы, страны, бюджет и лимиты проекта, расход за сегодня | 19 |
 | `check-project-sign-in.sh` | способы входа проекта, переходный период, 2FA обязательна | 43 |
-| `check-budget-alerts.sh` | письма админам при 80 % и 100 % бюджета | 14 |
-| `check-account.sh` | кабинет: профиль, способы входа, действия на страницах Keycloak | 37 |
+| `check-account.sh` | кабинет: профиль, способы входа, действия на страницах Keycloak | 42 |
 
-Часть: `scripts/keycloak/check-10.sh check-code-limits check-phone-code`. Тесты без стенда — `dotnet test`, плагин —
-`mvn test` в `infra/keycloak/providers/code-login`, тема и интерфейсы — `npm test` в `login-theme/` и `frontend/`.
+Часть: `scripts/keycloak/check-10.sh check-code-limits check-phone-code`. Тесты без стенда: `dotnet test` — 645,
+плагин (`mvn test` в `infra/keycloak/providers/code-login`) — 171, тема входа и интерфейсы (`npm test` в `login-theme/` и
+`frontend/`) — 49 и 108.
 
-**Порядок важен для `check-budget-alerts.sh`:** если бюджет в эти сутки уже исчерпали раньше, письма о 80 % не будет —
-скрипт попросит перезапустить Keycloak (сутки бюджета — по Москве).
+**Письма о бюджете идут первыми:** `check-code-limits.sh` исчерпывает бюджет суток, и после него письма о 80 % в эти
+сутки уже не будет. Если бюджет исчерпали раньше (прошлый прогон в те же сутки по Москве), `check-budget-alerts.sh`
+попросит перезапустить Keycloak: `docker compose restart keycloak`.
 
 ## Стенд и проекты, созданные раньше
 

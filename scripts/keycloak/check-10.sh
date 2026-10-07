@@ -5,13 +5,15 @@
 # Запуск: стенд поднят (docker compose up -d --build --wait; стенд старше этапа 10 —
 # scripts/project/upgrade-10.py sandbox), затем
 #   scripts/keycloak/check-10.sh
+# Письма о бюджете — первыми: check-code-limits исчерпывает бюджет суток, после него письма о 80 % в эти сутки не будет
+# (тогда — docker compose restart keycloak и снова).
 # Только часть: scripts/keycloak/check-10.sh check-code-limits check-phone-code
 set -uo pipefail
 
 DIR="$(dirname "$0")"
 SCRIPTS=("$@")
-[ ${#SCRIPTS[@]} -gt 0 ] || SCRIPTS=(check-code-limits check-phone-code check-sign-in-methods check-two-step-login check-phone-change
-  check-passkey-offer check-code-settings check-project-sign-in check-budget-alerts check-account)
+[ ${#SCRIPTS[@]} -gt 0 ] || SCRIPTS=(check-budget-alerts check-code-limits check-phone-code check-sign-in-methods check-two-step-login
+  check-phone-change check-passkey-offer check-code-settings check-project-sign-in check-account)
 OUT=$(mktemp); trap 'rm -f "$OUT"' EXIT
 
 TOTAL_PASS=0; TOTAL_FAIL=0; LINES=()
