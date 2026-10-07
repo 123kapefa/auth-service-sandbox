@@ -458,6 +458,15 @@
       "config": {}
     },
     {
+      "alias": "platform-passkey-offer",
+      "name": "Sandbox: предложить ключ доступа после входа по коду",
+      "providerId": "platform-passkey-offer",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 150,
+      "config": {}
+    },
+    {
       "alias": "update_user_locale",
       "name": "Update User Locale",
       "providerId": "update_user_locale",

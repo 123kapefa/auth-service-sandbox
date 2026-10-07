@@ -106,10 +106,12 @@ code_screen() {
   fi
 }
 
-# code_submit <jar> <код> — ввод кода; печатает, куда сервис вернул браузер, или «keycloak: <ошибка>»
+# code_submit <jar> <код> — ввод кода; печатает, куда сервис вернул браузер, или «keycloak: <ошибка>».
+# Предложение ключа доступа после входа по коду (10.6) пропускает («Не сейчас»).
 code_submit() {
   local jar=$1 h="$WORK/h" page="$WORK/page.html" url
   curl -s -o "$page" -D "$h" -b "$jar" -c "$jar" --data-urlencode "code=$2" "$(form_action "$page")"
+  skip_passkey_offer "$jar" "$page" "$h"
   url=$(header "$h" location)
   [ -n "$url" ] || { echo "keycloak: $(feedback "$page")"; return; }
   curl -s -o /dev/null -D "$h" -b "$jar" -c "$jar" "$url"
@@ -135,6 +137,17 @@ code_send_again() {
   local jar=$1 page="$WORK/page.html"
   curl -s -o "$page" -b "$jar" -c "$jar" --data-urlencode "resend=" "$(form_action "$page")"
   feedback "$page"
+}
+
+# Предложение ключа доступа после входа по коду (10.6, docs/keycloak/10-passkey-offer.md): Keycloak переадресует на
+# действие platform-passkey-offer — страницу регистрации ключа с platformPasskeyOffer.
+# skip_passkey_offer <jar> <html> <заголовки> — если ответ (заголовки) ведёт на предложение, открыть его и нажать
+# «Не сейчас»; ответ — в те же файлы
+skip_passkey_offer() {
+  local url; url=$(header "$3" location)
+  [[ "$url" == *execution=platform-passkey-offer* ]] || return 0
+  curl -s -o "$2" -D "$3" -b "$1" -c "$1" "$url"
+  curl -s -o "$2" -D "$3" -b "$1" -c "$1" --data-urlencode "skip=true" "$(form_action "$2")"
 }
 
 # Телефония стенда — заглушка idp-stub (docs/keycloak/10-phone-code.md): звонки и SMS, которые «ушли» на номер.

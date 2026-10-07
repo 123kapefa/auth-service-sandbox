@@ -118,6 +118,7 @@ curl -s -o "$WORK/page.html" -b "$JAR" -c "$JAR" --data-urlencode "otp=000000" "
 check "неверный код 2FA отклонён" "$([ "$(kc_page "$WORK/page.html")" = login-otp.ftl ] && echo "форма осталась: $(feedback "$WORK/page.html")" || echo пустили)" "форма осталась: Неверный код аутентификатора."
 curl -s -o "$WORK/page.html" -D "$WORK/h" -b "$JAR" -c "$JAR" --data-urlencode "otp=$(fresh_totp sandbox-otp-test-secret)" \
   "$(form_action "$WORK/page.html")"
+skip_passkey_offer "$JAR" "$WORK/page.html" "$WORK/h"   # ключа доступа нет — после входа по коду его предложат (10.6)
 URL=$(header "$WORK/h" location)
 curl -s -o /dev/null -D "$WORK/h" -b "$JAR" -c "$JAR" "$URL"
 check "верный код 2FA → вход" "$(header "$WORK/h" location)" /me/

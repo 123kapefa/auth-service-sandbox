@@ -53,6 +53,14 @@ export type KcContextExtensionPerPage = {
     loginAutoStart?: string;
   };
   "platform-code-login.ftl": CodeScreen;
+  /** Регистрация ключа доступа; platformPasskeyOffer "true" — это предложение после входа по коду (10.6). */
+  "webauthn-register.ftl": PasskeyOffer;
+  "webauthn-error.ftl": PasskeyOffer;
+};
+
+type PasskeyOffer = {
+  /** "true" — экран «Входите без кода» (действие platform-passkey-offer) с «Не сейчас». */
+  platformPasskeyOffer?: string;
 };
 
 export type KcContext = ExtendKcContext<KcContextExtension, KcContextExtensionPerPage>;

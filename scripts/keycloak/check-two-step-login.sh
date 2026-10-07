@@ -103,9 +103,13 @@ text = re.sub(r"(tab_id|client_data|session_code|execution)=[^&\"]*", r"\1=", te
 print(hashlib.sha256(text.encode()).hexdigest()[:16])
 EOF
 }
-# finish <jar> — пройти редирект в сервис; печатает, куда вернул сервис
+# finish <jar> — пройти редирект в сервис (предложение ключа доступа после кода — «Не сейчас»); печатает, куда вернул
+# сервис
 finish() {
-  local url; url=$(cat "$WORK/location")
+  local url
+  skip_passkey_offer "$1" "$(PAGE)" "$WORK/h"
+  header "$WORK/h" location > "$WORK/location"
+  url=$(cat "$WORK/location")
   [ -n "$url" ] || { echo "keycloak: $(feedback "$(PAGE)" | sed 's/^$/осталась форма/') ($(kc_page "$(PAGE)"))"; return; }
   curl -s -o /dev/null -D "$WORK/h" -b "$1" -c "$1" "$url"
   header "$WORK/h" location

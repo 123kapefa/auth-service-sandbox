@@ -11,6 +11,8 @@ export const { getKcContextMock } = createGetKcContextMock({
   kcContextExtensionPerPage: {
     "login.ftl": {},
     "platform-update-phone.ftl": { phoneStep: "phone" as "phone" | "code" },
+    "webauthn-register.ftl": {} as { platformPasskeyOffer?: string },
+    "webauthn-error.ftl": {} as { platformPasskeyOffer?: string },
     "platform-code-login.ftl": {
       codeChannel: "SMS" as "SMS" | "EMAIL",
       codeDelivery: "SMS" as "CALL" | "SMS" | "EMAIL",

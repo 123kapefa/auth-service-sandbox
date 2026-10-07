@@ -430,3 +430,80 @@ describe("смена номера", () => {
     expect(screen.queryByText("Войти по паролю")).not.toBeInTheDocument();
   });
 });
+
+describe("предложение ключа доступа", () => {
+  it("после входа по коду: «Входите без кода», «Добавить ключ доступа», «Не сейчас»", async () => {
+    render(
+      <KcPage
+        kcContext={getKcContextMock({
+          pageId: "webauthn-register.ftl",
+          overrides: { platformPasskeyOffer: "true" },
+        })}
+      />,
+    );
+
+    expect(await screen.findByText("Входите без кода")).toBeInTheDocument();
+    expect(screen.getByText(/Face ID, отпечатку или PIN/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Добавить ключ доступа" })).toHaveAttribute(
+      "type",
+      "button",
+    );
+    expect(screen.getByRole("button", { name: "Не сейчас" })).toHaveAttribute("name", "skip");
+    expect(screen.getByText(/Спросим снова через 30 дней/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Выполнить выход/)).not.toBeInTheDocument();
+    expect(document.getElementById("register")).toContainElement(
+      document.getElementById("clientDataJSON"),
+    );
+  });
+
+  it("не получилось: «Попробовать ещё раз» и «Не сейчас»", async () => {
+    render(
+      <KcPage
+        kcContext={getKcContextMock({
+          pageId: "webauthn-error.ftl",
+          overrides: { platformPasskeyOffer: "true" },
+        })}
+      />,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Не получилось добавить ключ");
+    const retry = screen.getByRole("button", { name: "Попробовать ещё раз" });
+    expect(retry.closest("form")?.elements.namedItem("isSetRetry")).toHaveValue("retry");
+    expect(screen.getByRole("button", { name: "Не сейчас" })).toHaveAttribute("name", "skip");
+  });
+
+  it("из кабинета: «Ключ доступа», «Добавить ключ доступа» и «Отмена», без «Не сейчас»", async () => {
+    render(
+      <KcPage
+        kcContext={getKcContextMock({
+          pageId: "webauthn-register.ftl",
+          overrides: { isAppInitiatedAction: true },
+        })}
+      />,
+    );
+
+    expect(await screen.findByText(/без пароля и кода/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Добавить ключ доступа" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Отмена" })).toHaveAttribute("name", "cancel-aia");
+    expect(screen.queryByRole("button", { name: "Не сейчас" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Спросим снова/)).not.toBeInTheDocument();
+    const logout = screen.getByLabelText("Выполнить выход на других устройствах");
+    expect(logout).toHaveAttribute("name", "logout-sessions");
+    expect(logout).not.toBeChecked();
+    expect(logout.closest("form")?.id).toBe("register");
+  });
+
+  it("ошибка ключа при входе — стандартная страница", async () => {
+    render(
+      <KcPage
+        kcContext={getKcContextMock({
+          pageId: "webauthn-error.ftl",
+          overrides: { isAppInitiatedAction: false },
+        })}
+      />,
+    );
+
+    await waitFor(() => expect(document.getElementById("kc-try-again")).toBeInTheDocument());
+    expect(screen.queryByText(/Не получилось добавить ключ/)).not.toBeInTheDocument();
+  });
+});
