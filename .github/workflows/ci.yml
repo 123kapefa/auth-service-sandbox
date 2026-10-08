@@ -45,8 +45,9 @@ jobs:
       - name: Build
         run: dotnet build AuthService.slnx -c Release --no-restore
 
+      # Тесты с Category=Infrastructure (Testcontainers, нужен Docker) идут отдельной задачей.
       - name: Test
-        run: dotnet test AuthService.slnx -c Release --no-build
+        run: dotnet test AuthService.slnx -c Release --no-build --filter "Category!=Infrastructure"
 
       # dotnet list package сам не падает на уязвимостях: считаем High и Critical по JSON.
       - name: Vulnerable packages
