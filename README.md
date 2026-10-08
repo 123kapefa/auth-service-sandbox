@@ -45,4 +45,5 @@ docker compose up -d --wait
 | Mailpit | http://localhost:8025 |
 
 Окружения `Development` (`dotnet run`, порт 5080), `Docker` (compose, порт 8080) и `Production`,
-и что где хранится — [docs/environments.md](docs/environments.md).
+и что где хранится — [docs/environments.md](docs/environments.md). Секреты — в хранилище Infisical, стенд с ними —
+`scripts/secrets/run.sh docker compose up -d --wait`; перечень, проверка утечек и смена — [docs/secrets.md](docs/secrets.md).

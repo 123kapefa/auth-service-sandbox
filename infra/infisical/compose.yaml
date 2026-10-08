@@ -1,0 +1,56 @@
+# Хранилище секретов стенда песочницы — свой сервер Infisical (docs/secrets.md). В бою — Infisical компании (облако
+# или свой сервер); этот файл ему не нужен. Ключи самого Infisical (шифрование и подпись сессий) создаёт
+# scripts/secrets/infisical-local.sh в .secrets/infisical.env (не в git): это «нулевой» секрет стенда, его не
+# положить в хранилище, которое он открывает.
+#   scripts/secrets/infisical-local.sh up        — поднять и подготовить (админ, проект auth-service, учётка стенда)
+#   scripts/secrets/infisical-local.sh down      — остановить (данные остаются в томе)
+name: sandbox-infisical
+
+services:
+  infisical-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: infisical
+      POSTGRES_USER: infisical
+      POSTGRES_PASSWORD: ${INFISICAL_DB_PASSWORD:?нужен INFISICAL_DB_PASSWORD — scripts/secrets/infisical-local.sh up}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infisical -d infisical"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - infisical_db:/var/lib/postgresql/data
+
+  infisical-redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  infisical:
+    image: infisical/infisical:v0.166.2
+    ports:
+      - "127.0.0.1:${INFISICAL_PORT:-8280}:8080"
+    environment:
+      ENCRYPTION_KEY: ${INFISICAL_ENCRYPTION_KEY:?нужен INFISICAL_ENCRYPTION_KEY}
+      AUTH_SECRET: ${INFISICAL_AUTH_SECRET:?нужен INFISICAL_AUTH_SECRET}
+      DB_CONNECTION_URI: postgres://infisical:${INFISICAL_DB_PASSWORD}@infisical-db:5432/infisical
+      REDIS_URL: redis://infisical-redis:6379
+      SITE_URL: http://localhost:${INFISICAL_PORT:-8280}
+      TELEMETRY_ENABLED: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/status > /dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+    depends_on:
+      infisical-db:
+        condition: service_healthy
+      infisical-redis:
+        condition: service_healthy
+
+volumes:
+  infisical_db:

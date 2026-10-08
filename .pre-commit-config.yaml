@@ -1,0 +1,7 @@
+# Проверки перед коммитом (https://pre-commit.com): pip install pre-commit && pre-commit install.
+# gitleaks ищет секреты в том, что коммитится; исключения — .gitleaks.toml (docs/secrets.md#проверка-утечек).
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks

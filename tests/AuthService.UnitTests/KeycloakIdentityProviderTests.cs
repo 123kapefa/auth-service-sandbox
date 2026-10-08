@@ -174,14 +174,63 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
         Assert.Contains("Keycloak:ClientSecret is required", exception.Message, StringComparison.Ordinal);
     }
 
+    // Смена секрета BFF (docs/secrets.md): сервис уже с новым секретом, Keycloak ещё со старым — запрос повторяется со старым.
+    [Fact]
+    public async Task SecretRotation_KeycloakStillHasPrevious_RetriesWithPrevious()
+    {
+        _keycloak.TokenResponse = TokensJson;
+        _keycloak.AcceptedSecret = "old-secret";
+
+        Result<TokenSet, Error> result = await CreateProvider("new-secret", previousSecret: "old-secret").RefreshAsync("refresh-0", default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["new-secret", "old-secret"], _keycloak.Posts.Select(post => post.Form["client_secret"].ToString()));
+    }
+
+    [Fact]
+    public async Task SecretRotation_KeycloakHasNew_NoRetry()
+    {
+        _keycloak.TokenResponse = TokensJson;
+        _keycloak.AcceptedSecret = "new-secret";
+
+        Result<TokenSet, Error> result = await CreateProvider("new-secret", previousSecret: "old-secret").RefreshAsync("refresh-0", default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("new-secret", Assert.Single(_keycloak.Posts).Form["client_secret"]);
+    }
+
+    [Fact]
+    public async Task SecretRejected_NoPrevious_IsUnavailableWithoutRetry()
+    {
+        _keycloak.TokenResponse = TokensJson;
+        _keycloak.AcceptedSecret = "other-secret";
+
+        Error error = (await CreateProvider().RefreshAsync("refresh-0", default)).Error;
+
+        Assert.Equal("auth.provider.unavailable", error.Messages[0].Code);
+        Assert.Single(_keycloak.Posts);
+    }
+
+    [Fact]
+    public async Task InvalidGrant_WithPrevious_NotRetried()
+    {
+        _keycloak.TokenResponse = (HttpStatusCode.BadRequest, """{"error":"invalid_grant","error_description":"Token is not active"}""");
+
+        Error error = (await CreateProvider("new-secret", previousSecret: "old-secret").RefreshAsync("stale", default)).Error;
+
+        Assert.Equal("auth.session.invalid", error.Messages[0].Code);
+        Assert.Single(_keycloak.Posts);
+    }
+
     public void Dispose() => _keycloak.Dispose();
 
     private static (HttpStatusCode, string) TokensJson =>
         (HttpStatusCode.OK, """{"access_token":"access-1","expires_in":900,"refresh_token":"refresh-1","refresh_expires_in":1800,"token_type":"Bearer"}""");
 
-    private IIdentityProvider CreateProvider() => BuildServices("test-secret").GetRequiredService<IIdentityProvider>();
+    private IIdentityProvider CreateProvider(string clientSecret = "test-secret", string? previousSecret = null) =>
+        BuildServices(clientSecret, previousSecret).GetRequiredService<IIdentityProvider>();
 
-    private ServiceProvider BuildServices(string? clientSecret)
+    private ServiceProvider BuildServices(string? clientSecret, string? previousSecret = null)
     {
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -191,6 +240,7 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
             ["Authentication:RequireHttpsMetadata"] = "false",
             ["Keycloak:ClientId"] = "sandbox-bff",
             ["Keycloak:ClientSecret"] = clientSecret,
+            ["Keycloak:PreviousClientSecret"] = previousSecret,
         }).Build();
 
         var services = new ServiceCollection();
@@ -234,6 +284,9 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
 
         public bool FailPosts { get; set; }
 
+        /// <summary>Секрет клиента, который принимает Keycloak; null — любой.</summary>
+        public string? AcceptedSecret { get; set; }
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             string url = request.RequestUri!.ToString();
@@ -248,7 +301,12 @@ public sealed class KeycloakIdentityProviderTests : IDisposable
             }
 
             string body = await request.Content!.ReadAsStringAsync(cancellationToken);
-            Posts.Add(new Request(url, QueryHelpers.ParseQuery(body)));
+            Dictionary<string, StringValues> form = QueryHelpers.ParseQuery(body);
+            Posts.Add(new Request(url, form));
+            if (AcceptedSecret is not null && !string.Equals(form["client_secret"], AcceptedSecret, StringComparison.Ordinal))
+            {
+                return Json(HttpStatusCode.Unauthorized, """{"error":"unauthorized_client","error_description":"Invalid client or Invalid client credentials"}""");
+            }
 
             (HttpStatusCode status, string json) = url.EndsWith("/logout", StringComparison.Ordinal) ? LogoutResponse : TokenResponse;
             return Json(status, json);
