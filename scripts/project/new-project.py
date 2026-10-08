@@ -30,6 +30,9 @@ import sys
 import uuid
 from pathlib import Path
 
+from keycloak_admin import load_script
+
+MIGRATIONS = load_script("migrate-realms.py")
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "infra/keycloak/realm/sandbox-realm.json"
 
@@ -87,6 +90,8 @@ def main():
     realm.pop("id", None)
     # https для внешних адресов — в бою обязательно (песочница работает по http).
     realm["sslRequired"] = "none" if args.dev else "external"
+    # Версия настроек — последняя миграция (scripts/project/migrate-realms.py): всё из них уже в шаблоне.
+    realm.setdefault("attributes", {})[MIGRATIONS.ATTRIBUTE] = str(MIGRATIONS.latest())
 
     # Демо-приложения и их следы: клиенты, области, роли клиентов, привязки областей.
     removed_ids = {c["id"] for c in realm["clients"] if c["clientId"] in keep_clients and c.get("id")}

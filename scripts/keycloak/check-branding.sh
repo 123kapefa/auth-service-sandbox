@@ -51,8 +51,8 @@ check "у служебной учётки сервиса — роль manage-bra
   "$(curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/users?username=service-account-sandbox-bff&exact=true" \
     | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["id"])' \
     | xargs -I{} curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/users/{}/role-mappings" \
-    | python3 -c 'import json,sys; r=json.load(sys.stdin); print(",".join(x["name"] for x in r.get("realmMappings",[])), "manage-realm" in [x["name"] for x in r["clientMappings"]["realm-management"]["mappings"]])')" \
-  "manage-branding False"
+    | python3 -c 'import json,sys; r=json.load(sys.stdin); print("manage-branding" in [x["name"] for x in r.get("realmMappings",[])], "manage-realm" in [x["name"] for x in r["clientMappings"]["realm-management"]["mappings"]])')" \
+  "True False"
 
 echo "2. Админка: оформление — только админ проекта"
 check "админ проекта читает" "$(api "$ADMIN" GET /auth/admin/branding | cut -d' ' -f1)" 200

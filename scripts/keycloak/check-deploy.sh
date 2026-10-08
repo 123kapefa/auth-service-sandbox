@@ -118,6 +118,10 @@ check "проект: https обязателен для внешних адрес
 check "первый админ" "$("$ROOT/scripts/project/add-admin.py" "$REALM" "$ADMIN_PHONE" --password "$PASSWORD" | cut -d' ' -f1-4)" "Админ проекта $REALM: +$ADMIN_PHONE"
 echo "AUTH_REGISTRATION_TOKEN=$(REALM=$REALM "$ROOT/scripts/keycloak/registration-token.sh")" >> "$DIR/auth.env"
 check "сервис входа из образа поднялся (мигратор отработал)" "$(dc up -d --wait auth-service > /dev/null 2>&1 && ready)" 200
+# Мигратор настроек проектов (до сервиса) — токен мастер-админки сам, по внутреннему адресу Keycloak в боевом режиме.
+LATEST=$(ls "$ROOT"/scripts/project/realm-migrations/[0-9][0-9][0-9][0-9]-*.py | wc -l | tr -d ' ')
+check "мигратор настроек проектов: проект из шаблона — последняя версия, изменений нет" \
+  "$(dc logs --no-log-prefix auth-realm-migrator 2>/dev/null | grep "^$REALM:")" "$REALM: версия $LATEST, изменений нет"
 check "образ сервиса — версия из Directory.Build.props" \
   "$(docker inspect --format '{{.Config.Image}}' "$(dc ps -q auth-service)")" "platform-auth-service:$VERSION"
 check "сервис — не root" "$(dc exec -T auth-service id -u 2>/dev/null)" 1654

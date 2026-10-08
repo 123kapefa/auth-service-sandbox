@@ -1,19 +1,12 @@
-#!/usr/bin/env python3
 """
-Этап 6б в проекте, созданном раньше (и на живом стенде песочницы: realm импортируется только в пустую базу).
-Новые проекты получают всё это из шаблона realm (new-project.py).
+Этап 6б: личный кабинет и оформление проекта (бывший upgrade-6b.py).
   - действия Keycloak, которые кабинет просит у страниц входа: смена почты (UPDATE_EMAIL) — включена и только после
     подтверждения письмом (verifyEmail); 2FA, коды восстановления, ключ доступа, удаление учётных данных — включены;
   - «Вернуться в приложение» на страницах Keycloak (после смены почты) — в личный кабинет: baseUrl клиента входа;
   - оформление проекта (6б.4) — как enable-branding.py.
-Повторный запуск ничего не ломает. Образ Keycloak — с плагином и темой 6б (docker compose up -d --build).
-  scripts/project/upgrade-6b.py demo-shop
+Образ Keycloak — с плагином и темой 6б.
 """
-import argparse
-import importlib.util
-from pathlib import Path
-
-from keycloak_admin import Admin
+from keycloak_admin import load_script
 
 # Действия при входе (kc_action), которыми пользуется кабинет; у UPDATE_EMAIL — подтверждение новой почты письмом.
 ACTIONS = {
@@ -24,13 +17,6 @@ ACTIONS = {
     "webauthn-register-passwordless": {},
     "delete_credential": {},
 }
-
-
-def load_branding():
-    spec = importlib.util.spec_from_file_location("enable_branding", Path(__file__).with_name("enable-branding.py"))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def enable_actions(admin):
@@ -56,21 +42,10 @@ def account_return(admin, branding):
     return bff["clientId"], bff["baseUrl"]
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Этап 6б (кабинет и оформление) в проекте, созданном раньше")
-    parser.add_argument("realm")
-    args = parser.parse_args()
-    admin = Admin(args.realm)
-    branding = load_branding()
-
+def apply(admin):
+    branding = load_script("enable-branding.py")
     enable_actions(admin)
     client, base_url = account_return(admin, branding)
     account, api = branding.enable(admin)
-
-    print(f"Этап 6б в {args.realm}: действия кабинета включены (смена почты — после подтверждения письмом), "
-          f"{client} → {base_url}, роль {branding.ROLE} у {account}, право {branding.PERMISSION} в роли admin ({api}).")
-    print("Админам проекта — войти заново (новое право придёт с новым токеном).")
-
-
-if __name__ == "__main__":
-    main()
+    return (f"действия кабинета включены (смена почты — после подтверждения письмом), {client} → {base_url}, "
+            f"роль {branding.ROLE} у {account}, право {branding.PERMISSION} в роли admin ({api})")
