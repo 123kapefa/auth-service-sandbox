@@ -45,6 +45,12 @@ jobs:
       - name: Build
         run: dotnet build AuthService.slnx -c Release --no-restore
 
+      # Модель EF не разошлась с миграциями базы сервиса (docs/migrations.md). dotnet-ef — версия пакетов EF Core.
+      - name: EF model vs migrations
+        run: |
+          dotnet tool install --global dotnet-ef --version 10.0.7
+          scripts/db/check-model.sh --configuration Release --no-build
+
       # Тесты с Category=Infrastructure (Testcontainers, нужен Docker) идут отдельной задачей.
       - name: Test
         run: dotnet test AuthService.slnx -c Release --no-build --filter "Category!=Infrastructure"

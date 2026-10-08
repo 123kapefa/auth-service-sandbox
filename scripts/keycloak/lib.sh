@@ -168,6 +168,18 @@ require_service() {
 }
 
 # summary — итог и код выхода
+# put_realm_attributes <адрес realm в Admin API> <токен> <файл JSON {"attributes": {…}}> — атрибуты realm поверх текущих;
+# печатает HTTP-код. PUT realm с attributes заменяет все его атрибуты (не перечисленные удаляются: версия настроек,
+# оформление, настройки входа), поэтому — прочитать и дополнить.
+put_realm_attributes() {
+  command curl -s -H "Authorization: Bearer $2" "$1" | python3 -c '
+import json,sys
+current = json.load(sys.stdin).get("attributes") or {}
+print(json.dumps({"attributes": {**current, **json.load(open(sys.argv[1]))["attributes"]}}))' "$3" > "$3.merged"
+  command curl -s -o /dev/null -w '%{http_code}' -X PUT -H "Authorization: Bearer $2" -H 'Content-Type: application/json' \
+    --data @"$3.merged" "$1"
+}
+
 summary() {
   echo
   echo "Итого: $PASS ✓, $FAIL ✗"

@@ -47,8 +47,7 @@ print(" ".join(f"{k[15:]}={v}" for k,v in sorted(a.items()) if k.startswith("pla
 # unset_attrs — снять настройки проекта (пустой атрибут — «не задано»): стенд снова по compose.yaml
 unset_attrs() {
   python3 -c 'import json,sys; print(json.dumps({"attributes": {"platform.codes." + k: "" for k in sys.argv[1].split()}}))' "$KEYS" > "$WORK/attrs.json"
-  command curl -s -o /dev/null -X PUT -H "Authorization: Bearer $(master_token)" -H 'Content-Type: application/json' \
-    --data @"$WORK/attrs.json" "$KC/admin/realms/$REALM"
+  put_realm_attributes "$KC/admin/realms/$REALM" "$(master_token)" "$WORK/attrs.json" > /dev/null
 }
 # code_login <номер> — войти по коду; печатает, куда вернули
 code_login() {

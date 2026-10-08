@@ -86,12 +86,13 @@ dotnet run --project src/AuthService.Api
 docker compose up -d --build --wait auth-service
 ```
 
-Мигратор (`efbundle` из образа сервиса) применяет миграции и завершается; в Docker сервис ждёт его успеха сам.
+Мигратор (`efbundle` из образа сервиса) применяет миграции и завершается; в Docker сервис ждёт его успеха сам — и успеха
+мигратора настроек проектов (`realm-migrator`, после Keycloak). Подробно, с резервными копиями — [migrations.md](migrations.md).
 Back-channel logout Keycloak в Development не работает: Keycloak из контейнера зовёт `auth-service:8080`.
 
 **Production** — в файле нет ни одного секрета. Без строк подключения сервис не стартует:
 `ConnectionStrings:AuthDb is required.`, `ConnectionStrings:Redis is required.` Миграции — тем же `efbundle`
-отдельным шагом развёртывания до старта сервиса.
+отдельным шагом развёртывания до старта сервиса, перед ним — резервная копия базы ([migrations.md](migrations.md)).
 
 Проверка: `curl http://localhost:<порт>/health/ready` → `Healthy`.
 

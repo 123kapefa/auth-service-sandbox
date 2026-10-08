@@ -2,6 +2,9 @@
   "realm": "sandbox",
   "enabled": true,
   "displayName": "Auth Sandbox",
+  "attributes": {
+    "platform.realmVersion": "2"
+  },
   "sslRequired": "none",
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,

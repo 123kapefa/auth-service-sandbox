@@ -24,10 +24,10 @@
 
 ## 1. Поставить сервис входа
 
-Нужны образы `platform-auth-service` и `platform-auth-keycloak` и Docker Compose 2.20+. Образы каждого релиза лежат в
-GHCR: `ghcr.io/123kapefa/platform-auth-service:<версия>` (в `auth/.env` — `AUTH_REGISTRY=ghcr.io/123kapefa/` и
-`AUTH_VERSION`, перед первым запуском — `docker login ghcr.io` с токеном GitHub, право `read:packages`). Другой
-источник — реестр компании или локальная сборка `scripts/package/build-images.sh`.
+Нужны образы `platform-auth-service`, `platform-auth-keycloak` и `platform-auth-realm-migrator` и Docker Compose 2.20+.
+Образы каждого релиза лежат в GHCR: `ghcr.io/123kapefa/platform-auth-service:<версия>` (в `auth/.env` —
+`AUTH_REGISTRY=ghcr.io/123kapefa/` и `AUTH_VERSION`, перед первым запуском — `docker login ghcr.io` с токеном GitHub,
+право `read:packages`). Другой источник — реестр компании или локальная сборка `scripts/package/build-images.sh`.
 
 ```yaml
 # compose.yaml проекта
@@ -171,6 +171,10 @@ builder.Services.AddHttpClient<NotificationsClient>(c => c.BaseAddress = new Uri
   его токены перестают действовать сразу; сервис снова заработает, как только новый секрет окажется в файле.
 - **Отзыв ключа** — сразу: новых токенов нет, выданные не принимаются.
 - **Блокировка, «выйти везде», смена ролей** — сервисы видят сразу (через Redis сервиса входа, задержка до 2 секунд).
+- **Новая версия** — поменять `AUTH_VERSION` и `docker compose up -d`, перед этим — резервные копии обеих баз.
+  Мигратор базы сервиса и мигратор настроек проектов отрабатывают сами до старта сервиса: проекты, созданные на
+  старой версии, получают всё новое без ручных скриптов. Порядок, откат и обновление Keycloak —
+  [migrations.md](migrations.md).
 - **Версия пакетов** — одна на пакеты и образы. Локальный фид получает уникальную версию каждой сборки
   (`0.1.0-dev.…`) и файл `platform-version.props` с ней — проект на локальном фиде импортирует его
   (`samples/shop/Directory.Packages.props`), иначе кэш NuGet подсунет старый пакет. `RELEASE=1 pack.sh` — версия без суффикса.

@@ -66,6 +66,23 @@ services:
         condition: service_healthy
       auth-migrator:
         condition: service_completed_successfully
+      realm-migrator:
+        condition: service_completed_successfully
+
+  # Миграции настроек проектов (realm): применяет недостающие ко всем проектам на Keycloak и завершается
+  # (docs/migrations.md). Realm песочницы импортируется из JSON уже с последней версией — мигратору делать нечего.
+  realm-migrator:
+    build:
+      context: .
+      dockerfile: infra/realm-migrator/Dockerfile
+    image: auth_service-realm-migrator:local
+    environment:
+      KC: http://keycloak:8180
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    depends_on:
+      keycloak:
+        condition: service_healthy
 
   # --- Keycloak (этап 1, docs/keycloak/01-stand.md) ---------------------------------
   # Отдельная БД: в реальных проектах Keycloak не делит базу с приложениями.

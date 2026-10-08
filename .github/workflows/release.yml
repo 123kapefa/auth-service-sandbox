@@ -148,7 +148,7 @@ jobs:
           {
             echo "## Образы (GHCR)"
             echo
-            for image in platform-auth-service platform-auth-keycloak; do
+            for image in platform-auth-service platform-auth-keycloak platform-auth-realm-migrator; do
               echo "- \`ghcr.io/$OWNER/$image:$VERSION\`"
             done
             echo

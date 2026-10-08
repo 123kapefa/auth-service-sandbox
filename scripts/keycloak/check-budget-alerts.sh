@@ -31,8 +31,7 @@ setting() {
   python3 -c '
 import json, sys
 print(json.dumps({"attributes": {"platform.codes." + k: v for k, v in (a.split("=", 1) for a in sys.argv[1:])}}))' "$@" > "$WORK/attrs.json"
-  command curl -s -o /dev/null -w '%{http_code}' -X PUT -H "Authorization: Bearer $(master_token)" -H 'Content-Type: application/json' \
-    --data @"$WORK/attrs.json" "$KEYCLOAK/admin/realms/$REALM"
+  put_realm_attributes "$KEYCLOAK/admin/realms/$REALM" "$(master_token)" "$WORK/attrs.json"
 }
 # spent — расход за сегодня, копейки (плагин, служебная учётка сервиса с правом manage-sign-in)
 spent() {

@@ -4,7 +4,7 @@
 # add-admin.py, приложение «Заказы» — add-app.py; свой экземпляр сервиса из того же образа (infra/projects/demo-shop).
 # Проекты изолированы: пользователи и токены одного не действуют в другом.
 # Этап 6б (docs/keycloak/06b-account-branding.md): кабинет и оформление в новом проекте — из шаблона; проект, созданный
-# раньше, получает их скриптом upgrade-6b.py.
+# раньше, получает их мигратором настроек проектов (scripts/project/migrate-realms.py, docs/migrations.md).
 # Запуск: стенд песочницы поднят (Keycloak, Postgres, Redis, сервис на 8080), затем
 #   scripts/keycloak/check-new-project.sh
 set -uo pipefail
@@ -119,6 +119,10 @@ project_6b() {
 }
 PROJECT_6B="смена почты: True true · возврат: $API/auth/account · учётка сервиса: True · admin: True"
 check "в realm: смена почты после подтверждения, «вернуться» — в кабинет, оформление — служебной учётке и admin" "$(project_6b)" "$PROJECT_6B"
+LATEST=$(ls "$ROOT"/scripts/project/realm-migrations/[0-9][0-9][0-9][0-9]-*.py | wc -l | tr -d ' ')
+check "версия настроек — последняя миграция, мигратору делать нечего" \
+  "$(kc_get "" 'r["attributes"].get("platform.realmVersion")') / $("$ROOT/scripts/project/migrate-realms.py" "$REALM" | sed -n 1p)" \
+  "$LATEST / $REALM: версия $LATEST, изменений нет"
 check "/auth/account — в кабинет проекта" "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$API/auth/account")" "302 $API/account/"
 check "кабинет покупателя: профиль" "$(json "$CUSTOMER" /me/profile 'r["phone"]')" "200 +$NEW"
 check "админ проекта сохранил оформление" \
@@ -127,7 +131,7 @@ check "оформление — на странице входа (плагин) 
   "$(curl -s "$KC/realms/$REALM/platform-branding" | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["name"], r["color"])') / $(json "$CUSTOMER" /me/branding 'r["name"] + " " + r["color"]')" \
   "Демо-магазин #0a7d4f / 200 Демо-магазин #0a7d4f"
 
-echo "6. Проект, созданный до 6б: upgrade-6b.py"
+echo "6. Проект, созданный до 6б: мигратор настроек проектов"
 # Как в проекте из шаблона до 6б: смена почты сразу, без письма; «вернуться» — никуда; оформление менять некому.
 kc_put() { curl -s -o /dev/null -X "$1" -H "Authorization: Bearer $MASTER" -H 'Content-Type: application/json' -d "$3" "$KC/admin/realms/$REALM$2"; }
 kc_put PUT /authentication/required-actions/UPDATE_EMAIL \
@@ -135,12 +139,15 @@ kc_put PUT /authentication/required-actions/UPDATE_EMAIL \
 kc_put PUT "/clients/$BFF_ID" "$(kc_get "/clients/$BFF_ID" 'json.dumps({**r, "baseUrl": ""})')"
 kc_put DELETE "/clients/$API_ID/roles/admin/composites" "[$(kc_get "/clients/$API_ID/roles/branding.manage" 'json.dumps(r)')]"
 kc_put DELETE /roles/manage-branding ""
+# Проект старше миграций — без версии.
+kc_put PUT "" "$(kc_get "" 'json.dumps({"attributes": {k: v for k, v in r["attributes"].items() if k != "platform.realmVersion"}})')"
 check "до обновления: ничего из 6б" "$(project_6b)" "смена почты: False None · возврат:  · учётка сервиса: False · admin: False"
 OLD="$WORK/old-admin"; : > "$OLD"
 login "$OLD" /admin/ "$ADMIN_PHONE" > /dev/null
 check "до обновления: оформление админу проекта не доступно" "$(curl -s -o /dev/null -w '%{http_code}' -b "$OLD" "$API/auth/admin/branding")" 403
-check "upgrade-6b.py" "$("$ROOT/scripts/project/upgrade-6b.py" "$REALM" | head -1 | cut -d: -f1)" "Этап 6б в $REALM"
-check "повторный запуск — без ошибок" "$("$ROOT/scripts/project/upgrade-6b.py" "$REALM" 2>&1 | head -1 | cut -d: -f1)" "Этап 6б в $REALM"
+check "до обновления: версии нет" "$("$ROOT/scripts/project/migrate-realms.py" --status "$REALM")" "$REALM: версия 0 из $LATEST"
+check "мигратор применил все миграции" "$("$ROOT/scripts/project/migrate-realms.py" "$REALM" | sed -n 1p)" "$REALM: версия 0 → $LATEST"
+check "повторный запуск — ничего не меняет" "$("$ROOT/scripts/project/migrate-realms.py" "$REALM" 2>&1 | sed -n 1p)" "$REALM: версия $LATEST, изменений нет"
 check "после обновления — как из шаблона" "$(project_6b)" "$PROJECT_6B"
 UPGRADED="$WORK/upgraded-admin"; : > "$UPGRADED"
 login "$UPGRADED" /admin/ "$ADMIN_PHONE" > /dev/null

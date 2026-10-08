@@ -98,6 +98,18 @@ services:
       auth-db:
         condition: service_healthy
 
+  # Миграции настроек проектов (realm) — при каждом развёртывании: недостающие применяются ко всем проектам на этом
+  # Keycloak, применённая версия — в атрибуте realm (docs/migrations.md). Мастер-админка — по внутреннему адресу.
+  auth-realm-migrator:
+    image: ${AUTH_REGISTRY:-}platform-auth-realm-migrator:${AUTH_VERSION:?нужен AUTH_VERSION}
+    environment:
+      KC: http://auth-keycloak:8180
+      KEYCLOAK_ADMIN: ${AUTH_KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${AUTH_KEYCLOAK_ADMIN_PASSWORD}
+    depends_on:
+      auth-keycloak:
+        condition: service_healthy
+
   auth-service:
     image: ${AUTH_REGISTRY:-}platform-auth-service:${AUTH_VERSION:?нужен AUTH_VERSION}
     init: true
@@ -140,6 +152,8 @@ services:
       auth-redis:
         condition: service_healthy
       auth-migrator:
+        condition: service_completed_successfully
+      auth-realm-migrator:
         condition: service_completed_successfully
       auth-keycloak:
         condition: service_healthy
