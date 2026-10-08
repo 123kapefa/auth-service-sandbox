@@ -43,15 +43,18 @@ snapshot() {
   done | sha256sum | cut -d' ' -f1
 }
 # deploy — развёртывание: контейнер мигратора, как при docker compose up. Печатает его вывод.
-deploy() { docker compose --project-directory "$ROOT" --progress quiet run --rm --no-deps realm-migrator 2>&1; }
+deploy() { COMPOSE_IGNORE_ORPHANS=1 docker compose --project-directory "$ROOT" --progress quiet run --rm --no-deps realm-migrator 2>&1; }
 
 TEMPLATE="почта: True true · возврат: True · учётка: ['manage-branding', 'manage-sign-in'] · admin: ['branding.manage', 'sign-in.manage'] · номер: True · ключ: True · капча: True"
 
 echo "1. Стенд из шаблона"
 check "realm — как из шаблона, версия — последняя" "$(migrated) / $(kc_get "" 'r["attributes"].get("platform.realmVersion")')" "$TEMPLATE / $LATEST"
-check "мигратору делать нечего" "$(deploy | head -1)" "$REALM: версия $LATEST, изменений нет"
+check "мигратору делать нечего" "$(deploy | sed -n 1p)" "$REALM: версия $LATEST, изменений нет"
 
 echo "2. Realm, созданный до этапа 6б"
+# Свои атрибуты проекта (оформление, настройки кодов) мигратор не трогает: метка — чтобы хоть один был.
+kc_put PUT "" "$(kc_get "" 'json.dumps({"attributes": {**r["attributes"], "platform.check.realm-migrations": "keep"}})')" > /dev/null
+others() { kc_get "" 'json.dumps({k: v for k, v in sorted(r["attributes"].items()) if k != "platform.realmVersion"})'; }
 kc_put PUT /authentication/required-actions/UPDATE_EMAIL \
   "$(kc_get /authentication/required-actions/UPDATE_EMAIL 'json.dumps({**r, "enabled": False, "config": {}})')" > /dev/null
 for action in platform-update-phone platform-passkey-offer; do
@@ -64,7 +67,8 @@ kc_put DELETE "/clients/$API_ID/roles/admin/composites" \
 kc_put DELETE /roles/manage-branding "" > /dev/null
 kc_put DELETE /roles/manage-sign-in "" > /dev/null
 CSP_OLD=$(kc_get "" 'r["browserSecurityHeaders"]["contentSecurityPolicy"].replace(" '"$CAPTCHA"'", "")')
-kc_put PUT "" "$(kc_get "" 'json.dumps({"browserSecurityHeaders": {**r["browserSecurityHeaders"], "contentSecurityPolicy": "'"$CSP_OLD"'"}, "attributes": {"platform.realmVersion": None}})')" > /dev/null
+kc_put PUT "" "$(kc_get "" 'json.dumps({"browserSecurityHeaders": {**r["browserSecurityHeaders"], "contentSecurityPolicy": "'"$CSP_OLD"'"}, "attributes": {k: v for k, v in r["attributes"].items() if k != "platform.realmVersion"}})')" > /dev/null
+OTHERS=$(others)
 check "до развёртывания: ничего из 6б и 10" "$(migrated)" \
   "почта: False None · возврат: False · учётка: [] · admin: [] · номер: False · ключ: False · капча: False"
 check "до развёртывания: версии нет" "$(kc_get "" 'r["attributes"].get("platform.realmVersion")') / $("$ROOT/scripts/project/migrate-realms.py" --status "$REALM")" \
@@ -76,19 +80,23 @@ check "мигратор применил все миграции по поряд
   "$(echo "$OUT" | head -1) / $(echo "$OUT" | sed -n 's/^  \([0-9]*-[a-z0-9-]*\):.*/\1/p' | tr '\n' ' ')" \
   "$REALM: версия 0 → $LATEST / $(cd "$ROOT/scripts/project/realm-migrations" && ls [0-9]*.py | sed 's/\.py$//' | tr '\n' ' ')"
 check "realm — как из шаблона, версия — последняя" "$(migrated) / $(kc_get "" 'r["attributes"].get("platform.realmVersion")')" "$TEMPLATE / $LATEST"
+check "свои атрибуты проекта — не тронуты" "$(others)" "$OTHERS"
 check "CSP — как была, с капчей" "$(kc_get "" 'r["browserSecurityHeaders"]["contentSecurityPolicy"]')" \
   "$(echo "$CSP_OLD" | sed "s#frame-src 'self'#frame-src 'self' $CAPTCHA#")"
 
 echo "4. Повторное развёртывание"
 BEFORE=$(snapshot)
-check "мигратор: изменений нет" "$(deploy | head -1)" "$REALM: версия $LATEST, изменений нет"
+check "мигратор: изменений нет" "$(deploy | sed -n 1p)" "$REALM: версия $LATEST, изменений нет"
 check "realm не изменился (снимок настроек, действий, ролей, клиентов)" "$(snapshot)" "$BEFORE"
 
 echo "5. Версия новее мигратора (развернули старую версию сервиса)"
-kc_put PUT "" "{\"attributes\":{\"platform.realmVersion\":\"$((LATEST + 1))\"}}" > /dev/null
-check "мигратор пропускает realm, не падает" "$(deploy | head -1; echo "код ${PIPESTATUS[0]}")" \
+version_attr() { kc_put PUT "" "$(kc_get "" 'json.dumps({"attributes": {**r["attributes"], "platform.realmVersion": "'"$1"'"}})')" > /dev/null; }
+version_attr $((LATEST + 1))
+OUT=$(deploy); CODE=$?
+check "мигратор пропускает realm, не падает" "$(echo "$OUT" | head -1; echo "код $CODE")" \
   "$REALM: версия $((LATEST + 1)) новее мигратора ($LATEST) — пропущен (развёрнута старая версия?)
 код 0"
-kc_put PUT "" "{\"attributes\":{\"platform.realmVersion\":\"$LATEST\"}}" > /dev/null
+version_attr "$LATEST"
+kc_put PUT "" "$(kc_get "" 'json.dumps({"attributes": {k: v for k, v in r["attributes"].items() if k != "platform.check.realm-migrations"}})')" > /dev/null
 
 summary

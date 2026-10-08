@@ -217,8 +217,8 @@ scripts/keycloak/check-6b.sh        # все проверки ниже по оч
 scripts/keycloak/check-6b.sh check-branding check-app-branding   # только часть
 ```
 
-Ожидается `Итого: 138 ✓, 0 ✗` (`check-account.sh` 42, `check-devices.sh` 14, `check-branding.sh` 24,
-`check-app-branding.sh` 26, `check-new-project.sh` 32). По отдельности:
+Ожидается `Итого: 140 ✓, 0 ✗` (`check-account.sh` 42, `check-devices.sh` 14, `check-branding.sh` 24,
+`check-app-branding.sh` 26, `check-new-project.sh` 34). По отдельности:
 
 ```bash
 scripts/keycloak/check-account.sh   # своим пользователем: смена пароля (и отмена), смена почты по ссылке из письма,

@@ -49,6 +49,12 @@ def version(admin):
     return int(attributes.get(ATTRIBUTE) or 0)
 
 
+def set_version(admin, number):
+    """PUT realm с attributes заменяет все его атрибуты (оформление, настройки входа и кодов) — пишем поверх текущих."""
+    attributes = admin.call("GET", "").get("attributes") or {}
+    admin.call("PUT", "", {"attributes": {**attributes, ATTRIBUTE: str(number)}})
+
+
 def migrate(admin, steps):
     """Недостающие миграции проекта по порядку; печатает, что сделано. True — что-то применено."""
     current = version(admin)
@@ -65,7 +71,7 @@ def migrate(admin, steps):
     for number, path in steps[current:]:
         summary = load_script(f"realm-migrations/{path.name}").apply(admin)
         # После каждой миграции: прервётся следующая — эта не повторится.
-        admin.call("PUT", "", {"attributes": {ATTRIBUTE: str(number)}})
+        set_version(admin, number)
         print(f"  {path.stem}: {summary}", flush=True)
     return True
 

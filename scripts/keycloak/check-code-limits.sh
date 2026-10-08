@@ -32,8 +32,7 @@ for pair in sys.argv[2:]:
     attrs["platform.codes." + key] = value
 print(json.dumps({"attributes": attrs}))
 PY
-  command curl -s -o /dev/null -w '%{http_code}' -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-    --data @"$WORK/attrs.json" "$KEYCLOAK/admin/realms/$REALM"
+  put_realm_attributes "$KEYCLOAK/admin/realms/$REALM" "$TOKEN" "$WORK/attrs.json"
 }
 
 # send_again <jar> [токен капчи] — «Отправить код ещё раз»; печатает сообщение Keycloak

@@ -31,14 +31,14 @@ scripts/keycloak/check-stand.sh
 `check-api.sh` 48, `check-login.sh` 16, `check-login-methods.sh` 22, `check-code-login.sh` 31, `check-admin.sh` 109,
 `check-roles.sh` 71, `check-admin-ui.sh` 28, `check-migration.sh` 26 (нужен .NET SDK), `check-service-keys.sh` 34 (нужно
 разрешение на регистрацию: `scripts/keycloak/registration-token.sh --write-env`, затем `docker compose up -d --wait`),
-весь этап 6б — `check-6b.sh` 138 (кабинет, устройства, оформление, новый проект), магазин из двух сервисов (этап 6а.4) —
+весь этап 6б — `check-6b.sh` 140 (кабинет, устройства, оформление, новый проект), магазин из двух сервисов (этап 6а.4) —
 `check-shop.sh` 61, вход через Госуслуги и Яндекс ID (на заглушке) — `check-external-login.sh` 41, защита от накрутки
 кодов (этап 10.1) — `check-code-limits.sh` 40, код на телефон звонком и запасной SMS (10.2) — `check-phone-code.sh` 24, способы входа человека (10.3) —
 `check-sign-in-methods.sh` 43, вход в два шага (10.4) — `check-two-step-login.sh` 35, смена номера самим человеком (10.5) — `check-phone-change.sh` 27, предложение ключа доступа после входа по коду (10.6) — `check-passkey-offer.sh` 12, коды и способы входа проекта в API админки (10.7) — `check-code-settings.sh` 19 и `check-project-sign-in.sh` 43, письма админам о бюджете кодов — `check-budget-alerts.sh` 14; весь этап 10 — `check-10.sh` 299. Тестов (после этапа 10): .NET — 645, плагина Keycloak (Java, в сборке образа) — 171, админки и кабинета (Vitest) — 108, темы входа (Vitest) — 49.
 
 Стенд, поднятый раньше: realm импортируется только в пустую базу, поэтому после `git pull` настройки этапов 6б и 10 ему
 даёт мигратор настроек проектов — сам, при `docker compose up -d --build --wait` (сервис `realm-migrator`,
-[migrations.md](../migrations.md#настройки-проектов-realm)); проверка мигратора — `check-realm-migrations.sh` 10. Вход
+[migrations.md](../migrations.md#настройки-проектов-realm)); проверка мигратора — `check-realm-migrations.sh` 11. Вход
 через Госуслуги и Яндекс ID (ключи у каждого проекта свои, не миграция) — `scripts/project/enable-external-login.py
 sandbox --stub`.
 
