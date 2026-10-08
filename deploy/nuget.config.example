@@ -1,13 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Пакеты сервиса входа для сервисов проекта: локальный фид (scripts/package/pack.sh → artifacts/nuget) или внутренний
-  NuGet-сервер компании. Скопировать как nuget.config в корень решения сервиса и поправить путь.
+  Пакеты сервиса входа для сервисов проекта. Скопировать как nuget.config в корень решения сервиса и оставить один
+  источник platform-auth:
+  - GitHub Packages — пакеты каждого релиза (тег vX.Y.Z, .github/workflows/release.yml). Читать можно только с токеном:
+    GITHUB_USER и GITHUB_TOKEN (право read:packages) — в переменных окружения, не в файле;
+  - локальный фид (scripts/package/pack.sh → artifacts/nuget): поправить путь, packageSourceCredentials убрать;
+  - внутренний NuGet-сервер компании — его адрес.
 -->
 <configuration>
   <packageSources>
     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-    <add key="platform-auth" value="../auth_service/artifacts/nuget" />
+    <add key="platform-auth" value="https://nuget.pkg.github.com/123kapefa/index.json" />
+    <!-- <add key="platform-auth" value="../auth_service/artifacts/nuget" /> -->
   </packageSources>
+  <packageSourceCredentials>
+    <platform-auth>
+      <add key="Username" value="%GITHUB_USER%" />
+      <add key="ClearTextPassword" value="%GITHUB_TOKEN%" />
+    </platform-auth>
+  </packageSourceCredentials>
   <packageSourceMapping>
     <packageSource key="platform-auth">
       <package pattern="Platform.*" />
