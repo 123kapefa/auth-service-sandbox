@@ -61,3 +61,18 @@ dotnet test --filter "Category!=Infrastructure"    # быстрые, без Dock
 `AuthService.InfrastructureTests` сами поднимают Postgres, Redis и Keycloak (наш образ из `infra/keycloak/Dockerfile`
 с realm из `infra/keycloak/realm`) через Testcontainers. Образ Keycloak тесты собирают сами (`docker build`, повторно — из
 кэша слоёв); готовый можно дать переменной `KEYCLOAK_TEST_IMAGE`. Остальные тесты работают на подделках.
+
+## Живые проверки стенда
+
+Скрипты `scripts/keycloak/check-*.sh` проверяют поднятый стенд по-настоящему: вход через страницу Keycloak, коды,
+админку, кабинет, магазин на сервисе входа, перенос пользователей. В CI их гоняет workflow «Стенд»
+(`.github/workflows/stand.yml`) ночью, на тег `v*`, вручную (Actions → Стенд → Run workflow) и на PR, который меняет
+сами проверки (`scripts/keycloak/`) или workflow:
+
+- **Стенд песочницы:** `docker compose up -d --build --wait`, разрешение на регистрацию клиентов
+  (`registration-token.sh --write-env`), затем `check-stand`, `check-api`, `check-login`, `check-admin`, `check-6b`,
+  `check-10`, `check-shop`, `check-migration` — каждый отдельным шагом.
+- **Развёртывание из образов:** `scripts/package/build-images.sh` и `check-deploy.sh` по `deploy/compose.yaml`.
+
+Упала проверка — в артефакте запуска (`stand-logs` или `deploy-logs`) вывод каждого скрипта и логи всех контейнеров
+(`scripts/ci/collect-logs.sh`).
