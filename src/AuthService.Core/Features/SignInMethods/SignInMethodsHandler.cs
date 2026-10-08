@@ -7,6 +7,7 @@ using AuthService.Core.Features.Security;
 using AuthService.Domain.AuditLog;
 using CSharpFunctionalExtensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.JsonWebTokens;
 using SharedKernel;
 
 namespace AuthService.Core.Features.SignInMethods;
@@ -90,7 +91,10 @@ public sealed partial class SignInMethodsHandler(
         IReadOnlySet<string> current = SignInMethodRules.EffectiveDisabled(account.Value.Facts);
         if (current.Contains(method) != enabled)
         {
-            return await GetAsync(actor.Id, cancellationToken); // уже так — без записи и уведомления
+            // Уже так — без журнала и уведомления. Но «включить» снимает и сохранённое выключение, которое сейчас не
+            // действует (пароль выключали при ключе доступа, ключ удалили): иначе новый ключ молча выключил бы его снова.
+            UnitResult<Error> forgotten = await ForgetSuspendedAsync(actor.Id, account.Value.Facts, cancellationToken);
+            return forgotten.IsFailure ? forgotten.Error : await GetAsync(actor.Id, cancellationToken);
         }
 
         if (!enabled && SignInMethodRules.DisableBlocker(account.Value.Facts, method) is { } blocker)
@@ -223,6 +227,61 @@ public sealed partial class SignInMethodsHandler(
         }
 
         return await GetAsync(userId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Забыть сохранённые выключения, которые сейчас не действуют (страховка: пароль выключали при ключе доступа или
+    /// приложении-аутентификаторе, а их больше нет). Без этого они молча вернутся с новым ключом. Ничего такого — без
+    /// записи. Для мест, где опора могла пропасть: админ удалил 2FA, человек удалил учётные данные, ссылка на новый пароль.
+    /// </summary>
+    public async Task<UnitResult<Error>> ForgetSuspendedAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        Result<Account, Error> account = await LoadAsync(userId, cancellationToken);
+        return account.IsFailure ? account.Error : await ForgetSuspendedAsync(userId, account.Value.Facts, cancellationToken);
+    }
+
+    /// <summary>
+    /// То же после возврата со страницы входа (человек удалил свои учётные данные): «по возможности» — сбой уходит в лог
+    /// и не мешает войти.
+    /// </summary>
+    public async Task ForgetSuspendedAfterLoginAsync(string accessToken, CancellationToken cancellationToken)
+    {
+        Guid userId;
+        try
+        {
+            if (!Guid.TryParse(new JsonWebTokenHandler().ReadJsonWebToken(accessToken).Subject, out userId))
+            {
+                return;
+            }
+        }
+        catch (ArgumentException)
+        {
+            return; // не JWT
+        }
+
+        try
+        {
+            UnitResult<Error> forgotten = await ForgetSuspendedAsync(userId, cancellationToken);
+            if (forgotten.IsFailure)
+            {
+                LogForgetFailed(logger, userId, forgotten.Error.GetMessage());
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            LogForgetFailed(logger, userId, exception.Message);
+        }
+    }
+
+    private async Task<UnitResult<Error>> ForgetSuspendedAsync(Guid userId, SignInFacts facts, CancellationToken cancellationToken)
+    {
+        IReadOnlySet<string> effective = SignInMethodRules.EffectiveDisabled(facts);
+        if (facts.Disabled.All(effective.Contains))
+        {
+            return UnitResult.Success<Error>();
+        }
+
+        return await SaveAsync(userId, effective, cancellationToken);
     }
 
     private bool RecentlyLoggedIn(DateTimeOffset? authenticatedAt) =>
@@ -403,4 +462,7 @@ public sealed partial class SignInMethodsHandler(
         IReadOnlyList<string> LinkedProviders,
         IReadOnlyList<string> ProjectDisabled,
         bool HasPasskeyCredential);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Suspended sign-in methods of user {UserId} were not cleared: {Error}")]
+    private static partial void LogForgetFailed(ILogger logger, Guid userId, string error);
 }

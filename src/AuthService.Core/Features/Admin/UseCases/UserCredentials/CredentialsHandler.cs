@@ -56,6 +56,14 @@ public sealed class CredentialsHandler(
             return SignInMethodErrors.PasswordDisabled();
         }
 
+        // Пароль выключали, но сейчас это не действует (нет ключа или 2FA): с новым паролем выключение не должно
+        // молча вернуться вместе с ключом.
+        UnitResult<Error> forgotten = await signInMethods.ForgetSuspendedAsync(userId, cancellationToken);
+        if (forgotten.IsFailure)
+        {
+            return forgotten.Error;
+        }
+
         UnitResult<Error> sent = await identityAdmin.SendActionsEmailAsync(
             userId, [Credentials.UPDATE_PASSWORD], ResetLinkLifetime, cancellationToken);
         if (sent.IsFailure)
@@ -94,6 +102,14 @@ public sealed class CredentialsHandler(
         if (removed.Value > 0) // 2FA и так не было — без записи в журнал
         {
             await audit.RecordAsync(AuditActions.USER_TWO_FACTOR_DISABLED, user.Value, new { removed = removed.Value }, cancellationToken);
+
+            // Без приложения выключенный пароль снова работает — и пусть: иначе он молча выключится, когда человек
+            // заведёт новое приложение или ключ.
+            UnitResult<Error> forgotten = await signInMethods.ForgetSuspendedAsync(userId, cancellationToken);
+            if (forgotten.IsFailure)
+            {
+                return forgotten.Error;
+            }
         }
 
         return await getUser.Handle(userId, onlyCustomers: false, cancellationToken);

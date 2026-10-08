@@ -120,32 +120,27 @@ final class CodeDispatcher {
                 if (methodDisabled) {
                     yield pretendSent(request, sent, delivery, limitStore, range, today, now);
                 }
-                // Расход — тоже атомарно: одновременные SMS не уйдут за бюджет; не ушёл код — расход возвращаем.
+                // Расход — тоже атомарно: одновременные SMS не уйдут за бюджет. Неудачная отправка расход не возвращает:
+                // «не удалось» бывает и после совершённого звонка или SMS (таймаут ответа провайдера), а платим за них.
                 List<Map.Entry<String, Integer>> spend = new ArrayList<>();
                 if (!limitStore.reserveSpend(delivery, limits.policy(), today, spend)) {
                     request.store().releaseSend(target, current);
                     yield refuse(request, current, limits, limitStore, today, new CodeLimits.Decision.BudgetExhausted());
                 }
                 Optional<String> code = deliver(request, delivery, sent.code(), email);
-                if (code.isEmpty()) {
-                    limitStore.release(spend);
-                }
                 // Звонок не удался (провайдер недоступен) — сразу запасная SMS, если она у проекта есть и в бюджете.
                 // Капча и лимиты уже пройдены этим запросом.
                 if (code.isEmpty() && delivery == CodeDelivery.CALL && limits.policy().allows(CodeDelivery.SMS)) {
                     delivery = CodeDelivery.SMS;
                     if (!limitStore.reserveSpend(delivery, limits.policy(), today, spend)) {
-                        request.store().releaseSend(target, current);
+                        failed(request, limitStore, range, today, now);
                         yield refuse(request, current, limits, limitStore, today, new CodeLimits.Decision.BudgetExhausted());
                     }
                     code = deliver(request, delivery, sent.code(), email);
-                    if (code.isEmpty()) {
-                        limitStore.release(spend);
-                    }
                 }
                 // Сохраняем только отправленный код: иначе пауза перед повтором началась бы без письма.
                 if (code.isEmpty()) {
-                    request.store().releaseSend(target, current);
+                    failed(request, limitStore, range, today, now);
                     yield new Outcome.Failed(current);
                 }
                 CodeState state = sent.state().sentAs(code.get(), delivery);
@@ -233,6 +228,14 @@ final class CodeDispatcher {
         metrics.refused(request.realm().getName(), "method-disabled");
         LOG.infof("Код на %s не отправлен: способ входа выключен у пользователя", request.target().value());
         return new Outcome.Sent(state);
+    }
+
+    // Отправка не удалась: она всё равно считается в истории (растущая пауза, капча — как после отправки), а занятость
+    // отправки (claimSend) не снимается до своего срока — повтор не раньше, чем через полминуты. Иначе медленный или
+    // недоступный провайдер давал бы звонить жертве без пауз (лимиты в час — тоже, но они крупнее).
+    private void failed(Request request, CodeLimitStore limitStore, String range, LocalDate today, Instant now) {
+        limitStore.recordSend(request.target(), request.ip(), range, null, 0, 0, today, now, spent -> 0);
+        metrics.refused(request.realm().getName(), "failed");
     }
 
     // Почта — письмом. Телефон — звонком-сбросом (дешевле); SMS — если попросили или звонки у проекта выключены.
