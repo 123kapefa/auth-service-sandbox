@@ -98,17 +98,18 @@ spec:
             - name: data-protection
               mountPath: /run/secrets/data-protection
               readOnly: true
-          # live — процесс отвечает; ready — есть база и Redis (HealthChecksConfiguration).
+          # live — процесс отвечает; ready — есть база и Redis (HealthChecksConfiguration). Host: localhost — kubelet
+          # ходит по IP пода, а его AllowedHosts не пропустит.
           startupProbe:
-            httpGet: { path: /health/live, port: http }
+            httpGet: { path: /health/live, port: http, httpHeaders: [{ name: Host, value: localhost }] }
             periodSeconds: 2
             failureThreshold: 60
           livenessProbe:
-            httpGet: { path: /health/live, port: http }
+            httpGet: { path: /health/live, port: http, httpHeaders: [{ name: Host, value: localhost }] }
             periodSeconds: 10
             timeoutSeconds: 3
           readinessProbe:
-            httpGet: { path: /health/ready, port: http }
+            httpGet: { path: /health/ready, port: http, httpHeaders: [{ name: Host, value: localhost }] }
             periodSeconds: 5
             timeoutSeconds: 3
           resources:

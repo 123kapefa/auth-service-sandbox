@@ -32,6 +32,13 @@ collect_logs() {
     k logs "$pod" --all-containers --timestamps --previous > "$LOGS/${pod#pod/}.previous.log" 2>/dev/null || true
   done
   echo "Логи подов: $LOGS"
+  # Не готовые поды — сразу в вывод: в журнале CI видно без артефакта.
+  k get pods -o wide
+  for pod in $(k get pods -o jsonpath='{range .items[?(@.status.containerStatuses[0].ready!=true)]}{.metadata.name}{" "}{end}'); do
+    echo "--- $pod"
+    k describe pod "$pod" | sed -n '/^Events:/,$p' | tail -15
+    k logs "$pod" --all-containers --tail 60 2>&1
+  done
 }
 
 finish() {
