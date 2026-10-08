@@ -142,8 +142,13 @@ read -ra ORIGINAL <<< "$(k get pods -l app.kubernetes.io/name=keycloak -o name |
 k delete "${ORIGINAL[0]}" --wait > /dev/null
 still_signed_in "одна реплика осталась"
 k rollout status "deploy/$RELEASE-keycloak" --timeout 300s > /dev/null
-# Вторая — аварийно (без ожидания): сессии — у оставшихся реплик кластера и в базе Keycloak.
+# Вторая — аварийно (без ожидания): сессии — у оставшихся реплик кластера и в базе Keycloak. Пока кластер не заметил
+# пропажу узла (десятки секунд), запросы к кэшу, чья копия была на нём, отказывают; вход при этом не теряется.
 k delete "${ORIGINAL[1]}" --grace-period=0 --force > /dev/null 2>&1
+for _ in $(seq 60); do
+  [ "$(status "$JAR" POST /auth/refresh)" = 200 ] && break
+  sleep 2
+done
 still_signed_in "вторая упала"
 k rollout status "deploy/$RELEASE-keycloak" --timeout 300s > /dev/null
 check "Keycloak снова в двух репликах" "$(ready keycloak)" 2

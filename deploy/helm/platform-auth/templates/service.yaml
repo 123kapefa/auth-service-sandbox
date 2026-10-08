@@ -35,6 +35,30 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      # Сервис стартует после Keycloak (как depends_on в compose): при старте он сверяет каталог прав с Keycloak, а
+      # первый запуск Keycloak со сборкой дольше, чем сервис готов ждать.
+      initContainers:
+        - name: wait-keycloak
+          image: {{ include "auth.image" (dict "root" . "image" .Values.images.realmMigrator) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          command:
+            - python3
+            - -c
+            - |
+              import time, urllib.request
+              url = "{{ include "auth.keycloakInternalUrl" . }}/realms/master"
+              while True:
+                  try:
+                      urllib.request.urlopen(url, timeout=5)
+                      break
+                  except Exception as error:
+                      print(f"Keycloak ещё не готов: {error}", flush=True)
+                      time.sleep(5)
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
       containers:
         - name: service
           image: {{ include "auth.image" (dict "root" . "image" .Values.images.service) }}
