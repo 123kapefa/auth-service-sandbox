@@ -111,7 +111,8 @@ if "$ROOT/scripts/keycloak/check-stand.sh" > "$WORK/stand.log" 2>&1; then ok "ch
 else bad "check-stand.sh"; sed 's/^/    /' "$WORK/stand.log"; fi
 
 echo "3. check-login.sh"
-if "$ROOT/scripts/keycloak/check-login.sh" > "$WORK/login.log" 2>&1; then ok "check-login.sh: $(tail -1 "$WORK/login.log")"
+# Две реплики сервиса: отзыв доходит до второй, когда истечёт её кэш проверки (2 с).
+if REVOCATION_CACHE_SECONDS=2 "$ROOT/scripts/keycloak/check-login.sh" > "$WORK/login.log" 2>&1; then ok "check-login.sh: $(tail -1 "$WORK/login.log")"
 else bad "check-login.sh"; sed 's/^/    /' "$WORK/login.log"; fi
 
 echo "4. Остановка реплики Keycloak не разлогинивает"

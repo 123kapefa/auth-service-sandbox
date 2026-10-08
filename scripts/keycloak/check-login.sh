@@ -39,8 +39,16 @@ check "refresh после выхода → 401" \
   "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Cookie: refreshToken=$LAST_REFRESH" "$API/auth/refresh")" 401
 check "сессия Keycloak закрыта — снова нужна форма" \
   "$(login "$JAR" / 0987654321 wrong-password | cut -c1-9)" keycloak:
-check "старый access-токен после выхода — 401 сразу (мгновенный отзыв)" \
-  "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: accessToken=$OLD_ACCESS" "$API/me/")" 401
+# Отметку отзыва видит сразу тот экземпляр сервиса, что принял выход; у остальных (несколько реплик, Kubernetes) —
+# когда истечёт их кэш проверки (TokenRevocation:LocalCache, 2 с). REVOCATION_CACHE_SECONDS — сколько ждать его.
+old_access_status() { curl -s -o /dev/null -w '%{http_code}' -H "Cookie: accessToken=$OLD_ACCESS" "$API/me/"; }
+OLD_STATUS=$(old_access_status)
+if [ "$OLD_STATUS" != 401 ] && [ "${REVOCATION_CACHE_SECONDS:-0}" -gt 0 ]; then
+  sleep "$((REVOCATION_CACHE_SECONDS + 1))"; OLD_STATUS=$(old_access_status)
+fi
+WHEN="сразу"; [ "${REVOCATION_CACHE_SECONDS:-0}" -gt 0 ] && WHEN="за ${REVOCATION_CACHE_SECONDS} с кэша реплик"
+check "старый access-токен после выхода — 401 $WHEN (мгновенный отзыв)" \
+  "$OLD_STATUS" 401
 
 echo "5. Отказы"
 JAR2="$WORK/jar2"; : > "$JAR2"
