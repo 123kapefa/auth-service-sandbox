@@ -15,6 +15,9 @@ import java.util.Set;
  *   <li><b>Способы</b> — человек сам выключил пароль (10.3): включённые у него способы по цене — ключ доступа → код на
  *       почту → звонок. Код уходит на почту и номер из аккаунта, на экране они скрыты частично. Один способ — шаг 2
  *       пропускается.</li>
+ *   <li><b>Пароль выключен в проекте</b> (а не самим человеком) — шаг 2 как у незнакомого логина: ключ доступа и код на
+ *       то, что ввели, без поля пароля. Иначе по экрану способов (и маске почты на нём) было бы видно, есть ли аккаунт
+ *       (приёмка 10.4).</li>
  * </ul>
  */
 final class LoginSteps {
@@ -32,8 +35,15 @@ final class LoginSteps {
      * @param hasPasskey есть ключ доступа
      * @param hasEmail   есть почта
      * @param phoneLogin логин — номер телефона (на него и уходит код)
+     * @param passwordOffInProject вход по паролю выключен для человека в проекте (ProjectSignIn); в disabled его нет —
+     *                             там только выключенное самим человеком
      */
-    record Account(boolean enabled, Set<String> disabled, boolean hasPasskey, boolean hasEmail, boolean phoneLogin) {
+    record Account(boolean enabled, Set<String> disabled, boolean hasPasskey, boolean hasEmail, boolean phoneLogin,
+                   boolean passwordOffInProject) {
+
+        Account(boolean enabled, Set<String> disabled, boolean hasPasskey, boolean hasEmail, boolean phoneLogin) {
+            this(enabled, disabled, hasPasskey, hasEmail, phoneLogin, false);
+        }
     }
 
     /**
@@ -41,8 +51,13 @@ final class LoginSteps {
      *
      * @param password поле пароля сразу (иначе — список способов)
      * @param methods  способы по цене: passkey, email-code, phone-code
+     * @param account  способы аккаунта: код уходит на почту и номер из аккаунта (иначе — на то, что ввели)
      */
-    record View(boolean password, List<String> methods) {
+    record View(boolean password, List<String> methods, boolean account) {
+
+        View(boolean password, List<String> methods) {
+            this(password, methods, false);
+        }
 
         /** Единственный способ, который открывается сам, без шага 2. */
         Optional<String> autoStart() {
@@ -70,8 +85,10 @@ final class LoginSteps {
                 methods.add(PASSKEY);
             }
             typed.map(LoginSteps::codeMethod).ifPresent(methods::add);
-            // Пароль выключен в проекте: незнакомому — код на то, что ввели (и ключ доступа), без поля пароля.
-            boolean password = passwordOn || account != null || methods.isEmpty();
+            // Пароль выключен в проекте — код на то, что ввели (и ключ доступа), без поля пароля: и незнакомому, и
+            // знакомому, у которого нет права переходного периода. У знакомого с правом — поле пароля.
+            boolean known = account != null && account.enabled();
+            boolean password = methods.isEmpty() || (known ? !account.passwordOffInProject() : passwordOn);
             return new View(password, List.copyOf(methods));
         }
         if (passkeysEnabled && account.hasPasskey()) {
@@ -83,7 +100,7 @@ final class LoginSteps {
         if (account.phoneLogin() && !account.disabled().contains(SignInMethods.PHONE_CODE)) {
             methods.add(SignInMethods.PHONE_CODE);
         }
-        return new View(false, List.copyOf(methods));
+        return new View(false, List.copyOf(methods), true);
     }
 
     static String codeMethod(CodeTarget.Channel channel) {

@@ -86,7 +86,7 @@ final class CodeLimitStore {
     /**
      * Атомарно учесть отправку способом delivery в расходе суток. SMS сверх бюджета не учитывается (false — бюджет
      * кончился); звонки и почта учитываются всегда. Расход — по числу отправок каждым способом и ценам: так его не
-     * теряют одновременные запросы. claimed — что занято (освободить, если код не ушёл).
+     * теряют одновременные запросы. claimed — что занято. Неудачная отправка расход не возвращает (CodeDispatcher).
      */
     boolean reserveSpend(CodeDelivery delivery, CodeLimitPolicy policy, LocalDate today,
                          List<Map.Entry<String, Integer>> claimed) {

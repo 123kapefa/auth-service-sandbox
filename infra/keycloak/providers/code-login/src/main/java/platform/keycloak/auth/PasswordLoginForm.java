@@ -32,7 +32,8 @@ import org.keycloak.services.validation.Validation;
  * <ol>
  *   <li>«Телефон или почта» → «Продолжить» (кнопка next). Ключ доступа, Яндекс ID и Госуслуги — тут же, без логина.</li>
  *   <li>Чем войти — по LoginSteps: поле пароля сразу (и для незнакомого логина) или список включённых способов,
- *       если человек выключил пароль. Один способ — открывается сам. «Изменить» (changeLogin) — назад к шагу 1.</li>
+ *       если человек выключил пароль (при выключенном в проекте пароле — ключ доступа и код на то, что ввели, как для
+ *       незнакомого). Один способ — открывается сам. «Изменить» (changeLogin) — назад к шагу 1.</li>
  * </ol>
  * Шаг страницы — атрибут loginStep (login, password, methods), способы — loginMethods. Введённый логин хранится в
  * заметке сессии входа; пароль проверяется именно для него.
@@ -129,8 +130,8 @@ public final class PasswordLoginForm extends UsernamePasswordForm {
         Step step = step(context);
         Optional<String> auto = step.view().autoStart();
         if (auto.isPresent() && !LoginSteps.PASSKEY.equals(auto.get())) {
-            if (step.user() == null) {
-                // Незнакомый логин, пароль выключен в проекте: код на то, что ввели.
+            if (!step.view().account()) {
+                // Пароль выключен в проекте: код на то, что ввели, — есть такой аккаунт или нет.
                 startCode(context, CodeTarget.parse(login).orElseThrow(), false);
             } else {
                 startCode(context, accountTarget(step.user(), auto.get()), true);
@@ -183,7 +184,7 @@ public final class PasswordLoginForm extends UsernamePasswordForm {
             context.challenge(challenge(context, "platformLoginMethodUnavailable", null));
             return;
         }
-        if (step.view().password() || step.user() == null) {
+        if (!step.view().account()) {
             // Код на то, что ввели: на экране — как ввели, есть аккаунт или нет.
             startCode(context, typed.orElseThrow(), false);
         } else {
@@ -227,13 +228,20 @@ public final class PasswordLoginForm extends UsernamePasswordForm {
         if (user != null) {
             SignInMethods.Facts facts = SignInMethods.facts(context.getSession(), context.getRealm(), user);
             Set<String> disabled = new HashSet<>(SignInMethods.effectiveDisabled(facts));
+            boolean passwordOff = false;
             for (String method : SignInMethods.ALL) {
                 if (SignInMethods.offInProject(context.getSession(), context.getRealm(), user, method)) {
-                    disabled.add(method);
+                    // Пароль, выключенный проектом, — как у незнакомого логина (LoginSteps); повторный вход (человек
+                    // уже известен) — экран его способов: скрывать нечего.
+                    if (SignInMethods.PASSWORD.equals(method) && !preset) {
+                        passwordOff = true;
+                    } else {
+                        disabled.add(method);
+                    }
                 }
             }
             account = new LoginSteps.Account(user.isEnabled(), disabled, facts.hasPasskey(),
-                facts.hasEmail(), user.getUsername().matches(PHONE_LOGIN));
+                facts.hasEmail(), user.getUsername().matches(PHONE_LOGIN), passwordOff);
         }
         boolean passwordOn = ProjectSignInRealm.on(context.getSession(), context.getRealm(), ProjectSignIn.Method.PASSWORD);
         return new Step(user, LoginSteps.view(typed, account, webauthnAuth != null && webauthnAuth.isPasskeysEnabled(), passwordOn));
@@ -300,7 +308,7 @@ public final class PasswordLoginForm extends UsernamePasswordForm {
         if (!preset) {
             form.setAttribute("loginDisplay", CodeTarget.parse(login).map(CodeTarget::display).orElse(login));
         }
-        if (!view.password()) {
+        if (view.account()) {
             UserModel user = step.user();
             if (view.methods().contains(SignInMethods.EMAIL_CODE)) {
                 form.setAttribute("loginEmailHint", accountTarget(user, SignInMethods.EMAIL_CODE).masked());
@@ -308,6 +316,12 @@ public final class PasswordLoginForm extends UsernamePasswordForm {
             if (view.methods().contains(SignInMethods.PHONE_CODE)) {
                 form.setAttribute("loginPhoneHint", accountTarget(user, SignInMethods.PHONE_CODE).masked());
             }
+        } else if (!view.password() && login != null) {
+            // Код — на то, что ввели: его и показываем (аккаунта не касается).
+            String shown = CodeTarget.parse(login).map(CodeTarget::display).orElse(login);
+            form.setAttribute(login.contains("@") ? "loginEmailHint" : "loginPhoneHint", shown);
+        }
+        if (!view.password()) {
             view.autoStart().ifPresent(method -> form.setAttribute("loginAutoStart", method));
         }
         if (view.methods().contains(LoginSteps.PASSKEY)) {

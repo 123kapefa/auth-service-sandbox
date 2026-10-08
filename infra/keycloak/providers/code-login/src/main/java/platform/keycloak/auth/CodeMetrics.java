@@ -10,8 +10,10 @@ import io.micrometer.core.instrument.Metrics;
  *   <li>platform_code_sent_total{realm,channel} — отправлено кодов (CALL, SMS, EMAIL);</li>
  *   <li>platform_code_verified_total{realm,channel} — введено верно (доля введённых = verified / sent);</li>
  *   <li>platform_code_cost_kopecks_total{realm,channel} — расход;</li>
- *   <li>platform_code_refused_total{realm,reason} — не отправлено: limit, captcha, country, budget;</li>
- *   <li>platform_code_budget_alerts_total{realm,percent} — оповещения о расходе (80, 100).</li>
+ *   <li>platform_code_refused_total{realm,reason} — не отправлено: limit, captcha, country, budget,
+ *       failed (провайдер не смог), method-disabled;</li>
+ *   <li>platform_code_budget_alerts_total{realm,percent} — оповещения о расходе (80, 100);</li>
+ *   <li>platform_code_captcha_unavailable_total{realm} — сервис капчи недоступен, капча считалась пройденной.</li>
  * </ul>
  * Оповещение о падении доли введённых — правило Prometheus (docs/keycloak/10-code-limits.md).
  */
@@ -45,6 +47,10 @@ final class CodeMetrics {
 
     void budgetAlert(String realm, int percent) {
         counter("platform_code_budget_alerts", realm, "percent", Integer.toString(percent)).increment();
+    }
+
+    void captchaUnavailable(String realm) {
+        Counter.builder("platform_code_captcha_unavailable").tag("realm", realm).register(registry).increment();
     }
 
     private Counter counter(String name, String realm, String tag, String value) {

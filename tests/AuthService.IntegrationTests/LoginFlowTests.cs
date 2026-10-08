@@ -189,6 +189,26 @@ public sealed class LoginFlowTests : IClassFixture<AuthServiceWebFactory>
     }
 
     [Theory]
+    [InlineData("success", null)]
+    [InlineData("cancelled", "password")]
+    public async Task Callback_AfterCredentialDeleted_SuspendedSignInMethodsForgotten(string status, string? left)
+    {
+        // Пароль выключали при ключе доступа; человек удалил ключ — выключение больше не действует и не должно вернуться.
+        _factory.IdentityAdmin.Add(TestUser.Customer);
+        _factory.IdentityAdmin.SetDisabledSignInMethods(TestUser.Customer, "password");
+        _keycloak.TokenResult = FakeIdentityProvider.Tokens(_factory.CreateToken(TestUser.Customer), "refresh-1");
+        HttpClient browser = _factory.CreateBrowserClient();
+        HttpResponseMessage login = await browser.GetAsync(new Uri(
+            "/auth/login?return_to=/account/&action=delete-credential&credential=4B4F2C3E-8F1A-4D7E-9A51-0D6A1C2B3E4F", UriKind.Relative));
+
+        HttpResponseMessage response = await Callback(
+            browser, SetCookie(login, LOGIN_COOKIE).Value.ToString(), $"code=c&state={_keycloak.LastAuthorization!.State}&kc_action_status={status}");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(left, (await _factory.IdentityAdmin.GetUserAsync(TestUser.Customer.Id, CancellationToken.None)).Value.DisabledSignInMethods);
+    }
+
+    [Theory]
     [InlineData("update-phone", "cancelled")]
     [InlineData("update-email", "success")]
     [InlineData(null, null)]

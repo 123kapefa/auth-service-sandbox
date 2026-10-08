@@ -63,7 +63,7 @@ final class CodeStore {
         return slots.claim(key(target) + ":send:" + version, SEND_CLAIM_SECONDS, 1) == 1;
     }
 
-    /** Отправка не удалась — можно пробовать снова, не дожидаясь, пока занятость истечёт. */
+    /** Отправки не было (отказ лимита или бюджета до провайдера) — можно пробовать снова, не дожидаясь срока. */
     void releaseSend(CodeTarget target, CodeState state) {
         String version = state.resendAllowedAt() == null ? "none" : Long.toString(state.resendAllowedAt().toEpochMilli());
         slots.release(key(target) + ":send:" + version, 1);

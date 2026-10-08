@@ -29,26 +29,65 @@ interface CaptchaVerifier {
     String STUB_SITE_KEY = "sandbox-stub";
     CaptchaVerifier STUB = (session, token, ip) -> STUB_TOKEN.equals(token);
 
-    /** Яндекс SmartCaptcha: POST /validate с серверным ключом, токеном и IP человека. */
-    static CaptchaVerifier smartCaptcha(String serverKey, String url) {
+    /** Чем кончилась серверная проверка. */
+    enum Answer {
+        /** Капча пройдена. */
+        PASSED,
+        /** Не пройдена, или сервис ответил так, что пройденной её не считать (4xx, непонятный ответ). */
+        FAILED,
+        /** Сервис капчи недоступен (5xx, таймаут, обрыв): вход не закрываем, лимиты действуют. */
+        UNAVAILABLE
+    }
+
+    /**
+     * Ответ SmartCaptcha → итог. Пропускаем только при сбое самого сервиса (5xx): так советует Яндекс. 4xx — ошибка
+     * нашей стороны (неверный серверный ключ, адрес), и пропускать на ней любой токен нельзя: капча перестала бы
+     * защищать, а сигнал был бы только в WARN. Непонятное тело на 200 — тоже отказ.
+     */
+    static Answer answer(int status, JsonNode json) {
+        if (status >= 500) {
+            return Answer.UNAVAILABLE;
+        }
+        if (status != 200 || json == null) {
+            return Answer.FAILED;
+        }
+        return "ok".equals(json.path("status").asText()) ? Answer.PASSED : Answer.FAILED;
+    }
+
+    /**
+     * Яндекс SmartCaptcha: POST /validate с серверным ключом, токеном и IP человека. Сервис недоступен — капча
+     * считается пройденной (WARN и метрика platform_code_captcha_unavailable_total).
+     */
+    static CaptchaVerifier smartCaptcha(String serverKey, String url, CodeMetrics metrics) {
         Logger log = Logger.getLogger(CaptchaVerifier.class);
         return (session, token, ip) -> {
+            Answer answer;
             try (SimpleHttpResponse response = SimpleHttp.create(session).doPost(url)
                 .param("secret", serverKey)
                 .param("token", token)
                 .param("ip", ip)
                 .asResponse()) {
-                if (response.getStatus() != 200) {
-                    // Так советует Яндекс: сбой сервиса капчи не должен закрывать вход. Лимиты при этом действуют.
-                    log.warnf("SmartCaptcha ответила %d — считаем капчу пройденной", response.getStatus());
-                    return true;
+                JsonNode json = null;
+                if (response.getStatus() == 200) {
+                    try {
+                        json = response.asJson();
+                    } catch (IOException | RuntimeException e) {
+                        log.warnf("SmartCaptcha: непонятный ответ — капча не пройдена (%s)", e.getMessage());
+                    }
                 }
-                JsonNode json = response.asJson();
-                return json != null && "ok".equals(json.path("status").asText());
+                answer = answer(response.getStatus(), json);
+                if (answer != Answer.PASSED && response.getStatus() != 200) {
+                    log.warnf("SmartCaptcha ответила %d — %s", response.getStatus(),
+                        answer == Answer.UNAVAILABLE ? "считаем капчу пройденной" : "капча не пройдена (проверьте ключ и адрес)");
+                }
             } catch (IOException e) {
                 log.warnf(e, "SmartCaptcha недоступна — считаем капчу пройденной");
-                return true;
+                answer = Answer.UNAVAILABLE;
             }
+            if (answer == Answer.UNAVAILABLE && metrics != null && session.getContext().getRealm() != null) {
+                metrics.captchaUnavailable(session.getContext().getRealm().getName());
+            }
+            return answer != Answer.FAILED;
         };
     }
 }

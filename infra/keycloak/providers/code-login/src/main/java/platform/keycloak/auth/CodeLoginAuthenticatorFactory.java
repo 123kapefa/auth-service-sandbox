@@ -109,9 +109,10 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
         this.config = config;
         // Проверяем настройки при старте: с опечаткой в лимитах Keycloak не поднимется, а не пропустит коды.
         CodeLimitPolicy.from(config::get, CodeLimitPolicy.DEFAULTS);
+        metrics = CodeMetrics.global();
         String serverKey = config.get("captcha-server-key");
         if (serverKey != null && !serverKey.isBlank()) {
-            captcha = CaptchaVerifier.smartCaptcha(serverKey, config.get("captcha-url", SMART_CAPTCHA_URL));
+            captcha = CaptchaVerifier.smartCaptcha(serverKey, config.get("captcha-url", SMART_CAPTCHA_URL), metrics);
         } else if (config.getBoolean("captcha-stub", false)) {
             captcha = CaptchaVerifier.STUB;
             LOG.warn("Капча кодов — заглушка стенда (captcha-stub): в бою нужен captcha-server-key");
@@ -124,7 +125,6 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
             // Тема рисует вместо виджета Яндекса галочку заглушки (её токен — STUB_TOKEN).
             captchaSiteKey = CaptchaVerifier.STUB_SITE_KEY;
         }
-        metrics = CodeMetrics.global();
         String phoneUrl = config.get("phone-provider-url");
         if (phoneUrl != null && !phoneUrl.isBlank()) {
             phone = new HttpPhoneProvider(phoneUrl);

@@ -90,4 +90,33 @@ class LoginStepsTest {
     void passwordView_neverAutoStarts() {
         assertTrue(LoginSteps.view(Optional.empty(), null, true).autoStart().isEmpty());
     }
+
+    @Test
+    void passwordOffInProject_knownLooksLikeUnknown() {
+        // Пароль выключен в проекте, а не человеком: ни экрана способов, ни маски почты — как у незнакомого логина.
+        LoginSteps.Account known = new LoginSteps.Account(true, Set.of(), true, true, true, true);
+        LoginSteps.View unknown = LoginSteps.view(PHONE, null, true, false);
+        assertEquals(new LoginSteps.View(false, List.of(PASSKEY, PHONE_CODE)), unknown);
+        assertEquals(unknown, LoginSteps.view(PHONE, known, true, false));
+        assertFalse(unknown.account());
+
+        LoginSteps.Account emailKnown = new LoginSteps.Account(true, Set.of(PHONE_CODE), false, true, false, true);
+        assertEquals(LoginSteps.view(EMAIL, null, false, false), LoginSteps.view(EMAIL, emailKnown, false, false));
+        assertEquals(Optional.of(EMAIL_CODE), LoginSteps.view(EMAIL, emailKnown, false, false).autoStart());
+    }
+
+    @Test
+    void passwordOffInProject_transitionRight_passwordField() {
+        // Право переходного периода: пароль у человека ещё работает.
+        LoginSteps.Account transition = new LoginSteps.Account(true, Set.of(), true, true, true, false);
+        assertTrue(LoginSteps.view(PHONE, transition, true, false).password());
+    }
+
+    @Test
+    void passwordOffByPersonAndProject_accountMethods() {
+        LoginSteps.Account both = new LoginSteps.Account(true, Set.of(SignInMethods.PASSWORD), true, true, true, true);
+        LoginSteps.View view = LoginSteps.view(PHONE, both, true, false);
+        assertTrue(view.account());
+        assertEquals(List.of(PASSKEY, EMAIL_CODE, PHONE_CODE), view.methods());
+    }
 }

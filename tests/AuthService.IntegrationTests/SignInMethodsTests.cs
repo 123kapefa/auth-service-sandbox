@@ -209,6 +209,56 @@ public sealed class SignInMethodsTests : IClassFixture<AuthServiceWebFactory>
     }
 
     [Fact]
+    public async Task Set_EnableSuspended_Forgotten_NewPasskeyDoesNotDisableAgain()
+    {
+        // Пароль выключали при ключе, ключ удалили: выключение не действует, но хранится. «Включить» его снимает —
+        // молча (для человека пароль и так работал), иначе новый ключ снова выключил бы пароль.
+        _keycloak.SetDisabledSignInMethods(TestUser.Customer, "password");
+
+        Assert.Equal(HttpStatusCode.OK, (await SetAsync("password", enabled: true)).StatusCode);
+
+        (Guid _, string name, string? value) = Assert.Single(_keycloak.AttributeChanges);
+        Assert.Equal((UserAttributes.DISABLED_SIGN_IN_METHODS, (string?)null), (name, value));
+        Assert.Empty(_factory.AuditLog.Entries);
+        Assert.Empty(_factory.Notices.Sent);
+
+        AddPasskey();
+        Assert.Equal("password:True:True:", Methods(await ResultAsync(await GetOwnAsync()))[0]);
+    }
+
+    [Fact]
+    public async Task Set_OtherMethod_SuspendedNotKept()
+    {
+        _keycloak.SetDisabledSignInMethods(TestUser.Customer, "password");
+
+        Assert.Equal(HttpStatusCode.OK, (await SetAsync("email-code", enabled: false)).StatusCode);
+
+        Assert.Equal("email-code", Assert.Single(_keycloak.AttributeChanges).Value);
+    }
+
+    [Fact]
+    public async Task AdminPasswordReset_SuspendedPasswordOff_Forgotten()
+    {
+        _keycloak.SetDisabledSignInMethods(TestUser.Customer, "password");
+
+        Assert.Equal(HttpStatusCode.OK, (await AdminAsync(HttpMethod.Post, "password-reset")).StatusCode);
+
+        Assert.Single(_keycloak.ActionEmails);
+        Assert.Null(Assert.Single(_keycloak.AttributeChanges).Value);
+    }
+
+    [Fact]
+    public async Task AdminDisableTwoFactor_SuspendedPasswordOff_Forgotten()
+    {
+        _keycloak.EnableTwoFactor(TestUser.Customer);
+        _keycloak.SetDisabledSignInMethods(TestUser.Customer, "password,email-code");
+
+        Assert.Equal(HttpStatusCode.OK, (await AdminAsync(HttpMethod.Delete, "two-factor")).StatusCode);
+
+        Assert.Equal("email-code", Assert.Single(_keycloak.AttributeChanges).Value);
+    }
+
+    [Fact]
     public async Task Set_NoticeFails_ChangeStillSaved()
     {
         _factory.Notices.Failure = IdentityProviderErrors.Unavailable();
