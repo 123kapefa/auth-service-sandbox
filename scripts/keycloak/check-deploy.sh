@@ -28,13 +28,8 @@ export COMPOSE_FILE="$DIR/compose.yaml"
 export KEYCLOAK_SERVICE=auth-keycloak KEYCLOAK_ADMIN=admin KEYCLOAK_ADMIN_PASSWORD=check-admin-password KC
 SECRET=deploy-shop-bff-secret
 
-# Сертификат DataProtection (PFX) — как в .env.example.
-openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj /CN=auth-data-protection \
-  -keyout "$DIR/dp.key" -out "$DIR/dp.crt" > /dev/null 2>&1
-openssl pkcs12 -export -inkey "$DIR/dp.key" -in "$DIR/dp.crt" -out "$DIR/dp.pfx" -passout pass:check-pfx \
-  -keypbe AES-256-CBC -certpbe AES-256-CBC -macalg sha256
-# В бою — chown root:1654 и 640 (.env.example); проверка идёт без sudo, сменить группу на 1654 не может — 644.
-chmod 644 "$DIR/dp.pfx"
+# Сертификат DataProtection (PFX в base64) — как в .env.example; в бою — из хранилища секретов.
+DP_CERT=$(PFX_PASSWORD=check-pfx "$ROOT/scripts/secrets/new-pfx.sh")
 
 cat > "$DIR/auth.env" <<ENV
 AUTH_VERSION=$VERSION
@@ -51,7 +46,7 @@ AUTH_KEYCLOAK_METADATA_URL=http://auth-keycloak:8180/realms/$REALM/.well-known/o
 AUTH_REQUIRE_HTTPS=false
 AUTH_ALLOWED_HOSTS=localhost
 AUTH_RETURN_ORIGIN=$API
-AUTH_DATA_PROTECTION_CERT_FILE=$DIR/dp.pfx
+AUTH_DATA_PROTECTION_CERT=$DP_CERT
 AUTH_DATA_PROTECTION_CERT_PASSWORD=check-pfx
 ENV
 

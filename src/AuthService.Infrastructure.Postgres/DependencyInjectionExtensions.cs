@@ -1,8 +1,8 @@
 using AuthService.Core.Abstractions;
 using AuthService.Infrastructure.Postgres.AuditLog;
+using AuthService.Infrastructure.Postgres.DataProtection;
 using AuthService.Infrastructure.Postgres.ServiceKeys;
 using AuthService.Infrastructure.Postgres.Sessions;
-using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -32,19 +32,26 @@ public static class DependencyInjectionExtensions
             .PersistKeysToDbContext<AuthDbContext>();
 
         // В бою ключи DataProtection шифруются сертификатом: иначе дамп базы содержит и ключи, и то, что ими зашифровано
-        // (токены управления ключами сервисов). DataProtection:CertificatePath (PFX) и :CertificatePassword — из секретов.
-        // В бою сертификат обязателен (флаг RequireCertificate в настройках Production): без него сервис не стартует.
-        string? certificate = configuration["DataProtection:CertificatePath"];
-        if (string.IsNullOrWhiteSpace(certificate) && configuration.GetValue<bool>("DataProtection:RequireCertificate"))
+        // (токены управления ключами сервисов). Сертификат — DataProtection:CertificatePath (PFX) или :Certificate (PFX в
+        // base64, из хранилища секретов), пароль — :CertificatePassword. В бою обязателен (RequireCertificate в настройках
+        // Production): без него сервис не стартует. Смена сертификата — с прежним в :PreviousCertificate* (docs/secrets.md).
+        DataProtectionCertificates certificates = DataProtectionCertificates.Load(configuration);
+        if (certificates.Current is null && configuration.GetValue<bool>("DataProtection:RequireCertificate"))
         {
             throw new InvalidOperationException(
-                "DataProtection:CertificatePath is required: keys protecting service key management tokens must be encrypted with a certificate (PFX).");
+                "DataProtection:CertificatePath or DataProtection:Certificate is required: keys protecting service key management tokens must be encrypted with a certificate (PFX).");
         }
 
-        if (!string.IsNullOrWhiteSpace(certificate))
+        if (certificates.Current is { } current)
         {
-            dataProtection.ProtectKeysWithCertificate(
-                X509CertificateLoader.LoadPkcs12FromFile(certificate, configuration["DataProtection:CertificatePassword"]));
+            dataProtection.ProtectKeysWithCertificate(current);
+            if (certificates.Previous is { } previous)
+            {
+                dataProtection.UnprotectKeysWithAnyCertificate(current, previous);
+            }
+
+            services.AddSingleton(certificates);
+            services.AddHostedService<DataProtectionKeyRewrapService>();
         }
 
         return services;

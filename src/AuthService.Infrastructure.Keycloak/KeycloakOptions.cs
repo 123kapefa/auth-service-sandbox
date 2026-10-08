@@ -12,6 +12,12 @@ public sealed class KeycloakOptions
     /// <summary>Секрет confidential-клиента. Только из переменной окружения / хранилища секретов.</summary>
     public string ClientSecret { get; init; } = string.Empty;
 
+    /// <summary>
+    /// Прежний секрет — только на время смены секрета (docs/secrets.md): Keycloak отверг ClientSecret — запрос
+    /// повторяется с этим. Пусто — повтора нет.
+    /// </summary>
+    public string PreviousClientSecret { get; init; } = string.Empty;
+
     public string Scope { get; init; } = "openid";
 
     /// <summary>

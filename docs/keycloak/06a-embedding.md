@@ -68,8 +68,9 @@ scripts/project/add-app.py shop orders "Заказы" --default-role customer --
 - **`deploy/compose.yaml`** — вставить в свой compose через `include:` со своим env-файлом по образцу
   `deploy/.env.example`. По умолчанию — боевой режим: Keycloak `start` за прокси с https (порты — на 127.0.0.1,
   `X-Forwarded-*` — только от прокси), сервис — Production, не root, ключи DataProtection зашифрованы сертификатом
-  (`AUTH_DATA_PROTECTION_CERT_FILE`, без него не стартует). Без обязательных переменных compose не запускается и
-  пишет, чего не хватает.
+  (`AUTH_DATA_PROTECTION_CERT` — PFX в base64, без него не стартует). Без обязательных переменных compose не
+  запускается и пишет, чего не хватает. Секреты — из хранилища: `infisical run -- docker compose up`
+  ([secrets.md](../secrets.md)).
 
 ## Магазин: «Заказы» и «Уведомления»
 

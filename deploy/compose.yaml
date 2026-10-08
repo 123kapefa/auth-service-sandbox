@@ -129,25 +129,21 @@ services:
       Authentication__MetadataAddress: ${AUTH_KEYCLOAK_METADATA_URL:-}
       Authentication__RequireHttpsMetadata: ${AUTH_REQUIRE_HTTPS:-true}
       Keycloak__ClientSecret: ${AUTH_BFF_CLIENT_SECRET:?нужен AUTH_BFF_CLIENT_SECRET}
+      # Прежний секрет — только на время смены секрета (docs/secrets.md).
+      Keycloak__PreviousClientSecret: ${AUTH_BFF_CLIENT_SECRET_PREVIOUS:-}
       Keycloak__RegistrationToken: ${AUTH_REGISTRATION_TOKEN:-}
       AllowedHosts: ${AUTH_ALLOWED_HOSTS:?нужен AUTH_ALLOWED_HOSTS — домен сервиса входа;localhost}
-      # Сертификат (PFX) шифрует ключи DataProtection в базе (ими защищены токены управления ключами сервисов);
-      # без него сервис в Production не стартует. Файл — AUTH_DATA_PROTECTION_CERT_FILE, монтируется ниже.
-      DataProtection__CertificatePath: /run/secrets/auth/data-protection.pfx
+      # Сертификат (PFX в base64) шифрует ключи DataProtection в базе (ими защищены токены управления ключами сервисов);
+      # без него сервис в Production не стартует. Значение — из хранилища секретов (docs/secrets.md): файла на машине нет.
+      # Прежний сертификат — только на время смены: сервис перешифровывает им старые ключи новым.
+      DataProtection__Certificate: ${AUTH_DATA_PROTECTION_CERT:?нужен AUTH_DATA_PROTECTION_CERT — сертификат DataProtection (PFX в base64)}
       DataProtection__CertificatePassword: ${AUTH_DATA_PROTECTION_CERT_PASSWORD:-}
+      DataProtection__PreviousCertificate: ${AUTH_DATA_PROTECTION_PREVIOUS_CERT:-}
+      DataProtection__PreviousCertificatePassword: ${AUTH_DATA_PROTECTION_PREVIOUS_CERT_PASSWORD:-}
       Cookies__Secure: ${AUTH_COOKIES_SECURE:-true}
       Cookies__Domain: ${AUTH_COOKIES_DOMAIN:-}
       ReturnUrls__AllowedOrigins__0: ${AUTH_RETURN_ORIGIN:?нужен AUTH_RETURN_ORIGIN — адрес приложения проекта}
       ReturnUrls__Default: ${AUTH_RETURN_DEFAULT:-/account/}
-    volumes:
-      # Абсолютный путь на машине; файл доступен на чтение пользователю сервиса (uid 1654). Нет файла — compose
-      # не стартует (без create_host_path Docker создал бы на его месте пустой каталог).
-      - type: bind
-        source: ${AUTH_DATA_PROTECTION_CERT_FILE:?нужен AUTH_DATA_PROTECTION_CERT_FILE — сертификат DataProtection (PFX)}
-        target: /run/secrets/auth/data-protection.pfx
-        read_only: true
-        bind:
-          create_host_path: false
     depends_on:
       auth-redis:
         condition: service_healthy

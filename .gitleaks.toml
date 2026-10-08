@@ -1,0 +1,22 @@
+# Поиск секретов в репозитории (gitleaks, docs/secrets.md#проверка-утечек): в CI (.github/workflows/secrets.yml) — вся
+# история, перед коммитом (pre-commit, .pre-commit-config.yaml) — то, что коммитится. Правила — стандартные gitleaks,
+# ниже только исключения: то, что выглядит секретом, но им не является. Новое исключение — с пояснением, почему это
+# не секрет; настоящий секрет не исключают, а меняют (docs/secrets.md#если-секрет-утёк).
+title = "auth-service-sandbox"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Заглушки разработки: development-only, development-*-secret, sandbox-* (.env.example, appsettings.Development.json, realm стенда)"
+regexTarget = "secret"
+regexes = [
+  '''^development(-[a-z]+)*$''',
+  '''^sandbox(-[a-z]+)+$''',
+]
+
+[[allowlists]]
+description = "GUID в тестах — идентификаторы (credential, пользователи), не секреты"
+paths = ['''^tests/''']
+regexTarget = "secret"
+regexes = ['''(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$''']

@@ -89,18 +89,13 @@ internal sealed partial class KeycloakServiceAccount(
             return configuration.Error;
         }
 
-        KeycloakOptions settings = options.Value;
-        using var form = new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["grant_type"] = "client_credentials",
-            ["client_id"] = settings.ClientId,
-            ["client_secret"] = settings.ClientSecret,
-        });
+        var form = new Dictionary<string, string>(StringComparer.Ordinal) { ["grant_type"] = "client_credentials" };
 
         try
         {
             using HttpClient client = httpClientFactory.CreateClient();
-            using HttpResponseMessage response = await client.PostAsync(new Uri(configuration.Value.TokenEndpoint), form, cancellationToken);
+            using HttpResponseMessage response = await KeycloakClientAuthentication.PostFormAsync(
+                client, new Uri(configuration.Value.TokenEndpoint), form, options.Value, cancellationToken);
             TokenResponse? token = response.IsSuccessStatusCode
                 ? await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken)
                 : null;

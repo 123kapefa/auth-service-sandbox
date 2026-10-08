@@ -56,9 +56,17 @@ services:
       ASPNETCORE_ENVIRONMENT: Docker
       ConnectionStrings__AuthDb: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       Keycloak__ClientSecret: ${SANDBOX_BFF_CLIENT_SECRET}
+      # Прежний секрет — только на время смены (scripts/secrets/rotate-bff-secret.sh, docs/secrets.md).
+      Keycloak__PreviousClientSecret: ${SANDBOX_BFF_CLIENT_SECRET_PREVIOUS:-}
       # Разрешение на регистрацию клиентов — выдача ключей сервисам (scripts/keycloak/registration-token.sh).
       Keycloak__RegistrationToken: ${KEYCLOAK_REGISTRATION_TOKEN:-}
       ConnectionStrings__Redis: redis:6379
+      # Сертификат ключей DataProtection — PFX в base64 из хранилища секретов (scripts/secrets/run.sh); без хранилища
+      # не задан, ключи в базе не шифруются (только стенд). Прежний — на время смены (rotate-data-protection-cert.sh).
+      DataProtection__Certificate: ${AUTH_DATA_PROTECTION_CERT:-}
+      DataProtection__CertificatePassword: ${AUTH_DATA_PROTECTION_CERT_PASSWORD:-}
+      DataProtection__PreviousCertificate: ${AUTH_DATA_PROTECTION_PREVIOUS_CERT:-}
+      DataProtection__PreviousCertificatePassword: ${AUTH_DATA_PROTECTION_PREVIOUS_CERT_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy

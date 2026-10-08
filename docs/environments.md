@@ -27,7 +27,7 @@
 |---|---|---|
 | Несекретное и общее для всех | `appsettings.json` | уровни логов по умолчанию |
 | Несекретное, своё у окружения | `appsettings.{Окружение}.json` | `AllowedHosts` прода, подробные логи в Development |
-| Секреты | **только** переменные окружения (в проде — из хранилища секретов) | `ConnectionStrings__AuthDb` (внутри пароль) |
+| Секреты | **только** переменные окружения из хранилища секретов ([secrets.md](secrets.md)) | `ConnectionStrings__AuthDb` (внутри пароль) |
 | Разное у разных копий одного окружения | переменные окружения | домен и база конкретного прод-контура |
 
 Исключение — **Development**: dev-плейсхолдеры (`development-only`) допустимы прямо в файле, как и в `.env.example`.
@@ -46,7 +46,10 @@
 | `Authentication:MetadataAddress` | откуда брать ключи | — (из Authority) | `http://keycloak:8180/.../openid-configuration` | задать, если сервер входа доступен по внутреннему адресу |
 | `Authentication:Audience` | проверка токенов (`aud`) | `sandbox-api` (база) | так же | так же |
 | `Authentication:RequireHttpsMetadata` | https для discovery | `false` | `false` | `true` (по умолчанию) |
-| `Keycloak:ClientId` / `ClientSecret` | клиент входа `sandbox-bff` | `sandbox-bff` / dev-заглушка в файле | так же / из `.env` через compose | так же / только переменная `Keycloak__ClientSecret` |
+| `Keycloak:ClientId` / `ClientSecret` | клиент входа `sandbox-bff` | `sandbox-bff` / dev-заглушка в файле | так же / из хранилища (или `.env`) через compose | так же / только переменная `Keycloak__ClientSecret` |
+| `Keycloak:PreviousClientSecret` | прежний секрет — только на время смены ([secrets.md](secrets.md#секрет-bff)) | — | так же | так же |
+| `DataProtection:Certificate` / `CertificatePath`, `CertificatePassword` | сертификат ключей DataProtection: PFX в base64 или файл | — (ключи не шифруются) | из хранилища; без него ключи не шифруются | обязателен (`RequireCertificate`) |
+| `DataProtection:PreviousCertificate*` | прежний сертификат — только на время смены ([secrets.md](secrets.md#сертификат-dataprotection)) | — | так же | так же |
 | `Cookies:Secure` / `Domain` | cookie входа | `false` / — | `false` / — | `true` / `.auth-sandbox.example` |
 | `ReturnUrls:AllowedOrigins` | куда вернуть после входа | `localhost:5080/3000/5173` | `localhost:8080/3000/5173` | приложения платформы |
 | `Logging:LogLevel` | ASP.NET Core | Debug | Debug для `AuthService`, фреймворк — Warning | Warning |

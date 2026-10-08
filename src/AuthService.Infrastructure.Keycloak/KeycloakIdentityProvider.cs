@@ -218,19 +218,15 @@ internal sealed partial class KeycloakIdentityProvider(
             now.AddSeconds(tokens.RefreshExpiresIn));
     }
 
-    // Клиентские учётные данные — в теле формы (client_secret_post), как принимает Keycloak.
+    // Клиентские учётные данные — в теле формы (client_secret_post), как принимает Keycloak; при смене секрета — и прежний.
     private async Task<Result<HttpResponseMessage, Error>> PostFormAsync(
         string endpoint,
         Dictionary<string, string> form,
         CancellationToken cancellationToken)
     {
-        form["client_id"] = _options.ClientId;
-        form["client_secret"] = _options.ClientSecret;
-
         try
         {
-            using var content = new FormUrlEncodedContent(form);
-            return await httpClient.PostAsync(new Uri(endpoint), content, cancellationToken);
+            return await KeycloakClientAuthentication.PostFormAsync(httpClient, new Uri(endpoint), form, _options, cancellationToken);
         }
         catch (HttpRequestException exception)
         {
