@@ -151,7 +151,7 @@ public sealed class AppAdminTests : IClassFixture<AuthServiceWebFactory>
         Assert.Empty(me.GetProperty("apps").EnumerateArray());
     }
 
-    public static TheoryData<TestUser> NotAdmins => [TestUser.Customer, _operator, TestUser.AdminInCustomerMode];
+    public static TheoryData<TestUser> NotAdmins => new() { TestUser.Customer, _operator, TestUser.AdminInCustomerMode };
 
     [Fact]
     public async Task AdminMe_Anonymous_Unauthorized()

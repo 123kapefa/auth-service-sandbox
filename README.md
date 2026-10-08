@@ -47,3 +47,14 @@ docker compose up -d --wait
 Окружения `Development` (`dotnet run`, порт 5080), `Docker` (compose, порт 8080) и `Production`,
 и что где хранится — [docs/environments.md](docs/environments.md). Секреты — в хранилище Infisical, стенд с ними —
 `scripts/secrets/run.sh docker compose up -d --wait`; перечень, проверка утечек и смена — [docs/secrets.md](docs/secrets.md).
+
+## Тесты
+
+```bash
+dotnet test                                        # все: нужен только Docker, docker compose up не нужен
+dotnet test --filter "Category!=Infrastructure"    # быстрые, без Docker
+```
+
+`AuthService.InfrastructureTests` сами поднимают Postgres, Redis и Keycloak (наш образ из `infra/keycloak/Dockerfile`
+с realm из `infra/keycloak/realm`) через Testcontainers. Образ Keycloak тесты собирают сами (`docker build`, повторно — из
+кэша слоёв); готовый можно дать переменной `KEYCLOAK_TEST_IMAGE`. Остальные тесты работают на подделках.
