@@ -86,6 +86,9 @@ Job остаётся до следующего развёртывания, и в
 
 ## Установка
 
+Пошагово, с тем, что нужно до установки (базы, Ingress, секреты, доступ к образам), созданием проекта и новой
+версией, — [release.md](release.md#развернуть-в-kubernetes). Коротко:
+
 ```bash
 helm upgrade --install auth deploy/helm/platform-auth -n auth --create-namespace -f my-values.yaml --wait --timeout 15m
 ```

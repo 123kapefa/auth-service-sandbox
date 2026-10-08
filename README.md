@@ -15,6 +15,7 @@ Keycloak отвечает за вход (пароль, почта, телефо�
 `accessToken`/`refreshToken` с обновлением и выходом (этап 3), проверяет токены и пускает к эндпоинтам
 по ролям, активному режиму и правам (этап 2). Способы входа (этап 3а): телефон или почта с паролем,
 сброс пароля по почте, 2FA по желанию, ключ доступа (passkey). Демо-страница для проверки — http://localhost:8080.
+Сервис собирается и проверяется в CI, выпускается тегом и ставится через Docker Compose или в Kubernetes (этап 11).
 
 Встроить сервис входа в свой проект — [руководство «Как встроить»](docs/embedding-guide.md).
 
@@ -51,6 +52,23 @@ docker compose up -d --wait
 Новая версия на работающем стенде или в бою: миграции базы и настроек проектов, резервные копии, обновление Keycloak —
 [docs/migrations.md](docs/migrations.md). Запуск в Kubernetes (Helm-чарт, Keycloak в несколько реплик, стенд в kind) —
 [docs/kubernetes.md](docs/kubernetes.md).
+
+## Выпуск и развёртывание
+
+Версия выпускается тегом `vX.Y.Z`: workflow «Release» кладёт образы `platform-auth-service`, `platform-auth-keycloak` и
+`platform-auth-realm-migrator` в GHCR (`ghcr.io/123kapefa/…`), пакеты `Platform.*` в GitHub Packages и создаёт релиз
+GitHub. Версия одна на пакеты, образы и чарт (`scripts/package/check-version.sh`). Проект ставит релиз через Docker
+Compose ([как встроить](docs/embedding-guide.md)) или в Kubernetes Helm-чартом, секреты берутся из Infisical.
+
+Пошагово, от номера версии до установки в кластер, — [docs/release.md](docs/release.md). Как устроены CI, релиз,
+секреты, миграции и Kubernetes — [этап 11](docs/keycloak/11-infrastructure.md).
+
+## CI
+
+На каждый PR и push в `main`: **CI** (`.github/workflows/ci.yml`) — сборка .NET с анализаторами, модель EF против
+миграций, тесты (быстрые и на Testcontainers), админка и тема входа (lint, типы, Vitest, сборка), плагин Keycloak,
+уязвимые пакеты; **secrets** — gitleaks по всей истории. Долгие проверки — стенд и Kubernetes — идут ночью, на тег и
+на PR, который их касается (ниже и в [kubernetes.md](docs/kubernetes.md#стенд-в-kind)).
 
 ## Тесты
 

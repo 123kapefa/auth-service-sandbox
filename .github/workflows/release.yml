@@ -1,5 +1,6 @@
 # Релиз по тегу vX.Y.Z: образы сервиса входа в GHCR, NuGet-пакеты в GitHub Packages, релиз GitHub с их перечнем.
-# Тег должен совпадать с VersionPrefix в Directory.Build.props: одна версия у образов, пакетов и релиза.
+# Тег должен совпадать с VersionPrefix в Directory.Build.props, версией чарта и AUTH_VERSION в deploy/.env.example
+# (scripts/package/check-version.sh): одна версия у образов, пакетов, чарта и релиза.
 # Ручной запуск — повторить релиз уже поставленного тега (образы перезаписываются, опубликованные пакеты пропускаются).
 # В PR, меняющем сборку образов или пакетов, — то же без публикации: проверка, что релиз соберётся.
 name: Release
@@ -19,6 +20,8 @@ on:
       - Dockerfile
       - infra/keycloak/Dockerfile
       - Directory.Build.props
+      - deploy/helm/platform-auth/Chart.yaml
+      - deploy/.env.example
 
 permissions:
   contents: read
@@ -48,12 +51,10 @@ jobs:
           ref: ${{ env.TAG || github.ref }}
 
       - id: version
+        # Версия одна: Directory.Build.props, чарт, deploy/.env.example и тег (в PR тега нет).
         run: |
-          version=$(sed -n 's#.*<VersionPrefix>\(.*\)</VersionPrefix>.*#\1#p' Directory.Build.props | head -1)
-          if [ "$PUBLISH" = true ] && [ "$TAG" != "v$version" ]; then
-            echo "::error::Тег $TAG не совпадает с VersionPrefix $version в Directory.Build.props (нужен v$version)"
-            exit 1
-          fi
+          if [ "$PUBLISH" = true ]; then version=$(scripts/package/check-version.sh "$TAG")
+          else version=$(scripts/package/check-version.sh); fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           # Имена в GHCR и GitHub Packages — только строчными.
           echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"

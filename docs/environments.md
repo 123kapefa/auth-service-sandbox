@@ -6,7 +6,7 @@
 |---|---|---|---|
 | `Development` | на машине, `dotnet run`; база — в Docker | http://localhost:5080 | `Properties/launchSettings.json` |
 | `Docker` | контейнер `auth-service` в compose | http://localhost:8080 | `compose.yaml` |
-| `Production` | прод-развёртывание (в песочнице — только проверка запуска) | домен `auth-sandbox.example`, https на прокси | окружение развёртывания |
+| `Production` | прод: `deploy/compose.yaml` на одной машине или Helm-чарт в Kubernetes (в песочнице — стенд из образов и kind) | домен проекта, https на прокси или Ingress | `deploy/.env` или values чарта |
 
 ## Как .NET собирает настройки
 
@@ -93,17 +93,40 @@ docker compose up -d --build --wait auth-service
 мигратора настроек проектов (`realm-migrator`, после Keycloak). Подробно, с резервными копиями — [migrations.md](migrations.md).
 Back-channel logout Keycloak в Development не работает: Keycloak из контейнера зовёт `auth-service:8080`.
 
-**Production** — в файле нет ни одного секрета. Без строк подключения сервис не стартует:
+**Production** — образы релиза из реестра, не сборка ([release.md](release.md)). В файле нет ни одного секрета. Без строк подключения сервис не стартует:
 `ConnectionStrings:AuthDb is required.`, `ConnectionStrings:Redis is required.` Миграции — тем же `efbundle`
 отдельным шагом развёртывания до старта сервиса, перед ним — резервная копия базы ([migrations.md](migrations.md)).
 
 Проверка: `curl http://localhost:<порт>/health/ready` → `Healthy`.
 
+## Production в Kubernetes
+
+Чарт `deploy/helm/platform-auth` задаёт настройки сервиса переменными окружения из values, секреты — из Secret,
+который пишет оператор Infisical ([kubernetes.md](kubernetes.md#секреты)). `appsettings.Production.json` из образа
+читается, но всё своё у проекта приходит из values:
+
+| Настройка | Откуда в Kubernetes |
+|---|---|
+| `ConnectionStrings:AuthDb` | `database.*` и `AUTH_DB_PASSWORD` из Secret |
+| `ConnectionStrings:Redis` | `redis` |
+| `Authentication:Authority` | `publicUrls.keycloak` + `realm` |
+| `Authentication:MetadataAddress` | внутренний адрес Keycloak в кластере (`http://<релиз>-keycloak:8180`), сам |
+| `Authentication:Audience`, `Keycloak:ClientId` | `service.audience`, `service.clientId` (`auth-api`, `auth-bff` — как у `create-project.sh`) |
+| `Keycloak:ClientSecret`, `PreviousClientSecret`, `RegistrationToken` | `AUTH_BFF_CLIENT_SECRET`, `AUTH_BFF_CLIENT_SECRET_PREVIOUS`, `AUTH_REGISTRATION_TOKEN` из Secret |
+| `DataProtection:CertificatePath` и пароль | файл из Secret `<релиз>-data-protection`, пароль — `AUTH_DATA_PROTECTION_CERT_PASSWORD` |
+| `AllowedHosts` | `service.allowedHosts`, по умолчанию домен `publicUrls.service` и `localhost` (пробы kubelet) |
+| `ForwardedHeaders:TrustedNetworks` | `service.trustedNetworks` — сеть подов, по умолчанию `10.0.0.0/8` |
+| `Cookies:Secure` / `Domain` | `service.cookies.*` |
+| `ReturnUrls:AllowedOrigins` | `service.returnOrigins` |
+| остальное | `service.extraEnv` |
+
+Пропущено обязательное значение — `helm template` и `helm install` падают с подсказкой, что задать.
+
 ## Грабли
 
 - **dotnet как PID 1.** Упавший при старте процесс в контейнере не завершается (ядро игнорирует `SIGABRT`
   для PID 1), контейнер висит в `running`. В `compose.yaml` стоит `init: true`; в проде нужно то же —
-  `--init`, `tini` или аналог оркестратора.
+  `--init`, `tini` или аналог оркестратора (в чарте — общее пространство процессов пода, PID 1 у него `pause`).
 - **`AllowedHosts` в проде** — проверки здоровья от оркестратора по IP пода получат 400. Для них оставлен
   `localhost`; если проверка ходит по другому имени — добавьте его.
 - **Таблицы в схеме `auth`**, а не `public`: `select * from auth.<таблица>`.
