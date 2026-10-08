@@ -13,12 +13,16 @@ public interface IAccountNotices
     Task<Result<string, Error>> SignInMethodsChangedAsync(Guid userId, SignInMethodNotice notice, CancellationToken cancellationToken);
 }
 
-/// <summary>Что изменилось: способ выключен или включён (Method — какой), или админ вернул способы по умолчанию.</summary>
-/// <param name="Event">disabled, enabled или reset.</param>
-/// <param name="Method">password, phone-code, email-code; у reset — null.</param>
+/// <summary>
+/// Что изменилось: способ выключен или включён (Method — какой), внешний вход отвязан (Method — провайдер) или админ
+/// вернул способы по умолчанию.
+/// </summary>
+/// <param name="Event">disabled, enabled, unlinked или reset.</param>
+/// <param name="Method">password, phone-code, email-code; у unlinked — yandex или esia; у reset — null.</param>
 public sealed record SignInMethodNotice(string Event, string? Method)
 {
     public const string DISABLED = "disabled";
     public const string ENABLED = "enabled";
+    public const string UNLINKED = "unlinked";
     public const string RESET = "reset";
 }

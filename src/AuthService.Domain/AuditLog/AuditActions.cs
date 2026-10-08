@@ -16,6 +16,9 @@ public static class AuditActions
     /// <summary>Админ вернул способы входа по умолчанию.</summary>
     public const string USER_SIGN_IN_METHODS_RESET = "UserSignInMethodsReset";
 
+    /// <summary>Человек отвязал внешний вход (Яндекс ID, Госуслуги) в кабинете.</summary>
+    public const string USER_EXTERNAL_LOGIN_UNLINKED = "UserExternalLoginUnlinked";
+
     /// <summary>Человек сам сменил номер (10.5) на странице Keycloak; запись — когда он вернулся в сервис.</summary>
     public const string USER_PHONE_CHANGED = "UserPhoneChanged";
 

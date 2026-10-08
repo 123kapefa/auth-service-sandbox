@@ -1,6 +1,8 @@
 package platform.keycloak.auth;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Locale;
 import java.util.Properties;
@@ -102,9 +104,34 @@ class SignInMethodsTest {
         disabled.method = PASSWORD;
         AccountNoticeResource.Notice reset = new AccountNoticeResource.Notice();
         reset.event = "reset";
+        messages.setProperty("platformSignInMethodsUnlinkedText", "От аккаунта в {0} отвязан {1}.");
+        messages.setProperty("platformSignInProviderYandex", "Яндекс ID");
+        AccountNoticeResource.Notice unlinked = new AccountNoticeResource.Notice();
+        unlinked.event = "unlinked";
+        unlinked.method = "yandex";
+        AccountNoticeResource.Notice unknown = new AccountNoticeResource.Notice();
+        unknown.event = "unlinked";
+        unknown.method = "github";
 
         Locale ru = Locale.forLanguageTag("ru");
         assertEquals("В Магазин выключен вход по паролю.", AccountNoticeResource.text(messages, ru, disabled, "Магазин"));
         assertEquals("Администратор Магазин вернул способы входа.", AccountNoticeResource.text(messages, ru, reset, "Магазин"));
+        assertEquals("От аккаунта в Магазин отвязан Яндекс ID.", AccountNoticeResource.text(messages, ru, unlinked, "Магазин"));
+        assertEquals("От аккаунта в Магазин отвязан github.", AccountNoticeResource.text(messages, ru, unknown, "Магазин"));
+    }
+
+    @Test
+    void notice_validMethod() {
+        AccountNoticeResource.Notice notice = new AccountNoticeResource.Notice();
+        notice.event = "unlinked";
+        notice.method = "esia";
+        assertTrue(AccountNoticeResource.validMethod(notice));
+        notice.method = null;
+        assertFalse(AccountNoticeResource.validMethod(notice));
+        notice.event = "disabled";
+        notice.method = "esia";
+        assertFalse(AccountNoticeResource.validMethod(notice));
+        notice.method = PASSWORD;
+        assertTrue(AccountNoticeResource.validMethod(notice));
     }
 }

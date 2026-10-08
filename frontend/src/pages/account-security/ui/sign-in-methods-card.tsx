@@ -16,13 +16,15 @@ import {
   projectMethod,
   providerTitle,
   type RemainingWay,
+  UnlinkProviderDialog,
   useSetSignInMethod,
 } from "@/features/account-sign-in-methods";
 
 /**
  * «Способы входа» (экраны 01, 04, 08 этапа 10): пароль, код на телефон, код на почту — включить и выключить (выключение
- * — с окном), ключ доступа и привязанные Яндекс ID и Госуслуги. Выключенное в проекте не показываем. Пароль и код на
- * телефон без ключа доступа или приложения-аутентификатора не выключить — объясняем и даём добавить.
+ * — с окном), ключ доступа и привязанные Яндекс ID и Госуслуги (отвязать — с окном). Выключенное в проекте не
+ * показываем. Пароль и код на телефон без ключа доступа или приложения-аутентификатора не выключить — объясняем и даём
+ * добавить; последний способ входа не выключить и не отвязать.
  */
 export function SignInMethodsCard({
   methods,
@@ -34,6 +36,7 @@ export function SignInMethodsCard({
   profile: AccountProfile;
 }) {
   const [disabling, setDisabling] = useState<SignInMethodKey | null>(null);
+  const [unlinking, setUnlinking] = useState<string | null>(null);
   const enable = useSetSignInMethod();
   const offInProject = new Set(methods.projectDisabled);
   const own = methods.methods.filter((item) => !offInProject.has(projectMethod[item.method]));
@@ -48,7 +51,8 @@ export function SignInMethodsCard({
   const target = (method: SignInMethodKey) =>
     method === "phone-code" ? profile.phone : method === "email-code" ? profile.email : null;
 
-  const remaining = (except: SignInMethodKey): RemainingWay[] => [
+  // Что останется без этого способа или внешнего входа.
+  const remaining = (except: string): RemainingWay[] => [
     ...(security.passkeys.length > 0 && passkeyShown
       ? [
           {
@@ -59,11 +63,14 @@ export function SignInMethodsCard({
       : []),
     ...own
       .filter((item) => item.method !== except && item.available && item.enabled)
-      .map((item) => ({
-        title: methodTitle[item.method],
-        detail: shownTarget(target(item.method)),
-      })),
-    ...providers.map((provider) => ({ title: providerTitle[provider] ?? provider, detail: null })),
+      .map((item) => {
+        // У пароля цели нет — без «— —».
+        const to = target(item.method);
+        return { title: methodTitle[item.method], detail: to ? shownTarget(to) : null };
+      }),
+    ...providers
+      .filter((provider) => provider !== except)
+      .map((provider) => ({ title: providerTitle[provider] ?? provider, detail: null })),
   ];
 
   return (
@@ -129,8 +136,22 @@ export function SignInMethodsCard({
             <Row
               title={providerTitle[provider] ?? provider}
               badges={<Badge variant="solid">привязан</Badge>}
-              hint="Вход в один шаг на странице входа"
-              actions={null}
+              hint={
+                methods.unlinkBlockers[provider] === "last_method"
+                  ? "Вход в один шаг на странице входа · последний способ входа — не отвязать"
+                  : "Вход в один шаг на странице входа"
+              }
+              actions={
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={provider in methods.unlinkBlockers}
+                  aria-label={`Отвязать: ${providerTitle[provider] ?? provider}`}
+                  onClick={() => setUnlinking(provider)}
+                >
+                  Отвязать
+                </Button>
+              }
             />
           </li>
         ))}
@@ -140,6 +161,13 @@ export function SignInMethodsCard({
           method={disabling}
           remaining={remaining(disabling)}
           onClose={() => setDisabling(null)}
+        />
+      )}
+      {unlinking && (
+        <UnlinkProviderDialog
+          provider={unlinking}
+          remaining={remaining(unlinking)}
+          onClose={() => setUnlinking(null)}
         />
       )}
     </Card>

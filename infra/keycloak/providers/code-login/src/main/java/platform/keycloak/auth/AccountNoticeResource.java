@@ -31,16 +31,17 @@ import org.keycloak.services.resource.RealmResourceProvider;
 
 /**
  * /realms/{realm}/platform-account-notice/users/{userId} — уведомить человека об изменении в его аккаунте (10.3:
- * способ входа выключен, включён, админ вернул способы по умолчанию). Письмо в оформлении проекта, если есть почта;
+ * способ входа выключен, включён, внешний вход отвязан, админ вернул способы по умолчанию). Письмо в оформлении проекта, если есть почта;
  * иначе SMS (она платная — только когда письмо послать некуда). Вызывает сервис входа токеном служебной учётки —
  * нужна роль manage-users (realm-management), которая у неё и так есть, чтобы менять пользователей.
- * Тело: {"event": "disabled" | "enabled" | "reset", "method": "password" | "phone-code" | "email-code"}.
+ * Тело: {"event": "disabled" | "enabled" | "reset", "method": "password" | "phone-code" | "email-code"} или
+ * {"event": "unlinked", "method": "yandex" | "esia"}.
  * Ответ: {"sent": "email" | "sms" | "none"}.
  */
 public final class AccountNoticeResource implements RealmResourceProvider {
 
     static final String TEMPLATE = "platform-sign-in-methods.ftl";
-    static final List<String> EVENTS = List.of("disabled", "enabled", "reset");
+    static final List<String> EVENTS = List.of("disabled", "enabled", "unlinked", "reset");
 
     private static final Logger LOG = Logger.getLogger(AccountNoticeResource.class);
 
@@ -75,8 +76,7 @@ public final class AccountNoticeResource implements RealmResourceProvider {
         if (denied != null) {
             return denied;
         }
-        if (notice == null || !EVENTS.contains(notice.event)
-            || (!"reset".equals(notice.event) && !SignInMethods.ALL.contains(notice.method))) {
+        if (notice == null || !EVENTS.contains(notice.event) || !validMethod(notice)) {
             return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("error", "invalid_notice"))
                 .type(MediaType.APPLICATION_JSON).build();
         }
@@ -110,11 +110,21 @@ public final class AccountNoticeResource implements RealmResourceProvider {
         }
     }
 
+    // У reset способа нет, у unlinked — провайдер (незнакомый — алиасом), у остальных — способ из SignInMethods.ALL.
+    static boolean validMethod(Notice notice) {
+        return switch (notice.event) {
+            case "reset" -> true;
+            case "unlinked" -> notice.method != null && !notice.method.isBlank();
+            default -> SignInMethods.ALL.contains(notice.method);
+        };
+    }
+
     // «В Магазин выключен вход по паролю.» — тексты из темы писем (их же видит письмо и SMS).
     static String text(Properties messages, Locale locale, Notice notice, String realmName) {
         String key = switch (notice.event) {
             case "disabled" -> "platformSignInMethodsDisabledText";
             case "enabled" -> "platformSignInMethodsEnabledText";
+            case "unlinked" -> "platformSignInMethodsUnlinkedText";
             default -> "platformSignInMethodsResetText";
         };
         String method = notice.method == null ? "" : messages.getProperty(methodKey(notice.method), notice.method);
@@ -125,7 +135,10 @@ public final class AccountNoticeResource implements RealmResourceProvider {
         return switch (method) {
             case SignInMethods.PASSWORD -> "platformSignInMethodPassword";
             case SignInMethods.PHONE_CODE -> "platformSignInMethodPhoneCode";
-            default -> "platformSignInMethodEmailCode";
+            case SignInMethods.EMAIL_CODE -> "platformSignInMethodEmailCode";
+            case "yandex" -> "platformSignInProviderYandex";
+            case "esia" -> "platformSignInProviderEsia";
+            default -> method;
         };
     }
 

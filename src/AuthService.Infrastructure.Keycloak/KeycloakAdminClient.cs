@@ -607,6 +607,9 @@ internal sealed partial class KeycloakAdminClient(
             : links.Error;
     }
 
+    public Task<UnitResult<Error>> UnlinkProviderAsync(Guid userId, string provider, CancellationToken cancellationToken) =>
+        SendExpectingSuccessAsync(HttpMethod.Delete, $"users/{userId}/federated-identity/{Uri.EscapeDataString(provider)}", cancellationToken);
+
     public async Task<Result<IReadOnlyList<IdentitySession>, Error>> GetSessionsAsync(Guid userId, CancellationToken cancellationToken)
     {
         Result<SessionRepresentation[], Error> sessions = await GetJsonAsync<SessionRepresentation[]>($"users/{userId}/sessions", cancellationToken);

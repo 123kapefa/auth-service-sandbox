@@ -4,12 +4,7 @@ import { accountDevicesQueries } from "@/entities/account-devices";
 import { type SignInMethodKey } from "@/entities/account-security";
 import { Button, Dialog } from "@/shared/ui";
 import { useSetSignInMethod } from "../model/use-set-sign-in-method";
-
-/** Чем можно будет войти после выключения: «Ключ доступа — iPhone, MacBook», «Код на почту — anna@mail.ru». */
-export interface RemainingWay {
-  title: string;
-  detail: string | null;
-}
+import { type RemainingWay, RemainingWays } from "./remaining-ways";
 
 const titles: Record<SignInMethodKey, string> = {
   password: "Выключить вход по паролю?",
@@ -56,22 +51,7 @@ export function DisableMethodDialog({
       title={titles[method]}
       description={texts[method]}
     >
-      {remaining.length > 0 && (
-        <div className="mb-4 text-sm">
-          <p className="mb-1.5 text-muted-foreground">Останутся:</p>
-          <ul className="grid gap-1">
-            {remaining.map((way) => (
-              <li key={way.title} className="flex gap-2">
-                <span aria-hidden className="mt-[0.45em] size-1.5 flex-none bg-primary" />
-                <span>
-                  {way.title}
-                  {way.detail && ` — ${way.detail}`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <RemainingWays ways={remaining} />
       <label className="mb-4 flex items-start gap-2.5 text-sm">
         <input
           type="checkbox"

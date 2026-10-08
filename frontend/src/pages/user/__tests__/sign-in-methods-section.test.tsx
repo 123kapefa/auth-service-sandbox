@@ -16,6 +16,7 @@ const METHODS: SignInMethods = {
   hasAuthenticator: false,
   hasRecoveryCodes: false,
   linkedProviders: ["yandex"],
+  unlinkBlockers: {},
   history: [{ at: "2026-10-05T15:40:00Z", method: "password", enabled: false, byAdmin: false }],
   projectDisabled: [],
 };

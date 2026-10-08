@@ -99,6 +99,26 @@ public static class SignInMethodRules
         // они не нужны: у Keycloak коды восстановления — второй шаг входа, и одни они спрашивались бы при каждом входе.
         return facts.HasAuthenticator && !facts.HasRecoveryCodes ? RECOVERY_CODES_REQUIRED : null;
     }
+    /// <summary>
+    /// Почему внешний вход (Яндекс ID, Госуслуги) нельзя отвязать; null — можно. Правило 1: после отвязки должно остаться,
+    /// чем войти, — ключ доступа, другой внешний вход или свой способ, который работает. Иначе страховка плагина молча
+    /// включила бы всё, что человек выключил.
+    /// </summary>
+    /// <param name="facts">Что есть у человека сейчас (с этим внешним входом).</param>
+    /// <param name="otherExternal">Останется другой внешний вход, не выключенный в проекте.</param>
+    public static string? UnlinkBlocker(SignInFacts facts, bool otherExternal)
+    {
+        ArgumentNullException.ThrowIfNull(facts);
+        if (facts.HasPasskey || otherExternal)
+        {
+            return null;
+        }
+
+        IReadOnlySet<string> disabled = EffectiveDisabled(facts);
+        bool ownLeft = All.Any(method =>
+            Available(facts, method) && facts.OffInProject?.Contains(method) != true && !disabled.Contains(method));
+        return ownLeft ? null : LAST_METHOD;
+    }
 }
 
 /// <summary>Что есть у человека для входа.</summary>

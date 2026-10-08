@@ -51,6 +51,9 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     /// <summary>Привязанные внешние входы: пользователь → алиасы провайдеров.</summary>
     private readonly ConcurrentDictionary<Guid, string[]> _linked = new();
 
+    /// <summary>Какие внешние входы сервис отвязал: (пользователь, провайдер).</summary>
+    public Collection<(Guid UserId, string Provider)> Unlinked { get; } = [];
+
     /// <summary>Какие сессии сервис завершил по одной.</summary>
     public Collection<string> DeletedSessions { get; } = [];
 
@@ -142,6 +145,7 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     {
         _accounts.Clear();
         _linked.Clear();
+        Unlinked.Clear();
         _twoFactor.Clear();
         _credentials.Clear();
         ActionEmails.Clear();
@@ -507,6 +511,18 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
         Task.FromResult(_accounts.ContainsKey(userId)
             ? Result.Success<IReadOnlyList<string>, Error>(_linked.TryGetValue(userId, out string[]? providers) ? providers : [])
             : IdentityProviderErrors.UserNotFound());
+
+    public Task<UnitResult<Error>> UnlinkProviderAsync(Guid userId, string provider, CancellationToken cancellationToken)
+    {
+        if (!_linked.TryGetValue(userId, out string[]? providers) || !providers.Contains(provider, StringComparer.Ordinal))
+        {
+            return Task.FromResult(UnitResult.Failure(IdentityProviderErrors.UserNotFound()));
+        }
+
+        _linked[userId] = [.. providers.Where(found => !string.Equals(found, provider, StringComparison.Ordinal))];
+        Unlinked.Add((userId, provider));
+        return Task.FromResult(UnitResult.Success<Error>());
+    }
 
     public Task<Result<IReadOnlyList<IdentitySession>, Error>> GetSessionsAsync(Guid userId, CancellationToken cancellationToken) =>
         Task.FromResult(Result.Success<IReadOnlyList<IdentitySession>, Error>(

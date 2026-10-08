@@ -19,7 +19,7 @@ Microsoft. Кто перешёл на ключ доступа, выключае�
 По ответам нельзя понять, что выключено и есть ли аккаунт. В журнале событий Keycloak у такого отказа — `reason`
 (`password_disabled`, `method_disabled`), в метриках кодов — отказ `method-disabled`.
 
-Ключ доступа не выключается, а удаляется; Яндекс ID и Госуслуги — отвязываются. Приложение-аутентификатор — второй
+Ключ доступа не выключается, а удаляется; Яндекс ID и Госуслуги — отвязываются ([ниже](#отвязать-внешний-вход)). Приложение-аутентификатор — второй
 шаг после пароля или кода, как раньше.
 
 ## Правила
@@ -61,7 +61,13 @@ GET /me/sign-in-methods
 PUT /me/sign-in-methods/{password | phone-code | email-code}
 { "enabled": false, "signOutOtherDevices": true }
 → то же, что GET; 409 sign_in_methods.<причина>, 403 auth.reauthentication_required, 404 — другой способ
+
+DELETE /me/sign-in-methods/providers/{yandex | esia}?signOutOtherDevices=false
+→ то же, что GET; 409 sign_in_methods.last_method, 403 auth.reauthentication_required, 404 sign_in_methods.not_linked
 ```
+
+В ответе GET ещё `unlinkBlockers: { "yandex": "last_method" }` — какой внешний вход нельзя отвязать и почему (нет
+в словаре — можно).
 
 `available` — способ у человека есть (пароль задан, телефон или почта указаны); `disableBlocker` — почему выключить
 нельзя (`not_available`, `needs_passkey_or_authenticator`, `last_method`, `recovery_codes_required`), по нему кабинет
@@ -75,6 +81,20 @@ PUT /me/sign-in-methods/{password | phone-code | email-code}
   только админ проекта, после недавнего входа; себе — нельзя). Человеку — письмо, в журнал — `UserSignInMethodsReset`;
 - `POST /auth/admin/users/{id}/password-reset` при выключенном пароле — 409 `users.password_disabled`: сначала вернуть
   способы по умолчанию.
+
+## Отвязать внешний вход
+
+Яндекс ID и Госуслуги человек отвязывает сам: `DELETE /me/sign-in-methods/providers/{provider}` удаляет связь в
+Keycloak (`DELETE …/users/{id}/federated-identity/{provider}`). Привязать снова — как в первый раз, на странице входа
+([09](09-external-login.md)). Правила те же:
+
+- остаться должно, чем войти (`last_method`): ключ доступа, другой внешний вход или свой способ, который работает
+  (есть, не выключен человеком и не выключен в проекте). Внешний вход, выключенный в проекте, в счёт не идёт. Без
+  этого правила отвязка сработала бы, но страховка плагина молча включила бы всё, что человек выключил;
+- только после недавнего входа (`auth.reauthentication_required`);
+- письмо или SMS (`event: "unlinked"`, `method` — провайдер), в журнал — `UserExternalLoginUnlinked` с `provider`;
+- «выйти на других устройствах» (по умолчанию да, `?signOutOtherDevices=false` — нет): если чужой вошёл через этот
+  Яндекс ID, его сессия закроется.
 
 ## Уведомления и журнал
 

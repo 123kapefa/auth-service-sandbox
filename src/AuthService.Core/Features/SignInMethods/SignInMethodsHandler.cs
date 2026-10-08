@@ -126,6 +126,63 @@ public sealed partial class SignInMethodsHandler(
         return await GetAsync(actor.Id, cancellationToken);
     }
 
+    /// <summary>
+    /// Человек отвязывает внешний вход (Яндекс ID, Госуслуги): только после недавнего входа и если останется, чем войти.
+    /// Письмо или SMS, запись в журнал и по умолчанию выход на других устройствах — как при выключении способа.
+    /// </summary>
+    public async Task<Result<SignInMethodsResponse, Error>> UnlinkAsync(
+        SignInMethodsActor actor,
+        string provider,
+        bool? signOutOtherDevices,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+
+        // Правило 3: украденная сессия не отвяжет вход, которым пользуется хозяин аккаунта.
+        if (!RecentlyLoggedIn(actor.AuthenticatedAt))
+        {
+            return AdminErrors.ReauthenticationRequired();
+        }
+
+        Result<Account, Error> account = await LoadAsync(actor.Id, cancellationToken);
+        if (account.IsFailure)
+        {
+            return account.Error;
+        }
+
+        if (!account.Value.LinkedProviders.Contains(provider, StringComparer.Ordinal))
+        {
+            return SignInMethodErrors.NotLinked(provider);
+        }
+
+        if (UnlinkBlocker(account.Value, provider) is { } blocker)
+        {
+            return SignInMethodErrors.CannotUnlink(blocker);
+        }
+
+        UnitResult<Error> unlinked = await identityAdmin.UnlinkProviderAsync(actor.Id, provider, cancellationToken);
+        if (unlinked.IsFailure)
+        {
+            return unlinked.Error;
+        }
+
+        await audit.RecordAsync(AuditActions.USER_EXTERNAL_LOGIN_UNLINKED, account.Value.User, new { provider }, cancellationToken);
+        await NotifyAsync(actor.Id, new SignInMethodNotice(SignInMethodNotice.UNLINKED, provider), cancellationToken);
+
+        // Правило 6: если чужой вошёл через этот Яндекс ID или Госуслуги, его сессия закроется.
+        if (signOutOtherDevices != false)
+        {
+            Result<Contracts.Security.TerminatedResponse, Error> signedOut =
+                await sessions.TerminateOthersAsync(actor.Id, actor.SessionId, cancellationToken);
+            if (signedOut.IsFailure)
+            {
+                LogSignOutFailed(logger, actor.Id, signedOut.Error.GetMessage());
+            }
+        }
+
+        return await GetAsync(actor.Id, cancellationToken);
+    }
+
     /// <summary>Админ возвращает способы входа по умолчанию (всё включено) — с журналом и уведомлением человеку.</summary>
     public async Task<Result<SignInMethodsResponse, Error>> ResetAsync(RoleChangeActor admin, Guid userId, CancellationToken cancellationToken)
     {
@@ -295,8 +352,24 @@ public sealed partial class SignInMethodsHandler(
         ];
     }
 
+    // Другой внешний вход в счёт, только если он не выключен в проекте (как HasExternal в фактах).
+    private static string? UnlinkBlocker(Account account, string provider) =>
+        SignInMethodRules.UnlinkBlocker(
+            account.Facts,
+            account.LinkedProviders.Any(other =>
+                !string.Equals(other, provider, StringComparison.Ordinal) && !account.ProjectDisabled.Contains(other)));
+
     private static SignInMethodsResponse ToResponse(Account account, IReadOnlyList<SignInMethodChangeResponse> history)
     {
+        Dictionary<string, string> unlinkBlockers = new(StringComparer.Ordinal);
+        foreach (string provider in account.LinkedProviders)
+        {
+            if (UnlinkBlocker(account, provider) is { } blocker)
+            {
+                unlinkBlockers[provider] = blocker;
+            }
+        }
+
         IReadOnlySet<string> disabled = SignInMethodRules.EffectiveDisabled(account.Facts);
         return new SignInMethodsResponse(
             [
@@ -310,6 +383,7 @@ public sealed partial class SignInMethodsHandler(
             account.Facts.HasAuthenticator,
             account.Facts.HasRecoveryCodes,
             account.LinkedProviders,
+            unlinkBlockers,
             history,
             account.ProjectDisabled);
     }
