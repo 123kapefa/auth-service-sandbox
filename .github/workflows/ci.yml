@@ -25,14 +25,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
       # Без lock-файлов NuGet: ключ — центральные версии и списки пакетов проектов.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'Directory.Build.props', '**/*.csproj') }}
@@ -75,9 +75,9 @@ jobs:
       run:
         working-directory: ${{ matrix.dir }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -102,10 +102,10 @@ jobs:
       run:
         working-directory: infra/keycloak/providers/code-login
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Та же Java 21, что в образе сборки infra/keycloak/Dockerfile.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
