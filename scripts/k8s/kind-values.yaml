@@ -1,0 +1,66 @@
+# Стенд песочницы в kind (scripts/k8s/check-kind.sh): демо-проект sandbox, базы и Redis внутри чарта, без Ingress —
+# сервис и Keycloak на NodePort (localhost:8080 и localhost:8180). Секреты — заглушки разработки, их задаёт скрипт.
+images:
+  registry: ""
+  # Образы собраны на машине и загружены в kind (kind load docker-image).
+  pullPolicy: Never
+
+realm: sandbox
+publicUrls:
+  service: http://localhost:8080
+  keycloak: http://localhost:8180
+
+stand:
+  enabled: true
+
+ingress:
+  enabled: false
+
+database:
+  name: auth_service
+  user: auth_service
+
+service:
+  # Демо-проект песочницы — свои имена клиентов (appsettings.Docker.json).
+  audience: sandbox-api
+  clientId: sandbox-bff
+  returnOrigins: [http://localhost:8080, http://localhost:3000, http://localhost:5173, http://localhost:5174]
+  cookies:
+    secure: false
+  serviceType: NodePort
+  nodePort: 30080
+  # Запросы с машины приходят через NodePort с адреса узла kind (сеть Docker).
+  trustedNetworks: [10.0.0.0/8, 172.16.0.0/12]
+
+keycloak:
+  serviceType: NodePort
+  nodePort: 30180
+  trustedProxies: [10.0.0.0/8, 172.16.0.0/12]
+  resources:
+    requests: { cpu: 250m, memory: 768Mi }
+    limits: { memory: 1536Mi }
+  # Как у keycloak в compose.yaml: значения для импорта realm JSON и ослабленные лимиты кодов стенда.
+  extraEnv:
+    - name: SANDBOX_BFF_CLIENT_SECRET
+      valueFrom: { secretKeyRef: { name: auth-secrets, key: AUTH_BFF_CLIENT_SECRET } }
+    - name: LEGACY_IMPORT_CLIENT_SECRET
+      valueFrom: { secretKeyRef: { name: auth-secrets, key: LEGACY_IMPORT_CLIENT_SECRET } }
+    - { name: ESIA_CLIENT_ID, value: SANDBOX }
+    - { name: ESIA_AUTHORIZATION_URL, value: "http://localhost:8190/esia/aas/oauth2/v2/ac" }
+    - { name: ESIA_TOKEN_URL, value: "http://idp-stub:8190/esia/aas/oauth2/v3/te" }
+    - { name: ESIA_API_URL, value: "http://idp-stub:8190/esia" }
+    - { name: ESIA_SIGNER_URL, value: "http://idp-stub:8190/sign" }
+    - { name: ESIA_CERTIFICATE_HASH, value: sandbox-certificate-hash }
+    - { name: YANDEX_CLIENT_ID, value: sandbox-yandex }
+    - { name: YANDEX_CLIENT_SECRET, value: sandbox-yandex-secret }
+    - { name: YANDEX_AUTHORIZATION_URL, value: "http://localhost:8190/yandex/authorize" }
+    - { name: YANDEX_TOKEN_URL, value: "http://idp-stub:8190/yandex/token" }
+    - { name: YANDEX_USER_INFO_URL, value: "http://idp-stub:8190/yandex/info?format=json" }
+    - { name: KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__COOLDOWNS, value: "60" }
+    - { name: KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__TARGET_PER_HOUR, value: "1000" }
+    - { name: KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__TARGET_PER_DAY, value: "1000" }
+    - { name: KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__IP_PER_HOUR, value: "1000" }
+    - { name: KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__RANGE_PER_HOUR, value: "1000" }
+    - { name: KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_AFTER, value: "1000" }
+    - { name: KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__DAILY_BUDGET, value: "0" }
+    - { name: KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_STUB, value: "true" }

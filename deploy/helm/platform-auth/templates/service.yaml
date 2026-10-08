@@ -1,0 +1,201 @@
+{{- $root := . -}}
+{{- $name := printf "%s-service" (include "auth.name" .) -}}
+{{- $sel := dict "root" . "component" "service" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+    app.kubernetes.io/name: service
+spec:
+  replicas: {{ .Values.service.replicas }}
+  selector:
+    matchLabels:
+      {{- include "auth.selector" $sel | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "auth.labels" . | nindent 8 }}
+        app.kubernetes.io/name: service
+      {{- with .Values.service.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      # dotnet не должен быть PID 1 (иначе упавший при старте процесс зависает): PID 1 — pause, как init: true в compose.
+      shareProcessNamespace: true
+      securityContext:
+        runAsNonRoot: true
+        # Встроенный пользователь образа aspnet (app); fsGroup — чтобы читать сертификат DataProtection из Secret.
+        runAsUser: 1654
+        runAsGroup: 1654
+        fsGroup: 1654
+      {{- with .Values.images.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # Сервис стартует после Keycloak (как depends_on в compose): при старте он сверяет каталог прав с Keycloak, а
+      # первый запуск Keycloak со сборкой дольше, чем сервис готов ждать.
+      initContainers:
+        - name: wait-keycloak
+          image: {{ include "auth.image" (dict "root" . "image" .Values.images.realmMigrator) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          command:
+            - python3
+            - -c
+            - |
+              import time, urllib.request
+              url = "{{ include "auth.keycloakInternalUrl" . }}/realms/master"
+              while True:
+                  try:
+                      urllib.request.urlopen(url, timeout=5)
+                      break
+                  except Exception as error:
+                      print(f"Keycloak ещё не готов: {error}", flush=True)
+                      time.sleep(5)
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+      containers:
+        - name: service
+          image: {{ include "auth.image" (dict "root" . "image" .Values.images.service) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: {{ .Values.service.environment | quote }}
+            {{- include "auth.secretEnv" (dict "root" . "name" "AUTH_DB_PASSWORD" "key" "AUTH_DB_PASSWORD") | nindent 12 }}
+            - name: ConnectionStrings__AuthDb
+              value: {{ include "auth.dbConnection" . | quote }}
+            - name: ConnectionStrings__Redis
+              value: {{ include "auth.redis" . | quote }}
+            - name: Authentication__Audience
+              value: {{ .Values.service.audience | quote }}
+            - name: Keycloak__ClientId
+              value: {{ .Values.service.clientId | quote }}
+            - name: Authentication__Authority
+              value: {{ printf "%s/realms/%s" (required "нужен publicUrls.keycloak — внешний адрес сервера входа" .Values.publicUrls.keycloak) (required "нужен realm — код проекта" .Values.realm) | quote }}
+            # Ключи и адреса сервера входа — по внутреннему адресу кластера; iss остаётся внешним (Authority).
+            - name: Authentication__MetadataAddress
+              value: {{ printf "%s/realms/%s/.well-known/openid-configuration" (include "auth.keycloakInternalUrl" .) .Values.realm | quote }}
+            - name: Authentication__RequireHttpsMetadata
+              value: "false"
+            {{- include "auth.secretEnv" (dict "root" . "name" "Keycloak__ClientSecret" "key" "AUTH_BFF_CLIENT_SECRET") | nindent 12 }}
+            # Прежний секрет — только на время смены секрета (docs/secrets.md).
+            {{- include "auth.secretEnv" (dict "root" . "name" "Keycloak__PreviousClientSecret" "key" "AUTH_BFF_CLIENT_SECRET_PREVIOUS" "optional" true) | nindent 12 }}
+            {{- include "auth.secretEnv" (dict "root" . "name" "Keycloak__RegistrationToken" "key" "AUTH_REGISTRATION_TOKEN" "optional" true) | nindent 12 }}
+            - name: AllowedHosts
+              value: {{ .Values.service.allowedHosts | default (printf "%s;localhost" (urlParse (required "нужен publicUrls.service — внешний адрес сервиса входа" .Values.publicUrls.service)).hostname) | quote }}
+            # Сертификат ключей DataProtection — файлом из Secret (docs/secrets.md); прежний — только на время смены.
+            - name: DataProtection__CertificatePath
+              value: /run/secrets/data-protection/certificate.pfx
+            {{- include "auth.secretEnv" (dict "root" . "name" "DataProtection__CertificatePassword" "key" "AUTH_DATA_PROTECTION_CERT_PASSWORD" "optional" true) | nindent 12 }}
+            {{- if .Values.dataProtection.previous }}
+            - name: DataProtection__PreviousCertificatePath
+              value: /run/secrets/data-protection/previous.pfx
+            {{- include "auth.secretEnv" (dict "root" . "name" "DataProtection__PreviousCertificatePassword" "key" "AUTH_DATA_PROTECTION_PREVIOUS_CERT_PASSWORD" "optional" true) | nindent 12 }}
+            {{- end }}
+            - name: Cookies__Secure
+              value: {{ .Values.service.cookies.secure | quote }}
+            - name: Cookies__Domain
+              value: {{ .Values.service.cookies.domain | quote }}
+            {{- range $i, $origin := (required "нужен service.returnOrigins — адреса приложений проекта" .Values.service.returnOrigins) }}
+            - name: ReturnUrls__AllowedOrigins__{{ $i }}
+              value: {{ $origin | quote }}
+            {{- end }}
+            - name: ReturnUrls__Default
+              value: {{ .Values.service.returnDefault | quote }}
+            # X-Forwarded-* — только от Ingress-контроллера (сети подов кластера).
+            {{- range $i, $network := .Values.service.trustedNetworks }}
+            - name: ForwardedHeaders__TrustedNetworks__{{ $i }}
+              value: {{ $network | quote }}
+            {{- end }}
+            {{- with .Values.service.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - name: data-protection
+              mountPath: /run/secrets/data-protection
+              readOnly: true
+          # live — процесс отвечает; ready — есть база и Redis (HealthChecksConfiguration). Host: localhost — kubelet
+          # ходит по IP пода, а его AllowedHosts не пропустит.
+          startupProbe:
+            httpGet: { path: /health/live, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 2
+            failureThreshold: 60
+          livenessProbe:
+            httpGet: { path: /health/live, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 10
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 5
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.service.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+      volumes:
+        - name: data-protection
+          secret:
+            secretName: {{ include "auth.dataProtectionSecretName" . }}
+            defaultMode: 0440
+      {{- with .Values.service.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.service.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        {{- if .Values.service.affinity }}
+        {{- toYaml .Values.service.affinity | nindent 8 }}
+        {{- else }}
+        # Реплики — по разным узлам, если узлов хватает.
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    {{- include "auth.selector" $sel | nindent 20 }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+    app.kubernetes.io/name: service
+spec:
+  type: {{ .Values.service.serviceType }}
+  selector:
+    {{- include "auth.selector" $sel | nindent 4 }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      {{- with .Values.service.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "auth.selector" $sel | nindent 6 }}

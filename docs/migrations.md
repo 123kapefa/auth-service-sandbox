@@ -9,7 +9,8 @@
 | База Keycloak | сам Keycloak при старте новой версии | его таблицы (`databasechangelog`) |
 
 Оба мигратора отрабатывают и завершаются при каждом `docker compose up`; сервис стартует только после их успеха
-(`depends_on: service_completed_successfully`). Повторный запуск ничего не меняет.
+(`depends_on: service_completed_successfully`). Повторный запуск ничего не меняет. В Kubernetes миграторы — Job-хуки
+Helm: база сервиса до раскатки, настройки проектов после нового Keycloak ([kubernetes.md](kubernetes.md#миграторы)).
 
 ## Порядок развёртывания
 

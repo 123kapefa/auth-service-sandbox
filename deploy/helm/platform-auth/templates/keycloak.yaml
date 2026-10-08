@@ -1,0 +1,193 @@
+{{- $name := printf "%s-keycloak" (include "auth.name" .) -}}
+{{- $sel := dict "root" . "component" "keycloak" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+    app.kubernetes.io/name: keycloak
+spec:
+  replicas: {{ .Values.keycloak.replicas }}
+  strategy:
+    type: {{ .Values.keycloak.updateStrategy }}
+  selector:
+    matchLabels:
+      {{- include "auth.selector" $sel | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "auth.labels" . | nindent 8 }}
+        app.kubernetes.io/name: keycloak
+      annotations:
+        # Новый realm JSON стенда — новые поды (импорт — только в пустую базу, docs/migrations.md).
+        checksum/realm: {{ .Values.keycloak.realmImport | sha256sum | trunc 16 }}
+        {{- with .Values.keycloak.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      # Остановка узла: Keycloak выходит из кластера и передаёт свою часть кэша (сессии входа) оставшимся.
+      terminationGracePeriodSeconds: 60
+      {{- with .Values.images.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: keycloak
+          image: {{ include "auth.image" (dict "root" . "image" .Values.images.keycloak) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          args:
+            {{- toYaml .Values.keycloak.command | nindent 12 }}
+            {{- if .Values.keycloak.realmImport }}
+            - --import-realm
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8180
+            - name: management
+              containerPort: 9000
+            # Кластер Infinispan (JGroups): узлы ходят друг к другу напрямую по IP пода.
+            - name: jgroups
+              containerPort: 7800
+          env:
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL_HOST
+              value: {{ include "auth.keycloakDbHost" . | quote }}
+            - name: KC_DB_URL_PORT
+              value: {{ .Values.keycloakDatabase.port | quote }}
+            - name: KC_DB_URL_DATABASE
+              value: {{ .Values.keycloakDatabase.name | quote }}
+            - name: KC_DB_USERNAME
+              value: {{ .Values.keycloakDatabase.user | quote }}
+            {{- include "auth.secretEnv" (dict "root" . "name" "KC_DB_PASSWORD" "key" "AUTH_KEYCLOAK_DB_PASSWORD") | nindent 12 }}
+            # Внешний адрес — от него iss в токенах; служебные адреса — по адресу запроса (сервис ходит по внутреннему).
+            - name: KC_HOSTNAME
+              value: {{ required "нужен publicUrls.keycloak — внешний адрес сервера входа" .Values.publicUrls.keycloak | quote }}
+            - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+              value: "true"
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_HTTP_PORT
+              value: "8180"
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            # X-Forwarded-* — только от Ingress-контроллера.
+            - name: KC_PROXY_TRUSTED_ADDRESSES
+              value: {{ join "," .Values.keycloak.trustedProxies | quote }}
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_METRICS_ENABLED
+              value: "true"
+            # Кластер: общий кэш Infinispan, узлы находят друг друга через базу Keycloak (таблица JGROUPS_PING).
+            # Сессии входа и действий видят все реплики — sticky-сессии на Ingress не нужны.
+            - name: KC_CACHE
+              value: ispn
+            - name: KC_CACHE_STACK
+              value: jdbc-ping
+            - name: POD_IP
+              valueFrom:
+                fieldRef: { fieldPath: status.podIP }
+            - name: KC_CACHE_EMBEDDED_NETWORK_BIND_ADDRESS
+              value: $(POD_IP)
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: {{ .Values.keycloak.admin | quote }}
+            {{- include "auth.secretEnv" (dict "root" . "name" "KC_BOOTSTRAP_ADMIN_PASSWORD" "key" "AUTH_KEYCLOAK_ADMIN_PASSWORD") | nindent 12 }}
+            # Капча перед отправкой кода (docs/keycloak/10-code-limits.md).
+            {{- include "auth.secretEnv" (dict "root" . "name" "KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_SERVER_KEY" "key" "AUTH_SMARTCAPTCHA_SERVER_KEY" "optional" true) | nindent 12 }}
+            {{- with .Values.keycloak.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- if .Values.keycloak.realmImport }}
+          volumeMounts:
+            - name: realm-import
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+          {{- end }}
+          # Порт управления 9000: started — Keycloak поднялся (первый запуск со сборкой — минута-две), ready — есть база.
+          startupProbe:
+            httpGet: { path: /health/started, port: management }
+            periodSeconds: 5
+            failureThreshold: 60
+          livenessProbe:
+            httpGet: { path: /health/live, port: management }
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet: { path: /health/ready, port: management }
+            periodSeconds: 5
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.keycloak.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+      {{- if .Values.keycloak.realmImport }}
+      volumes:
+        - name: realm-import
+          configMap:
+            name: {{ $name }}-realm
+      {{- end }}
+      {{- with .Values.keycloak.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.keycloak.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        {{- if .Values.keycloak.affinity }}
+        {{- toYaml .Values.keycloak.affinity | nindent 8 }}
+        {{- else }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    {{- include "auth.selector" $sel | nindent 20 }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+    app.kubernetes.io/name: keycloak
+spec:
+  type: {{ .Values.keycloak.serviceType }}
+  selector:
+    {{- include "auth.selector" $sel | nindent 4 }}
+  ports:
+    - name: http
+      port: 8180
+      targetPort: http
+      {{- with .Values.keycloak.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "auth.selector" $sel | nindent 6 }}
+{{- if .Values.keycloak.realmImport }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-realm
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+data:
+  realm.json: {{ .Values.keycloak.realmImport | quote }}
+{{- end }}

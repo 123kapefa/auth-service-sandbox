@@ -1,0 +1,7 @@
+apiVersion: v2
+name: platform-auth
+description: Сервис входа платформы в Kubernetes — сервис, Keycloak, миграторы базы и настроек проектов (docs/kubernetes.md)
+type: application
+# Версия чарта и образов — та же, что в Directory.Build.props (VersionPrefix); образы — scripts/package/build-images.sh.
+version: 0.1.0
+appVersion: "0.1.0"

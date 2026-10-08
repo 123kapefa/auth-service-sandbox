@@ -1,0 +1,94 @@
+# Запуск в Kubernetes (этап 11.7, docs/kubernetes.md): Helm-чарт deploy/helm/platform-auth. Проверка чарта — быстро;
+# установка в kind со сборкой образов и проверками стенда — долго, поэтому на PR только при правке чарта, скриптов
+# kind или этого workflow, а ещё ночью, на тег версии и вручную.
+# Упало — в артефакте k8s-logs ресурсы и логи всех подов.
+name: Kubernetes
+
+on:
+  schedule:
+    - cron: "30 1 * * *" # 04:30 по Москве
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - deploy/helm/**
+      - scripts/k8s/**
+      - scripts/keycloak/master-token.sh
+      - .github/workflows/kubernetes.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kubernetes-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  LANG: C.UTF-8
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  chart:
+    name: Чарт
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+
+      # Боевые значения (внешние базы, Ingress, Infisical) и стенд kind — оба варианта должны собираться.
+      - name: helm lint
+        run: |
+          prod=(--set realm=shop --set publicUrls.service=https://auth.example.com
+                --set publicUrls.keycloak=https://id.example.com --set database.host=pg --set keycloakDatabase.host=pg
+                --set redis=redis:6379 --set 'service.returnOrigins[0]=https://shop.example.com'
+                --set secrets.infisical.enabled=true --set secrets.infisical.identityId=id
+                --set secrets.infisical.serviceAccount=auth)
+          helm lint --strict deploy/helm/platform-auth "${prod[@]}"
+          helm template auth deploy/helm/platform-auth "${prod[@]}" > /dev/null
+          helm lint --strict deploy/helm/platform-auth -f scripts/k8s/kind-values.yaml \
+            --set secrets.create=true --set secrets.values.AUTH_DATA_PROTECTION_CERT=cGZ4 \
+            --set-file keycloak.realmImport=infra/keycloak/realm/sandbox-realm.json
+
+  kind:
+    name: Установка в kind
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Место на диске
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+
+      - uses: helm/kind-action@v1
+        with:
+          install_only: true
+
+      # Те же образы, что уходят в реестр.
+      - name: Собрать образы
+        run: scripts/package/build-images.sh
+
+      - name: check-kind
+        run: LOGS=k8s-logs scripts/k8s/check-kind.sh 2>&1 | tee check-kind.log
+
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: k8s-logs
+          path: |
+            k8s-logs/
+            check-kind.log
+          retention-days: 14
