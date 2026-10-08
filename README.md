@@ -62,7 +62,8 @@ dotnet test --filter "Category!=Infrastructure"    # быстрые, без Dock
 
 Скрипты `scripts/keycloak/check-*.sh` проверяют поднятый стенд по-настоящему: вход через страницу Keycloak, коды,
 админку, кабинет, магазин на сервисе входа, перенос пользователей. В CI их гоняет workflow «Стенд»
-(`.github/workflows/stand.yml`) ночью, на тег `v*` и вручную (Actions → Стенд → Run workflow):
+(`.github/workflows/stand.yml`) ночью, на тег `v*`, вручную (Actions → Стенд → Run workflow) и на PR, который меняет
+сами проверки (`scripts/keycloak/`) или workflow:
 
 - **Стенд песочницы:** `docker compose up -d --build --wait`, разрешение на регистрацию клиентов
   (`registration-token.sh --write-env`), затем `check-stand`, `check-api`, `check-login`, `check-admin`, `check-6b`,

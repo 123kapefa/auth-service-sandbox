@@ -47,12 +47,13 @@ check "токеном пользователя, даже админа проек
   "$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H "Authorization: Bearer $(user_token 71234567890)" -H 'Content-Type: application/json' -d '{"name":"x","theme":"dark"}' "$PLUGIN")" 403
 check "токеном мастер-админки (другой realm) — нет" \
   "$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H "Authorization: Bearer $MASTER" -H 'Content-Type: application/json' -d '{"name":"x","theme":"dark"}' "$PLUGIN")" 401
+# Есть ли у неё и другие роли realm (manage-sign-in с этапа 10), здесь не важно.
 check "у служебной учётки сервиса — роль manage-branding, а не manage-realm" \
   "$(curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/users?username=service-account-sandbox-bff&exact=true" \
     | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["id"])' \
     | xargs -I{} curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM/users/{}/role-mappings" \
-    | python3 -c 'import json,sys; r=json.load(sys.stdin); print(",".join(x["name"] for x in r.get("realmMappings",[])), "manage-realm" in [x["name"] for x in r["clientMappings"]["realm-management"]["mappings"]])')" \
-  "manage-branding False"
+    | python3 -c 'import json,sys; r=json.load(sys.stdin); print("manage-branding" in [x["name"] for x in r.get("realmMappings",[])], "manage-realm" in [x["name"] for x in r["clientMappings"]["realm-management"]["mappings"]])')" \
+  "True False"
 
 echo "2. Админка: оформление — только админ проекта"
 check "админ проекта читает" "$(api "$ADMIN" GET /auth/admin/branding | cut -d' ' -f1)" 200

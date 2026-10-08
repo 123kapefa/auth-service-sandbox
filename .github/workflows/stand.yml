@@ -1,6 +1,6 @@
 # Живые проверки стенда: настоящие Keycloak, Postgres, Redis и сервис входа в Docker и скрипты scripts/keycloak/check-*.sh
 # против них. Долго (сборка образов и сотни проверок), поэтому не на каждый PR, а ночью, на тег версии и вручную.
-# Плюс PR, который меняет сам этот workflow: так правка проверяется до слияния.
+# Плюс PR, который меняет сам этот workflow или скрипты проверок: так правка проверяется до слияния.
 # Упало — в артефакте stand-logs логи всех контейнеров и вывод каждого скрипта.
 name: Стенд
 
@@ -11,7 +11,7 @@ on:
     tags: ["v*"]
   workflow_dispatch:
   pull_request:
-    paths: [.github/workflows/stand.yml]
+    paths: [.github/workflows/stand.yml, scripts/keycloak/**, scripts/ci/**]
 
 permissions:
   contents: read
