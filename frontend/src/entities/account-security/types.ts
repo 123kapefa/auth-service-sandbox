@@ -57,6 +57,8 @@ export interface SignInMethods {
   hasRecoveryCodes: boolean;
   /** Привязанные внешние входы: yandex, esia. */
   linkedProviders: string[];
+  /** Почему внешний вход не отвязать: провайдер → last_method (последний способ входа); нет в словаре — можно. */
+  unlinkBlockers: Record<string, "last_method">;
   /** Новые сверху. */
   history: SignInMethodChange[];
   /** Выключено в проекте (phone, email, password, passkey, yandex, esia) — в кабинете не показываем. */

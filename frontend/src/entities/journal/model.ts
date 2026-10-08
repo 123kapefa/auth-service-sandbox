@@ -8,6 +8,7 @@ export const ACTION_LABELS: Record<string, string> = {
   UserTwoFactorDisabled: "Отключение 2FA",
   UserSignInMethodChanged: "Способ входа",
   UserSignInMethodsReset: "Способы входа по умолчанию",
+  UserExternalLoginUnlinked: "Отвязка внешнего входа",
   UserPhoneChanged: "Смена номера",
   PermissionCreated: "Право создано",
   PermissionDeleted: "Право удалено",

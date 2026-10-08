@@ -86,5 +86,40 @@ public sealed class SignInMethodRulesTests
         Assert.Null(SignInMethodRules.DisableBlocker(Facts(passkey: true, disabled: [PASSWORD]), PASSWORD));
     }
 
+    [Fact]
+    public void UnlinkBlocker_OwnMethodWorks_CanUnlink()
+    {
+        Assert.Null(SignInMethodRules.UnlinkBlocker(Facts(external: true), otherExternal: false));
+        Assert.Null(SignInMethodRules.UnlinkBlocker(Facts(authenticator: true, external: true, disabled: [PASSWORD, PHONE]), otherExternal: false));
+    }
+
+    [Fact]
+    public void UnlinkBlocker_EverythingOwnDisabled_LastMethod_UnlessPasskeyOrOtherExternal()
+    {
+        // Аутентификатор держит выключенными все три способа только вместе с внешним входом — без него войти нечем.
+        SignInFacts facts = Facts(authenticator: true, external: true, disabled: [PASSWORD, PHONE, EMAIL]);
+
+        Assert.Equal(SignInMethodRules.LAST_METHOD, SignInMethodRules.UnlinkBlocker(facts, otherExternal: false));
+        Assert.Null(SignInMethodRules.UnlinkBlocker(facts, otherExternal: true));
+        Assert.Null(SignInMethodRules.UnlinkBlocker(facts with { HasPasskey = true }, otherExternal: false));
+    }
+
+    [Fact]
+    public void UnlinkBlocker_OnlyExternal_NothingOwn_LastMethod()
+    {
+        // Зарегистрировался через Яндекс ID: ни пароля, ни номера-логина, ни почты.
+        SignInFacts facts = new(false, false, false, false, false, false, true, new HashSet<string>(StringComparer.Ordinal));
+
+        Assert.Equal(SignInMethodRules.LAST_METHOD, SignInMethodRules.UnlinkBlocker(facts, otherExternal: false));
+    }
+
+    [Fact]
+    public void UnlinkBlocker_OwnMethodOffInProject_DoesNotCount()
+    {
+        SignInFacts facts = Facts(external: true) with { HasPassword = false, HasPhone = false, OffInProject = new HashSet<string>([EMAIL]) };
+
+        Assert.Equal(SignInMethodRules.LAST_METHOD, SignInMethodRules.UnlinkBlocker(facts, otherExternal: false));
+    }
+
     private static string[] Sorted(IReadOnlySet<string> methods) => [.. SignInMethodRules.All.Where(methods.Contains)];
 }

@@ -22,6 +22,20 @@ export const accountSecurityApi = {
         { enabled, signOutOtherDevices },
       ),
     ),
+  /** Отвязать Яндекс ID или Госуслуги; только после недавнего входа и если останется, чем войти. */
+  unlinkProvider: async ({
+    provider,
+    signOutOtherDevices,
+  }: {
+    provider: string;
+    signOutOtherDevices: boolean;
+  }) =>
+    unwrap(
+      await apiClient.delete<Envelope<SignInMethods>>(
+        `/me/sign-in-methods/providers/${encodeURIComponent(provider)}`,
+        { params: { signOutOtherDevices } },
+      ),
+    ),
 };
 
 export const accountSecurityQueries = {

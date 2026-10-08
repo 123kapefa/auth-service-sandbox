@@ -129,6 +129,9 @@ public interface IIdentityAdmin
     /// <summary>Привязанные внешние входы пользователя (Яндекс ID, Госуслуги): алиасы провайдеров.</summary>
     Task<Result<IReadOnlyList<string>, Error>> GetLinkedProvidersAsync(Guid userId, CancellationToken cancellationToken);
 
+    /// <summary>Отвязать внешний вход: войти через этого провайдера в этот аккаунт больше нельзя (до новой привязки).</summary>
+    Task<UnitResult<Error>> UnlinkProviderAsync(Guid userId, string provider, CancellationToken cancellationToken);
+
     /// <summary>Сессии пользователя на сервере входа: где и когда вошёл, в какие приложения.</summary>
     Task<Result<IReadOnlyList<IdentitySession>, Error>> GetSessionsAsync(Guid userId, CancellationToken cancellationToken);
 

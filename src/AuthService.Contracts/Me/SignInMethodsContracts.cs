@@ -6,6 +6,10 @@ namespace AuthService.Contracts.Me;
 /// <param name="HasAuthenticator">Есть приложение-аутентификатор (2FA).</param>
 /// <param name="HasRecoveryCodes">Созданы коды восстановления.</param>
 /// <param name="LinkedProviders">Привязанные внешние входы: yandex, esia.</param>
+/// <param name="UnlinkBlockers">
+/// Почему внешний вход нельзя отвязать: провайдер → причина (last_method — это последний способ входа). Провайдера нет в
+/// словаре — отвязать можно.
+/// </param>
 /// <param name="History">Изменения способов входа, новые сверху (до 20).</param>
 /// <param name="ProjectDisabled">
 /// Способы, выключенные в проекте (10.7): phone, email, password, passkey, yandex, esia. Кабинет их не показывает.
@@ -17,6 +21,7 @@ public sealed record SignInMethodsResponse(
     bool HasAuthenticator,
     bool HasRecoveryCodes,
     IReadOnlyList<string> LinkedProviders,
+    IReadOnlyDictionary<string, string> UnlinkBlockers,
     IReadOnlyList<SignInMethodChangeResponse> History,
     IReadOnlyList<string> ProjectDisabled);
 

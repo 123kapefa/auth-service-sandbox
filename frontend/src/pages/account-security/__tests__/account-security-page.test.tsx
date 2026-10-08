@@ -51,6 +51,7 @@ const allOn: SignInMethods = {
   hasAuthenticator: false,
   hasRecoveryCodes: false,
   linkedProviders: [],
+  unlinkBlockers: {},
   history: [],
   projectDisabled: [],
 };
@@ -262,5 +263,46 @@ describe("AccountSecurityPage", () => {
     expect(methods.queryByText("Яндекс ID")).toBeNull();
     expect(methods.getByText("Госуслуги")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Ключи доступа" })).toBeNull();
+  });
+
+  it("отвязать Яндекс ID — окно: что останется, «выйти на других»; запрос с ним", async () => {
+    const unlink = vi
+      .spyOn(accountSecurityApi, "unlinkProvider")
+      .mockResolvedValue({ ...allOn, linkedProviders: ["esia"] });
+    renderPage(nothing, { ...allOn, linkedProviders: ["esia", "yandex"] });
+
+    await userEvent.click(
+      section("Способы входа").getByRole("button", { name: "Отвязать: Яндекс ID" }),
+    );
+
+    const dialog = within(screen.getByRole("dialog", { name: "Отвязать Яндекс ID?" }));
+    expect(dialog.getByText("Госуслуги")).toBeInTheDocument();
+    expect(dialog.getByText("Код на почту — anna@mail.ru")).toBeInTheDocument();
+    expect(dialog.queryByText("Яндекс ID")).toBeNull();
+    expect(dialog.getByText("Пароль")).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("checkbox"));
+    await userEvent.click(dialog.getByRole("button", { name: "Отвязать" }));
+
+    await waitFor(() =>
+      expect(unlink).toHaveBeenCalledWith(
+        { provider: "yandex", signOutOtherDevices: false },
+        expect.anything(),
+      ),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(section("Способы входа").queryByText("Яндекс ID")).toBeNull();
+    unlink.mockRestore();
+  });
+
+  it("последний способ входа — «Отвязать» выключена и объяснение", () => {
+    renderPage(nothing, {
+      ...allOn,
+      linkedProviders: ["yandex"],
+      unlinkBlockers: { yandex: "last_method" },
+    });
+
+    const methods = section("Способы входа");
+    expect(methods.getByRole("button", { name: "Отвязать: Яндекс ID" })).toBeDisabled();
+    expect(methods.getByText(/последний способ входа — не отвязать/)).toBeInTheDocument();
   });
 });

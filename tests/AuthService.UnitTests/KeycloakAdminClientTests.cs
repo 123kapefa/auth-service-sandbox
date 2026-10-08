@@ -59,6 +59,14 @@ public sealed class KeycloakAdminClientTests : IDisposable
     }
 
     [Fact]
+    public async Task UnlinkProvider_DeletesFederatedIdentity()
+    {
+        Assert.True((await CreateClient().UnlinkProviderAsync(_userId, "yandex", default)).IsSuccess);
+
+        Assert.Equal($"{ADMIN}/users/{_userId}/federated-identity/yandex", _keycloak.AdminRequests.Single().Url);
+    }
+
+    [Fact]
     public async Task ServiceAccountToken_IsReusedUntilExpiry()
     {
         IIdentityAdmin client = CreateClient();

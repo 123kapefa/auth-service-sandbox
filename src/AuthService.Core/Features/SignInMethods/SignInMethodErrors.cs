@@ -21,6 +21,19 @@ public static class SignInMethodErrors
             _ => "Этот способ входа сейчас выключить нельзя.",
         });
 
+    /// <summary>Такой внешний вход к аккаунту не привязан.</summary>
+    public static Error NotLinked(string provider) =>
+        Error.NotFound("sign_in_methods.not_linked", $"Внешний вход «{provider}» к вашему аккаунту не привязан.");
+
+    /// <summary>Отвязать нельзя — причина из SignInMethodRules.UnlinkBlocker (код ошибки — sign_in_methods.{причина}).</summary>
+    public static Error CannotUnlink(string blocker) =>
+        Error.Conflict("sign_in_methods." + blocker, blocker switch
+        {
+            SignInMethodRules.LAST_METHOD =>
+                "Это последний способ входа: сначала включите другой способ или добавьте ключ доступа.",
+            _ => "Этот внешний вход сейчас отвязать нельзя.",
+        });
+
     /// <summary>Вход по паролю выключен у человека — ссылка на новый пароль включила бы его обратно.</summary>
     public static Error PasswordDisabled() =>
         Error.Conflict("users.password_disabled", "Вход по паролю у пользователя выключен — сначала верните способы входа по умолчанию.");

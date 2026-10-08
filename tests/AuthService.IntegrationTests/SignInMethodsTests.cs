@@ -236,6 +236,93 @@ public sealed class SignInMethodsTests : IClassFixture<AuthServiceWebFactory>
     }
 
     [Fact]
+    public async Task Get_LinkedProviders_UnlinkBlockers()
+    {
+        // Пароль, номер и почта работают — Яндекс ID отвязать можно.
+        _keycloak.Link(TestUser.Customer, "yandex");
+        Assert.Empty((await ResultAsync(await GetOwnAsync())).GetProperty("unlinkBlockers").EnumerateObject());
+
+        // Всё своё выключено и держится только на Яндекс ID и Госуслугах: по одному отвязать можно, последний — нет.
+        AllOwnDisabledWithAuthenticator();
+        _keycloak.Link(TestUser.Customer, "esia", "yandex");
+        Assert.Empty((await ResultAsync(await GetOwnAsync())).GetProperty("unlinkBlockers").EnumerateObject());
+
+        _keycloak.Link(TestUser.Customer, "yandex");
+        JsonElement blockers = (await ResultAsync(await GetOwnAsync())).GetProperty("unlinkBlockers");
+        Assert.Equal("last_method", blockers.GetProperty("yandex").GetString());
+    }
+
+    [Fact]
+    public async Task Unlink_Removed_Audited_Notified_OtherDevicesSignedOut()
+    {
+        _keycloak.Link(TestUser.Customer, "esia", "yandex");
+
+        JsonElement result = await ResultAsync(await UnlinkAsync("yandex"));
+
+        Assert.Equal(["esia"], result.GetProperty("linkedProviders").EnumerateArray().Select(item => item.GetString()!).ToArray());
+        Assert.Equal((TestUser.Customer.Id, "yandex"), Assert.Single(_keycloak.Unlinked));
+        AuditEntry entry = Assert.Single(_factory.AuditLog.Entries);
+        Assert.Equal((AuditActions.USER_EXTERNAL_LOGIN_UNLINKED, TestUser.Customer.Id, TestUser.Customer.Id), (entry.Action, entry.ObjectId, entry.ActorId!.Value));
+        Assert.Equal((TestUser.Customer.Id, new SignInMethodNotice("unlinked", "yandex")), Assert.Single(_factory.Notices.Sent));
+        Assert.Equal(["s-phone"], _keycloak.DeletedSessions);
+        Assert.Empty(_keycloak.AttributeChanges);
+    }
+
+    [Fact]
+    public async Task Unlink_StayOnOtherDevices_SessionsKept()
+    {
+        _keycloak.Link(TestUser.Customer, "esia");
+
+        Assert.Equal(HttpStatusCode.OK, (await UnlinkAsync("esia", signOutOtherDevices: false)).StatusCode);
+
+        Assert.Empty(_keycloak.DeletedSessions);
+    }
+
+    [Fact]
+    public async Task Unlink_LastMethod_Conflict_NothingUnlinked()
+    {
+        AllOwnDisabledWithAuthenticator();
+        _keycloak.Link(TestUser.Customer, "yandex");
+
+        await AssertErrorAsync(await UnlinkAsync("yandex"), HttpStatusCode.Conflict, "sign_in_methods.last_method");
+
+        Assert.Empty(_keycloak.Unlinked);
+        Assert.Empty(_factory.AuditLog.Entries);
+        Assert.Empty(_factory.Notices.Sent);
+    }
+
+    [Fact]
+    public async Task Unlink_OtherProviderOffInProject_LastMethod()
+    {
+        // Госуслуги привязаны, но в проекте выключены: войти ими нельзя — Яндекс ID последний.
+        AllOwnDisabledWithAuthenticator();
+        _keycloak.Link(TestUser.Customer, "esia", "yandex");
+        Dictionary<string, ProjectSignInMethod> methods = new(FakeProjectSignIn.Default().Methods, StringComparer.Ordinal)
+        {
+            [ProjectSignInRules.ESIA] = new(ProjectSignInRules.OFF, Configured: true),
+        };
+        _factory.SignIn.Current = FakeProjectSignIn.Default() with { Methods = methods };
+
+        await AssertErrorAsync(await UnlinkAsync("yandex"), HttpStatusCode.Conflict, "sign_in_methods.last_method");
+    }
+
+    [Fact]
+    public async Task Unlink_NotLinked_NotFound() =>
+        await AssertErrorAsync(await UnlinkAsync("yandex"), HttpStatusCode.NotFound, "sign_in_methods.not_linked");
+
+    [Fact]
+    public async Task Unlink_OldLogin_ReauthenticationRequired()
+    {
+        _keycloak.Link(TestUser.Customer, "yandex");
+
+        await AssertErrorAsync(
+            await UnlinkAsync("yandex", loggedInAgo: TimeSpan.FromMinutes(10)),
+            HttpStatusCode.Forbidden,
+            "auth.reauthentication_required");
+        Assert.Empty(_keycloak.Unlinked);
+    }
+
+    [Fact]
     public async Task AdminReset_Cleared_Audited_Notified_InHistory()
     {
         _keycloak.SetDisabledSignInMethods(TestUser.Customer, "password,phone-code");
@@ -298,6 +385,14 @@ public sealed class SignInMethodsTests : IClassFixture<AuthServiceWebFactory>
 
     private void AddPasskey() => AddCredential(Credentials.PASSKEY);
 
+    // Аутентификатор с кодами восстановления, пароль и коды выключены: держится только на внешнем входе.
+    private void AllOwnDisabledWithAuthenticator()
+    {
+        AddCredential(Credentials.OTP);
+        AddCredential(Credentials.RECOVERY_CODES);
+        _keycloak.SetDisabledSignInMethods(TestUser.Customer, "password,phone-code,email-code");
+    }
+
     private void AddCredential(string type) =>
         _keycloak.AddCredential(TestUser.Customer, new UserCredential(type + "-1", type, null, _created));
 
@@ -318,6 +413,13 @@ public sealed class SignInMethodsTests : IClassFixture<AuthServiceWebFactory>
     {
         using HttpClient client = _factory.CreateClientFor(TestUser.Customer, DateTimeOffset.UtcNow - (loggedInAgo ?? TimeSpan.Zero), CURRENT);
         return await client.PutAsJsonAsync($"/me/sign-in-methods/{method}", new { enabled, signOutOtherDevices });
+    }
+
+    private async Task<HttpResponseMessage> UnlinkAsync(string provider, bool? signOutOtherDevices = null, TimeSpan? loggedInAgo = null)
+    {
+        using HttpClient client = _factory.CreateClientFor(TestUser.Customer, DateTimeOffset.UtcNow - (loggedInAgo ?? TimeSpan.Zero), CURRENT);
+        string query = signOutOtherDevices is { } signOut ? $"?signOutOtherDevices={(signOut ? "true" : "false")}" : string.Empty;
+        return await client.DeleteAsync(new Uri($"/me/sign-in-methods/providers/{provider}{query}", UriKind.Relative));
     }
 
     private async Task<HttpResponseMessage> AdminAsync(

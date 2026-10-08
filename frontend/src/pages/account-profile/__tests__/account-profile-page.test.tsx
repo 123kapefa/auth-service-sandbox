@@ -39,6 +39,7 @@ function renderPage(data: AccountProfile, route = "/", projectDisabled: string[]
     hasAuthenticator: false,
     hasRecoveryCodes: false,
     linkedProviders: [],
+    unlinkBlockers: {},
     history: [],
     projectDisabled,
   });
