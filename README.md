@@ -49,7 +49,8 @@ docker compose up -d --wait
 `scripts/secrets/run.sh docker compose up -d --wait`; перечень, проверка утечек и смена — [docs/secrets.md](docs/secrets.md).
 
 Новая версия на работающем стенде или в бою: миграции базы и настроек проектов, резервные копии, обновление Keycloak —
-[docs/migrations.md](docs/migrations.md).
+[docs/migrations.md](docs/migrations.md). Запуск в Kubernetes (Helm-чарт, Keycloak в несколько реплик, стенд в kind) —
+[docs/kubernetes.md](docs/kubernetes.md).
 
 ## Тесты
 

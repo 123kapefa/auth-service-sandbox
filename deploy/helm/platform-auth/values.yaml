@@ -1,0 +1,149 @@
+# Сервис входа платформы в Kubernetes (docs/kubernetes.md). Здесь — бой: Postgres и Redis свои у проекта (адреса ниже),
+# секреты — из хранилища (Infisical, docs/secrets.md), снаружи — Ingress с https. Стенд в kind — scripts/k8s/kind-values.yaml.
+
+# Образы — scripts/package/build-images.sh; релиз по тегу кладёт их в GHCR. Тег по умолчанию — appVersion чарта.
+images:
+  registry: ghcr.io/123kapefa/
+  tag: ""
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+  service: platform-auth-service
+  keycloak: platform-auth-keycloak
+  realmMigrator: platform-auth-realm-migrator
+
+# Проект (realm Keycloak) — его код; от него Authentication:Authority сервиса.
+realm: ""
+
+# Внешние адреса (https, через Ingress): от адреса Keycloak — iss в токенах, браузер и приложения видят один и тот же.
+publicUrls:
+  service: ""   # https://auth.example.com
+  keycloak: ""  # https://id.example.com
+
+# Секреты — один Secret с именами как в хранилище (docs/secrets.md):
+#   AUTH_DB_PASSWORD, AUTH_KEYCLOAK_DB_PASSWORD, AUTH_KEYCLOAK_ADMIN_PASSWORD, AUTH_BFF_CLIENT_SECRET,
+#   AUTH_DATA_PROTECTION_CERT_PASSWORD; необязательные — AUTH_REGISTRATION_TOKEN, AUTH_BFF_CLIENT_SECRET_PREVIOUS,
+#   AUTH_DATA_PROTECTION_PREVIOUS_CERT_PASSWORD, AUTH_SMARTCAPTCHA_SERVER_KEY.
+# Сертификат DataProtection — файлом из второго Secret (dataProtection ниже).
+secrets:
+  # Имя Secret; пусто — <релиз>-secrets.
+  name: ""
+  # Оператор Infisical (secrets-operator) кладёт секреты окружения в Secret сам; учётка оператора входит по
+  # Kubernetes Auth (токен ServiceAccount) — секрета на машине нет.
+  infisical:
+    enabled: false
+    hostAPI: https://app.infisical.com/api
+    projectSlug: auth-service
+    envSlug: prod
+    secretsPath: /
+    # Machine Identity с Kubernetes Auth в Infisical и ServiceAccount, токеном которого оператор входит.
+    identityId: ""
+    serviceAccount: ""
+    resyncInterval: 60
+  # Только стенд: Secret из значений ниже (не в git, --set). В бою — Infisical или Secret, созданный заранее.
+  create: false
+  values: {}
+
+dataProtection:
+  # Secret с PFX файлом: ключ certificate.pfx, на время смены — previous.pfx (docs/secrets.md). Пусто —
+  # <релиз>-data-protection; с Infisical создаётся из AUTH_DATA_PROTECTION_CERT (PFX в base64) хранилища.
+  secretName: ""
+  # true — на время смены сертификата: в Secret есть previous.pfx, сервис перешифровывает им старые ключи.
+  previous: false
+
+# База сервиса входа (журнал, ключи сервисов, устройства) — Postgres проекта; пароль — AUTH_DB_PASSWORD.
+database:
+  host: ""
+  port: 5432
+  name: auth_service
+  user: auth_service
+  # Дополнение строки подключения: SSL Mode=Require; …
+  options: ""
+
+# База Keycloak — отдельная (Keycloak не делит базу с приложениями); пароль — AUTH_KEYCLOAK_DB_PASSWORD.
+keycloakDatabase:
+  host: ""
+  port: 5432
+  name: keycloak
+  user: keycloak
+
+# Redis проекта — отметки мгновенного отзыва токенов: host:port[,password=…].
+redis: ""
+
+service:
+  replicas: 2
+  environment: Production
+  # Клиенты проекта — одинаковые во всех проектах (scripts/project/create-project.sh).
+  audience: auth-api
+  clientId: auth-bff
+  # Пусто — домен из publicUrls.service и localhost (проверки здоровья изнутри пода).
+  allowedHosts: ""
+  # Куда можно вернуть пользователя после входа: адреса приложений проекта.
+  returnOrigins: []
+  returnDefault: /account/
+  cookies:
+    secure: true
+    # Родительский домен приложений проекта — вход виден всем поддоменам (SSO).
+    domain: ""
+  # X-Forwarded-* принимаются только из этих сетей — сети подов кластера, где Ingress-контроллер.
+  trustedNetworks: [10.0.0.0/8]
+  # Тип и nodePort Service — для стенда без Ingress (kind); в бою ClusterIP.
+  serviceType: ClusterIP
+  nodePort: null
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 512Mi }
+  extraEnv: []
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+keycloak:
+  # Две реплики и больше — кластер: общий кэш (Infinispan), узлы находят друг друга через базу (jdbc-ping),
+  # sticky-сессии не нужны.
+  replicas: 2
+  # Смена версии Keycloak (не патча) — Recreate: разные версии в одном кластере не работают (docs/migrations.md).
+  updateStrategy: RollingUpdate
+  # start: http внутри кластера, https снаружи делает Ingress.
+  command: [start]
+  admin: admin
+  # X-Forwarded-* принимаются только от Ingress-контроллера: сети подов кластера.
+  trustedProxies: [10.0.0.0/8]
+  # Только стенд: realm JSON для импорта при первом запуске (--set-file keycloak.realmImport=…). В бою проекты
+  # создаются скриптами (scripts/project/create-project.sh).
+  realmImport: ""
+  serviceType: ClusterIP
+  nodePort: null
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits: { memory: 1536Mi }
+  extraEnv: []
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Миграторы — Job-хуки Helm (docs/kubernetes.md): база сервиса — до раскатки новой версии, настройки проектов (realm) —
+# после того, как поднят новый Keycloak.
+migrations:
+  backoffLimit: 6
+  activeDeadlineSeconds: 900
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { memory: 256Mi }
+
+podDisruptionBudget:
+  minAvailable: 1
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  # Secret с сертификатом https для обоих доменов (cert-manager или созданный заранее).
+  tlsSecretName: platform-auth-tls
+
+# Только стенд: Postgres (обе базы) и Redis внутри чарта, данные — до перезапуска пода (emptyDir).
+stand:
+  enabled: false
+  postgresImage: postgres:17-alpine
+  redisImage: redis:7-alpine

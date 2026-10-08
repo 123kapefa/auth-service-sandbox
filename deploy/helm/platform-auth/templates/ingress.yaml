@@ -1,0 +1,52 @@
+{{- if .Values.ingress.enabled }}
+{{/* Снаружи — https на Ingress; до сервиса и Keycloak — http внутри кластера с X-Forwarded-* от контроллера. */}}
+{{- $base := include "auth.name" . -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $base }}
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+  annotations:
+    {{- if eq .Values.ingress.className "nginx" }}
+    # Страницы и ответы Keycloak несут большие заголовки (cookie сессии, токены): стандартного буфера мало.
+    nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        - {{ (urlParse .Values.publicUrls.service).hostname }}
+        - {{ (urlParse .Values.publicUrls.keycloak).hostname }}
+      secretName: {{ .Values.ingress.tlsSecretName }}
+  rules:
+    - host: {{ (urlParse (required "нужен publicUrls.service" .Values.publicUrls.service)).hostname }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $base }}-service
+                port: { name: http }
+    - host: {{ (urlParse (required "нужен publicUrls.keycloak" .Values.publicUrls.keycloak)).hostname }}
+      http:
+        paths:
+          # Мастер-админка Keycloak (/admin) снаружи не нужна: техник ходит к ней через kubectl port-forward.
+          - path: /realms
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $base }}-keycloak
+                port: { name: http }
+          - path: /resources
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $base }}-keycloak
+                port: { name: http }
+{{- end }}

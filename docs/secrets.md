@@ -38,8 +38,9 @@
 - **Docker Compose** (стенд, `deploy/compose.yaml`): `infisical run -- docker compose up` — CLI получает секреты
   окружения и запускает compose с ними в переменных окружения; compose подставляет их в `${…}` вместо `.env`.
   На диск они не пишутся. В песочнице это `scripts/secrets/run.sh <команда>`.
-- **Kubernetes** (11.7): оператор Infisical (`InfisicalSecret`) кладёт секреты окружения в Secret, под берёт их
-  переменными окружения; учётка оператора входит по Kubernetes Auth — без секрета на машине.
+- **Kubernetes** ([kubernetes.md](kubernetes.md#секреты)): оператор Infisical (`InfisicalSecret`) кладёт секреты
+  окружения в Secret, под берёт их переменными окружения, а сертификат DataProtection монтируется файлом из второго
+  Secret. Учётка оператора входит по Kubernetes Auth, без секрета на машине.
 
 Вход в хранилище — учётка машины (Universal Auth: `INFISICAL_CLIENT_ID` и `INFISICAL_CLIENT_SECRET` меняются на токен
 на час) или человек под своим входом (`infisical login`). Учётка машины — «нулевой» секрет: им открывается хранилище,

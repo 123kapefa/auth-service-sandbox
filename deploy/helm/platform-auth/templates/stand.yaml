@@ -1,0 +1,99 @@
+{{- if .Values.stand.enabled }}
+{{/* Только стенд (kind): Postgres сервиса, Postgres Keycloak и Redis внутри чарта; данные живут, пока жив под. */}}
+{{- $root := . -}}
+{{- $base := include "auth.name" . -}}
+{{- range $db := list (dict "name" "db" "database" $root.Values.database "passwordKey" "AUTH_DB_PASSWORD") (dict "name" "keycloak-db" "database" $root.Values.keycloakDatabase "passwordKey" "AUTH_KEYCLOAK_DB_PASSWORD") }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $base }}-{{ $db.name }}
+  labels:
+    {{- include "auth.labels" $root | nindent 4 }}
+    app.kubernetes.io/name: {{ $db.name }}
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels:
+      {{- include "auth.selector" (dict "root" $root "component" $db.name) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "auth.labels" $root | nindent 8 }}
+        app.kubernetes.io/name: {{ $db.name }}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ $root.Values.stand.postgresImage }}
+          env:
+            - name: POSTGRES_DB
+              value: {{ $db.database.name | quote }}
+            - name: POSTGRES_USER
+              value: {{ $db.database.user | quote }}
+            {{- include "auth.secretEnv" (dict "root" $root "name" "POSTGRES_PASSWORD" "key" $db.passwordKey) | nindent 12 }}
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ $db.database.user | quote }}, "-d", {{ $db.database.name | quote }}]
+            periodSeconds: 3
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $base }}-{{ $db.name }}
+  labels:
+    {{- include "auth.labels" $root | nindent 4 }}
+spec:
+  selector:
+    {{- include "auth.selector" (dict "root" $root "component" $db.name) | nindent 4 }}
+  ports:
+    - port: 5432
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $base }}-redis
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+    app.kubernetes.io/name: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "auth.selector" (dict "root" . "component" "redis") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "auth.labels" . | nindent 8 }}
+        app.kubernetes.io/name: redis
+    spec:
+      containers:
+        - name: redis
+          image: {{ .Values.stand.redisImage }}
+          ports:
+            - containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            periodSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $base }}-redis
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "auth.selector" (dict "root" . "component" "redis") | nindent 4 }}
+  ports:
+    - port: 6379
+{{- end }}

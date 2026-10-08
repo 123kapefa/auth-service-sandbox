@@ -1,0 +1,95 @@
+{{/*
+Миграторы — Job-хуки Helm (docs/kubernetes.md, docs/migrations.md):
+- база сервиса (efbundle): pre-upgrade — до раскатки новой версии сервиса, схема совместима с прежней версией;
+  при установке — post-install (базы стенда создаются самим чартом, до хука их нет; сервиса без данных ещё никто
+  не ждёт);
+- настройки проектов (realm): post-install и post-upgrade — после того, как поднят новый Keycloak: миграции включают
+  шаги его плагинов. При установке проектов ещё нет — мигратору делать нечего.
+Job остаётся до следующего развёртывания — его лог: kubectl logs job/<релиз>-migrator.
+*/}}
+{{- $base := include "auth.name" . -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $base }}-migrator
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+    app.kubernetes.io/name: migrator
+  annotations:
+    helm.sh/hook: post-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: {{ .Values.migrations.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migrations.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "auth.labels" . | nindent 8 }}
+        app.kubernetes.io/name: migrator
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1654
+      {{- with .Values.images.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: migrator
+          image: {{ include "auth.image" (dict "root" . "image" .Values.images.service) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          # Строка подключения — переменной окружения (её читает AuthDbContextFactory), не аргументом.
+          command: ["./efbundle"]
+          env:
+            {{- include "auth.secretEnv" (dict "root" . "name" "AUTH_DB_PASSWORD" "key" "AUTH_DB_PASSWORD") | nindent 12 }}
+            - name: AUTH_CONNECTION_STRING
+              value: {{ include "auth.dbConnection" . | quote }}
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $base }}-realm-migrator
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+    app.kubernetes.io/name: realm-migrator
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: {{ .Values.migrations.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migrations.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "auth.labels" . | nindent 8 }}
+        app.kubernetes.io/name: realm-migrator
+    spec:
+      restartPolicy: Never
+      {{- with .Values.images.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: realm-migrator
+          image: {{ include "auth.image" (dict "root" . "image" .Values.images.realmMigrator) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          env:
+            # Мастер-админка — по внутреннему адресу кластера.
+            - name: KC
+              value: {{ include "auth.keycloakInternalUrl" . | quote }}
+            - name: KEYCLOAK_ADMIN
+              value: {{ .Values.keycloak.admin | quote }}
+            {{- include "auth.secretEnv" (dict "root" . "name" "KEYCLOAK_ADMIN_PASSWORD" "key" "AUTH_KEYCLOAK_ADMIN_PASSWORD") | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
