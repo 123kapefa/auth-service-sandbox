@@ -1,0 +1,129 @@
+# Живые проверки стенда: настоящие Keycloak, Postgres, Redis и сервис входа в Docker и скрипты scripts/keycloak/check-*.sh
+# против них. Долго (сборка образов и сотни проверок), поэтому не на каждый PR, а ночью, на тег версии и вручную.
+# Плюс PR, который меняет сам этот workflow: так правка проверяется до слияния.
+# Упало — в артефакте stand-logs логи всех контейнеров и вывод каждого скрипта.
+name: Стенд
+
+on:
+  schedule:
+    - cron: "0 1 * * *" # 04:00 по Москве
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+  pull_request:
+    paths: [.github/workflows/stand.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stand-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # Скрипты печатают кириллицу и считают буквы, а не байты.
+  LANG: C.UTF-8
+
+defaults:
+  run:
+    # С pipefail: «скрипт | tee» падает, если упал скрипт.
+    shell: bash
+
+jobs:
+  stand:
+    name: Стенд песочницы
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+
+      # Образы стенда и магазина не помещаются в свободное место раннера рядом с предустановленными SDK.
+      - name: Место на диске
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      # check-migration запускает инструмент переноса через dotnet run, samples/shop/setup.sh собирает пакеты.
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Поднять стенд
+        id: up
+        run: |
+          mkdir -p stand-logs
+          cp .env.example .env
+          docker compose up -d --build --wait --wait-timeout 600
+
+      # Разрешение на регистрацию клиентов живёт в Keycloak: на новом стенде — выдать и перезапустить сервис.
+      - name: Разрешение на регистрацию клиентов
+        id: token
+        run: scripts/keycloak/registration-token.sh --write-env
+
+      # Каждый скрипт — свой шаг: видно, какой упал, и следующие идут дальше. Порядок — как руками: check-admin
+      # возвращает пользователей в исходный режим, check-10 начинает с писем о бюджете на свежих сутках.
+      - name: check-stand
+        if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: scripts/keycloak/check-stand.sh 2>&1 | tee -a stand-logs/check-stand.log
+      - name: check-api
+        if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: scripts/keycloak/check-api.sh 2>&1 | tee -a stand-logs/check-api.log
+      - name: check-login
+        if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: scripts/keycloak/check-login.sh 2>&1 | tee -a stand-logs/check-login.log
+      - name: check-admin
+        if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: scripts/keycloak/check-admin.sh 2>&1 | tee -a stand-logs/check-admin.log
+      - name: check-6b
+        if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: scripts/keycloak/check-6b.sh 2>&1 | tee -a stand-logs/check-6b.log
+      - name: check-10
+        if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: scripts/keycloak/check-10.sh 2>&1 | tee -a stand-logs/check-10.log
+      - name: check-shop
+        if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: scripts/keycloak/check-shop.sh 2>&1 | tee -a stand-logs/check-shop.log
+      - name: check-migration
+        if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: scripts/keycloak/check-migration.sh 2>&1 | tee -a stand-logs/check-migration.log
+
+      - name: Логи контейнеров
+        if: failure()
+        run: scripts/ci/collect-logs.sh stand-logs
+
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: stand-logs
+          path: stand-logs/
+          retention-days: 14
+
+  deploy:
+    name: Развёртывание из образов
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      # Образы — те же, что уходят в реестр (scripts/package/build-images.sh), собранные здесь же.
+      - name: Собрать образы
+        run: |
+          mkdir -p deploy-logs
+          scripts/package/build-images.sh
+
+      # KEEP=1: установка остаётся после проверки, чтобы при падении снять логи её контейнеров.
+      - name: check-deploy
+        run: KEEP=1 scripts/keycloak/check-deploy.sh 2>&1 | tee -a deploy-logs/check-deploy.log
+
+      - name: Логи контейнеров
+        if: failure()
+        run: scripts/ci/collect-logs.sh deploy-logs
+
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: deploy-logs
+          path: deploy-logs/
+          retention-days: 14
