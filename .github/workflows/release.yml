@@ -1,0 +1,167 @@
+# Релиз по тегу vX.Y.Z: образы сервиса входа в GHCR, NuGet-пакеты в GitHub Packages, релиз GitHub с их перечнем.
+# Тег должен совпадать с VersionPrefix в Directory.Build.props: одна версия у образов, пакетов и релиза.
+# Ручной запуск — повторить релиз уже поставленного тега (образы перезаписываются, опубликованные пакеты пропускаются).
+# В PR, меняющем сборку образов или пакетов, — то же без публикации: проверка, что релиз соберётся.
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Тег релиза, например v0.1.0
+        required: true
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - scripts/package/**
+      - Dockerfile
+      - infra/keycloak/Dockerfile
+      - Directory.Build.props
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # Тег: из push, из ручного запуска; в PR — пусто (версия берётся из Directory.Build.props).
+  TAG: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+  PUBLISH: ${{ github.event_name != 'pull_request' }}
+
+jobs:
+  version:
+    name: Версия
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      owner: ${{ steps.version.outputs.owner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG || github.ref }}
+
+      - id: version
+        run: |
+          version=$(sed -n 's#.*<VersionPrefix>\(.*\)</VersionPrefix>.*#\1#p' Directory.Build.props | head -1)
+          if [ "$PUBLISH" = true ] && [ "$TAG" != "v$version" ]; then
+            echo "::error::Тег $TAG не совпадает с VersionPrefix $version в Directory.Build.props (нужен v$version)"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Имена в GHCR и GitHub Packages — только строчными.
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+  images:
+    name: Образы
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io/${{ needs.version.outputs.owner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG || github.ref }}
+
+      - name: Вход в GHCR
+        if: env.PUBLISH == 'true'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      # Версия и latest; --push — только в релизе.
+      - name: Сборка и отправка
+        run: scripts/package/build-images.sh ${{ env.PUBLISH == 'true' && '--push' || '' }}
+
+  packages:
+    name: Пакеты
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG || github.ref }}
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - uses: actions/cache@v5
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'Directory.Build.props', '**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      # RELEASE=1 — версия без суффикса -dev. Пакуются все библиотеки с IsPackable: кроме трёх, что подключают
+      # сервисы проекта, это их зависимости (Contracts, SharedKernel, Framework, Validation).
+      - name: Сборка пакетов
+        run: RELEASE=1 scripts/package/pack.sh "$PWD/artifacts/nuget"
+
+      - name: Проверка версии пакетов
+        run: |
+          for package in Platform.Authentication Platform.Authentication.Redis Platform.AuthService.Client; do
+            test -f "artifacts/nuget/$package.${{ needs.version.outputs.version }}.nupkg" \
+              || { echo "::error::Нет пакета $package ${{ needs.version.outputs.version }}"; exit 1; }
+          done
+
+      # --skip-duplicate: повторный запуск не падает на уже опубликованной версии.
+      - name: Отправка в GitHub Packages
+        if: env.PUBLISH == 'true'
+        run: |
+          dotnet nuget push "artifacts/nuget/*.nupkg" \
+            --source "https://nuget.pkg.github.com/${{ needs.version.outputs.owner }}/index.json" \
+            --api-key "${{ secrets.GITHUB_TOKEN }}" --skip-duplicate
+
+  release:
+    name: Релиз
+    needs: [version, images, packages]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Релиз GitHub
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+          OWNER: ${{ needs.version.outputs.owner }}
+        run: |
+          packages=$(grep -h -o '<PackageId>[^<]*' $(grep -rl '<IsPackable>true' src --include='*.csproj') \
+            | sed 's#<PackageId>##' | sort)
+          {
+            echo "## Образы (GHCR)"
+            echo
+            for image in platform-auth-service platform-auth-keycloak platform-auth-realm-migrator; do
+              echo "- \`ghcr.io/$OWNER/$image:$VERSION\`"
+            done
+            echo
+            echo "Поднять без локальной сборки: \`AUTH_REGISTRY=ghcr.io/$OWNER/ AUTH_VERSION=$VERSION\` в \`deploy/.env\`, затем \`docker compose -f deploy/compose.yaml up -d\`."
+            echo
+            echo "## Пакеты NuGet (GitHub Packages, версия $VERSION)"
+            echo
+            for package in $packages; do echo "- \`$package\`"; done
+            echo
+            echo "Фид: \`https://nuget.pkg.github.com/$OWNER/index.json\`, подключение — \`deploy/nuget.config.example\`."
+          } > release-notes.md
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TAG" --notes-file release-notes.md
+          else
+            gh release create "$TAG" --title "$TAG" --notes-file release-notes.md --verify-tag
+          fi

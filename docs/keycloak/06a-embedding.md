@@ -63,7 +63,7 @@ scripts/project/add-app.py shop orders "Заказы" --default-role customer --
   подключение — `deploy/nuget.config.example`. Сервису проекта: `Platform.Authentication` (проверка токенов,
   `RequireUser`/`RequireService`, токен сервиса по ключу — секция `ServiceToken`), `Platform.Authentication.Redis`
   (мгновенный отзыв), `Platform.AuthService.Client` (`AddAuthServiceClient`: адрес — `AuthService:BaseUrl`).
-- **Образы** `platform-auth-service` и `platform-auth-keycloak` с той же версией: `scripts/package/build-images.sh`
+- **Образы** `platform-auth-service`, `platform-auth-keycloak` и `platform-auth-realm-migrator` с той же версией: `scripts/package/build-images.sh`
   (`REGISTRY=… --push` — в реестр компании).
 - **`deploy/compose.yaml`** — вставить в свой compose через `include:` со своим env-файлом по образцу
   `deploy/.env.example`. По умолчанию — боевой режим: Keycloak `start` за прокси с https (порты — на 127.0.0.1,

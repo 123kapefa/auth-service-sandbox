@@ -113,7 +113,7 @@ public sealed class AdminUsersTests : IClassFixture<AuthServiceWebFactory>
         Assert.Equal(HttpStatusCode.Forbidden, (await GetAsync(user, $"/auth/admin/users/{TestUser.Customer.Id}")).StatusCode);
     }
 
-    public static TheoryData<TestUser> WithoutUsersView => [TestUser.Customer, TestUser.AdminInCustomerMode];
+    public static TheoryData<TestUser> WithoutUsersView => new() { TestUser.Customer, TestUser.AdminInCustomerMode };
 
     private static IEnumerable<JsonElement> Rows(JsonElement page) => page.GetProperty("items").EnumerateArray();
 

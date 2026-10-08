@@ -128,7 +128,7 @@ public sealed class SetRoleTests : IClassFixture<AuthServiceWebFactory>
     }
 
     public static TheoryData<TestUser> WithoutRolesManage =>
-        [TestUser.ManagerInManagerMode, TestUser.AdminInCustomerMode, TestUser.Customer];
+        new() { TestUser.ManagerInManagerMode, TestUser.AdminInCustomerMode, TestUser.Customer };
 
     private async Task<HttpResponseMessage> PutAsync(TestUser target, string role, TimeSpan? loggedInAgo = null, TestUser? caller = null)
     {

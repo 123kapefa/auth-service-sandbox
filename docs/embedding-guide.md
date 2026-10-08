@@ -24,8 +24,10 @@
 
 ## 1. Поставить сервис входа
 
-Нужны образы `platform-auth-service`, `platform-auth-keycloak` и `platform-auth-realm-migrator` (из реестра компании
-или `scripts/package/build-images.sh`) и Docker Compose 2.20+.
+Нужны образы `platform-auth-service`, `platform-auth-keycloak` и `platform-auth-realm-migrator` и Docker Compose 2.20+.
+Образы каждого релиза лежат в GHCR: `ghcr.io/123kapefa/platform-auth-service:<версия>` (в `auth/.env` —
+`AUTH_REGISTRY=ghcr.io/123kapefa/` и `AUTH_VERSION`, перед первым запуском — `docker login ghcr.io` с токеном GitHub,
+право `read:packages`). Другой источник — реестр компании или локальная сборка `scripts/package/build-images.sh`.
 
 ```yaml
 # compose.yaml проекта
@@ -64,8 +66,9 @@ scripts/project/add-app.py shop notifications "Уведомления"
 
 ## 4. Сервис приложения
 
-**Пакеты** — из фида компании (или локального: `scripts/package/pack.sh` → `artifacts/nuget`, подключение —
-`deploy/nuget.config.example`):
+**Пакеты** — из GitHub Packages (`https://nuget.pkg.github.com/123kapefa/index.json`, каждый релиз; читать — с токеном
+GitHub, право `read:packages`), фида компании или локального (`scripts/package/pack.sh` → `artifacts/nuget`).
+Подключение — `deploy/nuget.config.example`:
 
 ```xml
 <PackageReference Include="Platform.Authentication" />         <!-- проверка токенов, права, токен по ключу -->

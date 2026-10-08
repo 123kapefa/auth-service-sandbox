@@ -49,3 +49,14 @@ docker compose up -d --wait
 
 Новая версия на работающем стенде или в бою: миграции базы и настроек проектов, резервные копии, обновление Keycloak —
 [docs/migrations.md](docs/migrations.md).
+
+## Тесты
+
+```bash
+dotnet test                                        # все: нужен только Docker, docker compose up не нужен
+dotnet test --filter "Category!=Infrastructure"    # быстрые, без Docker
+```
+
+`AuthService.InfrastructureTests` сами поднимают Postgres, Redis и Keycloak (наш образ из `infra/keycloak/Dockerfile`
+с realm из `infra/keycloak/realm`) через Testcontainers. Образ Keycloak тесты собирают сами (`docker build`, повторно — из
+кэша слоёв); готовый можно дать переменной `KEYCLOAK_TEST_IMAGE`. Остальные тесты работают на подделках.
