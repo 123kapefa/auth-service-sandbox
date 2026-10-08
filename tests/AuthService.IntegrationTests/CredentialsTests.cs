@@ -104,7 +104,7 @@ public sealed class CredentialsTests : IClassFixture<AuthServiceWebFactory>
         Assert.Empty(_keycloak.ActionEmails);
     }
 
-    public static TheoryData<TestUser> NotProjectAdmins => [TestUser.ManagerInManagerMode, TestUser.AdminInCustomerMode, TestUser.Customer];
+    public static TheoryData<TestUser> NotProjectAdmins => new() { TestUser.ManagerInManagerMode, TestUser.AdminInCustomerMode, TestUser.Customer };
 
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, TimeSpan? loggedInAgo = null, TestUser? caller = null)
     {

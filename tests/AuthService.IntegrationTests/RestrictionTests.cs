@@ -112,7 +112,7 @@ public sealed class RestrictionTests : IClassFixture<AuthServiceWebFactory>
             HttpStatusCode.Forbidden,
             (await PutAsync(caller, TestUser.ManagerInManagerMode, new { restricted = true })).StatusCode);
 
-    public static TheoryData<TestUser> WithoutUsersBlock => [TestUser.Customer, TestUser.AdminInCustomerMode];
+    public static TheoryData<TestUser> WithoutUsersBlock => new() { TestUser.Customer, TestUser.AdminInCustomerMode };
 
     private async Task<HttpResponseMessage> PutAsync(TestUser caller, TestUser target, object body)
     {

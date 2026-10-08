@@ -1,0 +1,117 @@
+# Сборка и проверки на каждый PR и на push в main: .NET, админка с кабинетом, тема входа, плагин Keycloak.
+# Четыре части идут параллельно; красная любая — красный PR.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# Новый push в PR отменяет прошлый прогон этого PR; прогоны main не отменяются.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  dotnet:
+    name: .NET
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # Без lock-файлов NuGet: ключ — центральные версии и списки пакетов проектов.
+      - uses: actions/cache@v5
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'Directory.Build.props', '**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore AuthService.slnx
+
+      # Анализаторы с TreatWarningsAsErrors: нарушение — ошибка сборки.
+      - name: Build
+        run: dotnet build AuthService.slnx -c Release --no-restore
+
+      # Тесты с Category=Infrastructure (Testcontainers, нужен Docker) идут отдельной задачей.
+      - name: Test
+        run: dotnet test AuthService.slnx -c Release --no-build --filter "Category!=Infrastructure"
+
+      # dotnet list package сам не падает на уязвимостях: считаем High и Critical по JSON.
+      - name: Vulnerable packages
+        run: |
+          dotnet list AuthService.slnx package --vulnerable --include-transitive
+          dotnet list AuthService.slnx package --vulnerable --include-transitive --format json > vulnerable.json
+          count=$(jq '[.projects[].frameworks[]? | (.topLevelPackages[]?, .transitivePackages[]?) | .vulnerabilities[]? | select(.severity == "High" or .severity == "Critical")] | length' vulnerable.json)
+          if [ "$count" -gt 0 ]; then
+            echo "::error::Уязвимые пакеты NuGet уровня High/Critical: $count"
+            exit 1
+          fi
+
+  web:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Админка и кабинет
+            dir: frontend
+          - name: Тема входа
+            dir: login-theme
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.dir }}/package-lock.json
+
+      - run: npm ci --no-fund --no-audit
+      - run: npm run lint
+      - run: npm run type-check
+      - run: npm test
+      - run: npm run build
+
+      # Только то, что уходит в браузер: у инструментов сборки (eslint-плагины и т. п.) бывают
+      # уязвимости без исправления, и они навсегда держали бы CI красным.
+      - name: npm audit
+        run: npm audit --omit=dev --audit-level=high
+
+  keycloak-plugin:
+    name: Плагин Keycloak
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: infra/keycloak/providers/code-login
+    steps:
+      - uses: actions/checkout@v5
+
+      # Та же Java 21, что в образе сборки infra/keycloak/Dockerfile.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+          cache-dependency-path: infra/keycloak/providers/code-login/pom.xml
+
+      # package запускает и JUnit-тесты плагина.
+      - run: mvn -B -ntp package
