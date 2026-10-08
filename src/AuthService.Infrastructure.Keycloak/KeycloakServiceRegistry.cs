@@ -160,7 +160,10 @@ internal sealed partial class KeycloakServiceRegistry(
             using HttpResponseMessage response = await http.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                return Failure(response.StatusCode, clientId, registration);
+                // Занятый clientId Keycloak отдаёт как 400 invalid_client_metadata «Client Identifier in use», не 409.
+                return response.StatusCode == HttpStatusCode.BadRequest && await IsClientIdInUseAsync(response, cancellationToken)
+                    ? Failure(HttpStatusCode.Conflict, clientId, registration)
+                    : Failure(response.StatusCode, clientId, registration);
             }
 
             JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
@@ -199,6 +202,9 @@ internal sealed partial class KeycloakServiceRegistry(
             _ => IdentityProviderErrors.Unavailable(),
         };
     }
+
+    private static async Task<bool> IsClientIdInUseAsync(HttpResponseMessage response, CancellationToken cancellationToken) =>
+        (await response.Content.ReadAsStringAsync(cancellationToken)).Contains("Client Identifier in use", StringComparison.Ordinal);
 
     private static HttpRequestMessage Request(HttpMethod method, Uri address, string bearer)
     {

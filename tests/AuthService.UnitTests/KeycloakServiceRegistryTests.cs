@@ -63,6 +63,18 @@ public sealed class KeycloakServiceRegistryTests : IDisposable
     }
 
     [Fact]
+    public async Task Register_ClientIdInUse_Exists()
+    {
+        // Так Keycloak отвечает на занятый clientId (проверено на настоящем Keycloak — AuthService.InfrastructureTests).
+        _keycloak.RegisterStatus = HttpStatusCode.BadRequest;
+        _keycloak.RegisterBody = """{"error":"invalid_client_metadata","error_description":"Client Identifier in use"}""";
+
+        Error error = (await CreateRegistry().RegisterAsync(CLIENT, "Заказы", default)).Error;
+
+        Assert.Equal("services.exists", error.Messages[0].Code);
+    }
+
+    [Fact]
     public async Task Register_NoServiceAccountToken_ClientRemovedByItsManagementToken()
     {
         _keycloak.TokenStatus = HttpStatusCode.Unauthorized;
