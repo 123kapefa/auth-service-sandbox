@@ -39,15 +39,15 @@
 
 ### 2FA по желанию
 
-Свой сценарий входа **`sandbox browser`** (копия встроенного `browser`; встроенные лучше не править), назначен `browserFlow`:
+Свой сценарий входа **`platform browser`** (копия встроенного `browser`; встроенные лучше не править), назначен `browserFlow`:
 
 ```
-sandbox browser
+platform browser
 ├── cookie (уже вошёл)                  ALTERNATIVE
 ├── вход через внешнего провайдера      ALTERNATIVE
-└── sandbox forms                       ALTERNATIVE
+└── platform forms                       ALTERNATIVE
     ├── логин и пароль                  REQUIRED
-    └── sandbox conditional 2FA         CONDITIONAL
+    └── platform conditional 2FA         CONDITIONAL
         ├── условие: пользователь настроил 2FA          REQUIRED
         ├── условие: вошёл не по passkey                REQUIRED
         ├── код из приложения (OTP)                     ALTERNATIVE
