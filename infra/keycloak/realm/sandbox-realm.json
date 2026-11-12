@@ -3,7 +3,7 @@
   "enabled": true,
   "displayName": "Auth Sandbox",
   "attributes": {
-    "platform.realmVersion": "2"
+    "platform.realmVersion": "3"
   },
   "sslRequired": "none",
   "registrationAllowed": false,
@@ -43,6 +43,7 @@
   "loginTheme": "platform",
   "emailTheme": "platform",
   "browserFlow": "platform browser",
+  "resetCredentialsFlow": "platform reset credentials",
   "webAuthnPolicyPasswordlessPasskeysEnabled": true,
   "authenticationFlows": [
     {
@@ -186,6 +187,66 @@
           "userSetupAllowed": false,
           "authenticator": "auth-recovery-authn-code-form",
           "priority": 40
+        }
+      ]
+    },
+    {
+      "alias": "platform reset credentials",
+      "description": "Забыли пароль: человека ищут по номеру (приводится к логину на сервере) или почте, письмо со ссылкой, новый пароль, 2FA — если настроена",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "platform-reset-choose-user",
+          "priority": 10
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "reset-credential-email",
+          "priority": 20
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "reset-password",
+          "priority": 30
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "userSetupAllowed": false,
+          "priority": 40,
+          "flowAlias": "platform reset conditional OTP"
+        }
+      ]
+    },
+    {
+      "alias": "platform reset conditional OTP",
+      "description": "Код 2FA при сбросе пароля — только тем, кто её настроил",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "conditional-user-configured",
+          "priority": 10
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "userSetupAllowed": false,
+          "authenticator": "reset-otp",
+          "priority": 20
         }
       ]
     },

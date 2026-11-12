@@ -25,7 +25,13 @@ BFF_ID=$(kc_get "/clients?clientId=sandbox-bff" 'r[0]["id"]')
 API_ID=$(kc_get "/clients?clientId=sandbox-api" 'r[0]["id"]')
 SA_ID=$(kc_get "/clients/$BFF_ID/service-account-user" 'r["id"]')
 
-# Всё, что дают миграции 0001 (6б) и 0002 (10), — одной строкой.
+# Сценарий сброса пароля realm и его первый шаг (миграция 0003).
+reset_flow() {
+  local flow
+  flow=$(kc_get "" 'r["resetCredentialsFlow"]')
+  echo "$flow: $(kc_get "/authentication/flows/${flow// /%20}/executions" 'r[0]["providerId"]')"
+}
+# Всё, что дают миграции 0001 (6б), 0002 (10) и 0003 (сброс пароля), — одной строкой.
 migrated() {
   echo "почта: $(kc_get /authentication/required-actions/UPDATE_EMAIL 'r["enabled"], r["config"].get("verifyEmail")')" \
     "· возврат: $(kc_get "/clients/$BFF_ID" 'bool(r.get("baseUrl"))')" \
@@ -33,7 +39,8 @@ migrated() {
     "· admin: $(kc_get "/clients/$API_ID/roles/admin/composites" 'sorted(x["name"] for x in r if x["name"] in ("branding.manage", "sign-in.manage"))')" \
     "· номер: $(kc_get /authentication/required-actions/platform-update-phone 'r["enabled"]')" \
     "· ключ: $(kc_get /authentication/required-actions/platform-passkey-offer 'r["enabled"]')" \
-    "· капча: $(kc_get "" '"'"$CAPTCHA"'" in r["browserSecurityHeaders"]["contentSecurityPolicy"]')"
+    "· капча: $(kc_get "" '"'"$CAPTCHA"'" in r["browserSecurityHeaders"]["contentSecurityPolicy"]')" \
+    "· сброс: $(reset_flow)"
 }
 # Снимок realm, который могла тронуть миграция: настройки, действия, роли, клиент входа, состав admin.
 snapshot() {
@@ -45,7 +52,7 @@ snapshot() {
 # deploy — развёртывание: контейнер мигратора, как при docker compose up. Печатает его вывод.
 deploy() { COMPOSE_IGNORE_ORPHANS=1 docker compose --project-directory "$ROOT" --progress quiet run --rm --no-deps realm-migrator 2>&1; }
 
-TEMPLATE="почта: True true · возврат: True · учётка: ['manage-branding', 'manage-sign-in'] · admin: ['branding.manage', 'sign-in.manage'] · номер: True · ключ: True · капча: True"
+TEMPLATE="почта: True true · возврат: True · учётка: ['manage-branding', 'manage-sign-in'] · admin: ['branding.manage', 'sign-in.manage'] · номер: True · ключ: True · капча: True · сброс: platform reset credentials: platform-reset-choose-user"
 
 echo "1. Стенд из шаблона"
 check "realm — как из шаблона, версия — последняя" "$(migrated) / $(kc_get "" 'r["attributes"].get("platform.realmVersion")')" "$TEMPLATE / $LATEST"
@@ -68,9 +75,12 @@ kc_put DELETE /roles/manage-branding "" > /dev/null
 kc_put DELETE /roles/manage-sign-in "" > /dev/null
 CSP_OLD=$(kc_get "" 'r["browserSecurityHeaders"]["contentSecurityPolicy"].replace(" '"$CAPTCHA"'", "")')
 kc_put PUT "" "$(kc_get "" 'json.dumps({"browserSecurityHeaders": {**r["browserSecurityHeaders"], "contentSecurityPolicy": "'"$CSP_OLD"'"}, "attributes": {k: v for k, v in r["attributes"].items() if k != "platform.realmVersion"}})')" > /dev/null
+# Сброс пароля — встроенный сценарий, копию (миграция 0003) удаляем.
+kc_put PUT "" '{"resetCredentialsFlow": "reset credentials"}' > /dev/null
+kc_put DELETE "/authentication/flows/$(kc_get "/authentication/flows" '[f["id"] for f in r if f["alias"] == "platform reset credentials"][0]')" "" > /dev/null
 OTHERS=$(others)
 check "до развёртывания: ничего из 6б и 10" "$(migrated)" \
-  "почта: False None · возврат: False · учётка: [] · admin: [] · номер: False · ключ: False · капча: False"
+  "почта: False None · возврат: False · учётка: [] · admin: [] · номер: False · ключ: False · капча: False · сброс: reset credentials: reset-credentials-choose-user"
 check "до развёртывания: версии нет" "$(kc_get "" 'r["attributes"].get("platform.realmVersion")') / $("$ROOT/scripts/project/migrate-realms.py" --status "$REALM")" \
   "None / $REALM: версия 0 из $LATEST"
 
