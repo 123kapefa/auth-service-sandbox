@@ -86,7 +86,8 @@ echo "2. Сброс пароля по почте"
 curl -s -o /dev/null -X DELETE "$MAILPIT/api/v1/messages"
 NEW_PASSWORD="Sandbox-$(date +%s)"
 JAR="$WORK/jar2"; : > "$JAR"
-check "запрос сброса принят" "$(reset_request "$JAR" 79990000005)" "В ближайшее время Вы должны получить письмо с дальнейшими инструкциями."
+# Номер — как вводят люди, а не цифрами: приводит к логину сервер (#57), скрипт темы в этой проверке не участвует.
+check "запрос сброса принят" "$(reset_request "$JAR" '+7 (999) 000-00-05')" "В ближайшее время Вы должны получить письмо с дальнейшими инструкциями."
 LINK=$(mail_link reset@sandbox.test)
 check "письмо со ссылкой пришло на reset@sandbox.test" "$([ -n "$LINK" ] && echo да || echo нет)" да
 check "письмо — по шаблону темы sandbox" "$(curl -s "$MAILPIT/api/v1/search?query=to:reset@sandbox.test" | python3 -c '

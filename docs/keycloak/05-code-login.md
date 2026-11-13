@@ -32,20 +32,20 @@
 ### Сценарий входа в realm
 
 ```
-sandbox browser
+platform browser
 ├── cookie (уже вошёл)                          ALTERNATIVE
 ├── вход через внешнего провайдера              ALTERNATIVE
-└── sandbox forms                               ALTERNATIVE
+└── platform forms                               ALTERNATIVE
     ├── форма: телефон или почта + пароль       REQUIRED      platform-password-login   ← плагин
-    ├── sandbox code login                      CONDITIONAL
+    ├── platform code login                      CONDITIONAL
     │   ├── условие: нажали «Войти по коду»     REQUIRED      platform-condition-code-requested  ← плагин
     │   └── код: отправка, экран, проверка      REQUIRED      platform-code-login       ← плагин
-    └── sandbox conditional 2FA                 CONDITIONAL   (без изменений, этап 3а)
+    └── platform conditional 2FA                 CONDITIONAL   (без изменений, этап 3а)
 ```
 
 Форма входа одна на оба способа. «Вход» — проверка пароля, как у встроенной формы. «Войти по коду» — пароль не
 проверяется, номер или почта запоминается в сессии входа (auth note — на сервере, браузер его не видит и не подменит),
-и срабатывает условный подсценарий `sandbox code login`. После него — общий подсценарий 2FA, поэтому 2FA после кода
+и срабатывает условный подсценарий `platform code login`. После него — общий подсценарий 2FA, поэтому 2FA после кода
 не потребовала ни строчки кода.
 
 ### Плагин
@@ -156,7 +156,7 @@ docker compose logs keycloak | grep "DEV SMS"
   «мусорные» пользователи.
 - **Письмо — простой текст.** Шаблоны писем Keycloak ждут пользователя, а неизвестной почте код уходит до его
   создания; HTML-письмо — свой `EmailTemplateProvider` или письмо собирать самим.
-- **Форма сброса пароля** приводит номер к цифрам только скриптом темы — [#57](https://github.com/123kapefa/auth-service-sandbox/issues/57).
+- ~~Форма сброса пароля приводила номер к цифрам только скриптом темы~~ — **снято** ([#57](https://github.com/123kapefa/auth-service-sandbox/issues/57)): номер приводит сервер, шаг `platform-reset-choose-user` ([03a](03a-login-methods.md#сброс-пароля)).
 - **Тема показывает `+9990000002`** для 10 цифр без 7 (сервер понимает как `+79990000002`) — мелкая правка скрипта темы.
 
 ## Оценка до прод-качества
@@ -171,7 +171,7 @@ docker compose logs keycloak | grep "DEV SMS"
 | HTML-письмо с кодом | свой `EmailTemplateProvider` или шаблон темы писем | 1–2 дня |
 | Интеграционные тесты плагина | Testcontainers с Keycloak в CI вместо ручного стенда | 2–3 дня |
 | Метрики и аудит | отправлено / неверно / заблокировано, стоимость SMS | 1–2 дня |
-| Нормализация номера в сбросе пароля | [#57](https://github.com/123kapefa/auth-service-sandbox/issues/57) | 0,5 дня |
+| ~~Нормализация номера в сбросе пароля~~ | сделано, [#57](https://github.com/123kapefa/auth-service-sandbox/issues/57) | — |
 | **Итого** | | **~2–3 недели** |
 
 И постоянно: на каждое обновление Keycloak — пересборка плагина, сверка копии `login.ftl`, прогон проверок

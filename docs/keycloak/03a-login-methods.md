@@ -34,19 +34,20 @@
 ### Сброс пароля
 
 - `resetPasswordAllowed: true`, SMTP → Mailpit (`mailpit:1025`, `no-reply@sandbox.test`). Письма — http://localhost:8025.
+- Сценарий сброса — `platform reset credentials` (копия встроенного `reset credentials`, назначен `resetCredentialsFlow`): шаг выбора человека — `platform-reset-choose-user` (плагин `code-login`, класс `ResetChooseUser`). Номер приводится к логину на сервере, как на входе: «+7 (999) 000-00-05», «8 999 000 00 05» и «9990000005» — один человек; скрипт темы остаётся для удобства ввода. Старым проектам сценарий включает миграция `0003-reset-password-phone`.
 - Ссылка одноразовая. Для неизвестного логина — тот же ответ и без письма: по форме нельзя узнать, есть ли пользователь.
 
 ### 2FA по желанию
 
-Свой сценарий входа **`sandbox browser`** (копия встроенного `browser`; встроенные лучше не править), назначен `browserFlow`:
+Свой сценарий входа **`platform browser`** (копия встроенного `browser`; встроенные лучше не править), назначен `browserFlow`:
 
 ```
-sandbox browser
+platform browser
 ├── cookie (уже вошёл)                  ALTERNATIVE
 ├── вход через внешнего провайдера      ALTERNATIVE
-└── sandbox forms                       ALTERNATIVE
+└── platform forms                       ALTERNATIVE
     ├── логин и пароль                  REQUIRED
-    └── sandbox conditional 2FA         CONDITIONAL
+    └── platform conditional 2FA         CONDITIONAL
         ├── условие: пользователь настроил 2FA          REQUIRED
         ├── условие: вошёл не по passkey                REQUIRED
         ├── код из приложения (OTP)                     ALTERNATIVE

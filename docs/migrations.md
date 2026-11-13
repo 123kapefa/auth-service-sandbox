@@ -66,6 +66,7 @@ Realm импортируется из JSON только в пустую базу
 |---|---|---|
 | `0001-stage-6b` | действия кабинета (смена почты — после письма), «вернуться» — в кабинет, оформление: роль `manage-branding` и право `branding.manage` | `upgrade-6b.py` |
 | `0002-stage-10` | смена номера, предложение ключа, настройки входа: роль `manage-sign-in` и право `sign-in.manage`, капча в CSP | `upgrade-10.py` |
+| `0003-reset-password-phone` | сброс пароля: сценарий `platform reset credentials` с серверным приведением номера (#57) | — |
 
 **Как работает.** Мигратор (`scripts/project/migrate-realms.py`) проходит по всем realm Keycloak. Проект — realm с
 клиентом `auth-api` (в песочнице `sandbox-api`); остальные и `master` не трогаются. Версия проекта — атрибут realm
