@@ -26,3 +26,21 @@
 Что прошло гладко: вход через страницы проекта (тема, название, вход по коду) для приложения с `--web`; проверка
 токенов, прав и мгновенного отзыва в чужом сервисе — три строки в `Program.cs`; токен по ключу с повтором на 401;
 чужие токены (другой проект, другой адресат, человек вместо сервиса) отклоняются без своего кода.
+
+## 6а.5 Существующий проект: education-platform
+
+Тестовая копия `archforge-testbed/education-platform` — LMS с OpenIddict + ASP.NET Core Identity.
+Сервисы подключены пакетами `Platform.Authentication` напрямую (не через NuGet-фид), как подключил бы их
+разработчик существующего проекта. Проверка — `scripts/keycloak/check-education-platform.sh`.
+
+| # | Трение | Как обошли | Предложение | Вес |
+|---|---|---|---|---|
+| 13 | **Внутренние вызовы сервисов требуют роль `platform-service` в токене.** `RequireAnyRole(PlatformRoles.SERVICE, ...)` во всех `internal/`-endpoint'ах education-platform читает flat claim `role` из JWT. Наш токен ключа его не содержит: в нём `client_id`, но не `role: platform-service`. `oidc-hardcoded-role-mapper` Keycloak не подходит — он пишет в `realm_access.roles`, а не в flat `role` | маппер `oidc-hardcoded-claim-mapper` на каждый ключ-клиент (`apply.sh` шаг 3): `claim.name=role, claim.value=platform-service` → `RequireAnyRole` проходит | убрать зависимость от имени роли в чужом коде: `RequireService()` из `Platform.Authentication` или `RequireAnyRole` на claim `client_id` | важно |
+| 14 | **NextAuth (Next.js) ожидал endpoint'ы OpenIddict, а не Keycloak.** Собственный AuthService возвращал OpenIddict-специфичный `/connect/userinfo` без `preferred_username`; NextAuth-конфигурация опиралась на internal URL `auth-service:8005` | переключить provider на `oidc` с двумя URL (issuer снаружи, wellKnown изнутри) и выбрать нужные claims вручную | включить в руководство «Как встроить»: Next.js + NextAuth — готовый фрагмент конфигурации | средне |
+| 15 | **`docker-compose.keycloak.yml` нужен отдельный от `docker-compose.yml`.** Переменные среды каждого сервиса задаются в обоих файлах, и `extends:` Docker Compose не поддерживает нескольких merge-уровней для environment. Пришлось дублировать секцию `x-keycloak-auth` через YAML-якоря | YAML-якорь `&keycloak-auth` в override-файле | документировать паттерн в руководстве | мелочь |
+| 16 | **`depends_on: !reset []` для фронтенда.** Оригинальный `docker-compose.yml` указывает `depends_on` на все сервисы; override не может убрать конкретные зависимости, только сбросить всё. Иначе compose отказывается поднять фронтенд без поднятого auth-service (OpenIddict) | `depends_on: !reset []` в override | документировать в `embedding-guide.md` | мелочь |
+
+Что прошло гладко: замена `OpenIddict.Validation.*` на `Platform.Authentication` — одна строка в `Authentication.csproj`
+и три строки в `AuthenticationExtensions.cs`; `UserScopedDataMiddleware` и `RolePermissions` без изменений (роли и права
+в коде проекта, не в Keycloak); мгновенный отзыв — один пакет и одна строка; `AddJwtAuthentication` → новый сервис входа
+прозрачно для 9 из 10 сервисов; вход через страницы Keycloak — PKCE в NextAuth без кастомного кода.

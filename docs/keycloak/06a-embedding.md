@@ -1,6 +1,6 @@
 # Этап 6а. Сервис входа как компонент
 
-**Статус:** 🔄 идёт (6а.1–6а.4 и 6а.6 готовы, 6а.5 — впереди) · **Ветка:** `stage-6a/embedding` · **Задача:** [#98](https://github.com/123kapefa/auth-service-sandbox/issues/98)
+**Статус:** ✅ готово · **Ветка:** `stage-6a/embedding` → `main` · **Задача:** [#98](https://github.com/123kapefa/auth-service-sandbox/issues/98)
 
 ## Цель
 
@@ -16,7 +16,7 @@
 | 6а.2 | Без «зашитой» песочницы: нейтральные имена, шаблон нового проекта и скрипты | ✅ |
 | 6а.3 | Поставка: NuGet-пакеты, токен сервиса по ключу, клиент API, образы с версией, `deploy/compose.yaml` | ✅ |
 | 6а.4 | Новый проект: два мини-сервиса («Заказы», «Уведомления») и страница; [журнал трений](06a-friction.md) | ✅ |
-| 6а.5 | Существующий проект: тестовая копия education-platform | ⬜ |
+| 6а.5 | Существующий проект: тестовая копия education-platform | ✅ |
 | 6а.6 | [Руководство «Как встроить»](../embedding-guide.md) и исправления по журналу трений | ✅ |
 
 ## Ключи сервисов
@@ -96,6 +96,52 @@ scripts/project/add-app.py shop orders "Заказы" --default-role customer --
 Поднять магазин (стенд песочницы поднят): `samples/shop/setup.sh` — проект и его сервис входа, приложение «Заказы»,
 ключи, запуск сервисов (права и роли «Заказы» и «Уведомления» объявляют сами), сотрудник `79995550002` (режим «Сотрудник» — из кабинета) и покупатель `79995550003` (пароль `Test1234!`); секреты ключей — файлами в `samples/shop/.secrets` (секреты compose). Магазин — http://localhost:5300, письма — http://localhost:8025. Что мешало — [журнал трений](06a-friction.md).
 
+## Существующий проект: education-platform
+
+Тестовая копия `archforge-testbed/education-platform` — LMS-платформа с собственным AuthService (OpenIddict +
+ASP.NET Core Identity). Задача: заменить его нашим сервисом входа без переписывания остальных сервисов.
+
+Что менялось, а что осталось:
+
+| Слой | Прежде (OpenIddict) | После (сервис входа) |
+|---|---|---|
+| Вход в браузере | NextAuth → `/connect/authorize` своего AuthService | NextAuth → `/protocol/openid-connect/auth` Keycloak (realm education) |
+| Проверка токенов | `OpenIddict.Validation` во всех сервисах | `Platform.Authentication` (пакет) во всех сервисах |
+| Мгновенный отзыв | — (не было) | `Platform.Authentication.Redis` (тот же Redis проекта) |
+| Пользовательская база | ASP.NET Core Identity в `auth` схеме Postgres | Keycloak (realm education) |
+| Сервис-сервис | роль `platform-service` из токена Identity | ключ сервиса (service-tag, service-content) → client_credentials → Platform.Authentication |
+
+**Что подключили:**
+- `Shared/Authentication/Authentication.csproj` — `Platform.Authentication` и `Platform.Authentication.Redis` вместо
+  `OpenIddict.Validation.*`; `AddJwtAuthentication` → `AddPlatformJwtAuthentication` + `AddPlatformPermissions` +
+  `AddPlatformTokenRevocation` (3 строки, остальное без изменений)
+- `frontend/src/shared/auth/auth.ts` — NextAuth provider `oidc` на Keycloak (issuer, wellKnown, education-web PKCE);
+  роли из `role` claim Keycloak вместо `roles` OpenIddict; логика refresh без изменений
+- `docker-compose.keycloak.yml` — override: среда каждого сервиса (`AUTHENTICATION__*`) и фронтенда
+
+**Что оставили:**
+- AuthService (OpenIddict) — остаётся в репозитории как отдельный сервис; выключается через override compose, не
+  удаляется; бизнес-логика сервисов (курсы, теги, нотификации) не тронута
+- Роли (PARTICIPANT, AUTHOR, ADMIN, …) и права (`RolePermissions`) — из кода, не из Keycloak
+- Межсервисные вызовы внутри education-platform через `RequireAnyRole(SERVICE, ADMIN)` — их токены остаются
+  токенами сервиса входа платформы; `RequireAnyRole` принимает наш токен ключа, если в нём есть claim `role: platform-service`
+  (трение №13 — см. [журнал трений](06a-friction.md#6а5-существующий-проект-education-platform))
+
+**Запуск:**
+
+```bash
+# Шаг 1 — стенд sandbox поднят, создаём realm и выдаём ключи
+samples/education/apply.sh
+
+# Выводит env-блок для archforge-testbed/education-platform/.env, а также сохраняет секреты в samples/education/.secrets/
+
+# Шаг 2 — в archforge-testbed/education-platform: добавить переменные в .env, затем
+docker compose -f docker-compose.yml -f docker-compose.keycloak.yml --profile app up -d tag-service education-service
+docker compose -f docker-compose.yml -f docker-compose.keycloak.yml --profile frontend up -d frontend
+```
+
+Проверка: `scripts/keycloak/check-education-platform.sh` — realm, ключи, структура токенов (19 проверок).
+
 ## Права и роли приложения из кода
 
 Права проверяет код (`RequirePermissions("orders.view")`) — значит, и объявлять их должен код: тогда право не забудут
@@ -133,10 +179,11 @@ builder.Services.AddAppCatalog(builder.Configuration, catalog => catalog
 ## Проверка
 
 ```bash
-scripts/keycloak/check-service-keys.sh   # ключи на стенде песочницы
-scripts/keycloak/check-new-project.sh    # проект с нуля (demo-shop), свой экземпляр сервиса
+scripts/keycloak/check-service-keys.sh         # ключи на стенде песочницы
+scripts/keycloak/check-new-project.sh          # проект с нуля (demo-shop), свой экземпляр сервиса
 scripts/package/build-images.sh && scripts/keycloak/check-deploy.sh   # поставка в боевом режиме
-scripts/keycloak/check-shop.sh           # магазин: вход, права, сервис сервису по ключу, чужие запросы, перевыпуск
+scripts/keycloak/check-shop.sh                 # магазин: вход, права, сервис сервису по ключу, чужие запросы, перевыпуск
+scripts/keycloak/check-education-platform.sh   # education-platform: realm, ключи, структура токенов
 ```
 
 `check-shop.sh` (61 проверка) поднимает магазин с нуля (`setup.sh`) и проходит путь покупателя и сотрудника: новый
