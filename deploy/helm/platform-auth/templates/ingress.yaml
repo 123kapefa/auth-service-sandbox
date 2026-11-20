@@ -1,4 +1,11 @@
 {{- if .Values.ingress.enabled }}
+{{- /* use-regex и rewrite-target превращают пути в регулярные выражения без привязки: /realms/shop начал бы совпадать с /realms/shop-test
+       и обходить границы, на которых держится закрытие realm master. */ -}}
+{{- range $key := (list "nginx.ingress.kubernetes.io/use-regex" "nginx.ingress.kubernetes.io/rewrite-target") }}
+{{- if hasKey ($.Values.ingress.annotations | default dict) $key }}
+{{- fail (printf "ingress.annotations: «%s» не поддерживается — пути Ingress должны сравниваться по сегментам (закрытие realm master)" $key) }}
+{{- end }}
+{{- end }}
 {{/* Снаружи — https на Ingress; до сервиса и Keycloak — http внутри кластера с X-Forwarded-* от контроллера. */}}
 {{- $base := include "auth.name" . -}}
 apiVersion: networking.k8s.io/v1
@@ -36,8 +43,11 @@ spec:
     - host: {{ (urlParse (required "нужен publicUrls.keycloak" .Values.publicUrls.keycloak)).hostname }}
       http:
         paths:
-          # Мастер-админка Keycloak (/admin) снаружи не нужна: техник ходит к ней через kubectl port-forward.
-          - path: /realms
+          # Снаружи — только realm проекта: страницы входа, токены, ключи. Мастер-админка Keycloak (/admin) и realm master
+          # (/realms/master: вход мастер-админа, пароль которого иначе можно перебирать из интернета) снаружи не нужны:
+          # техник ходит к ним через kubectl port-forward. Prefix сравнивает по сегментам: /realms/shop не открывает
+          # /realms/shop-test и /realms/master.
+          - path: /realms/{{ include "auth.realm" . }}
             pathType: Prefix
             backend:
               service:

@@ -27,6 +27,7 @@ services:
     image: ${AUTH_REGISTRY:-}platform-auth-keycloak:${AUTH_VERSION:?нужен AUTH_VERSION}
     # Бой — start: https снаружи делает прокси (он же ставит X-Forwarded-*), до Keycloak — http внутри сети;
     # порт Keycloak должен быть доступен только прокси. Локально без прокси — AUTH_KEYCLOAK_COMMAND=start-dev.
+    # Прокси публикует снаружи только /realms/<код проекта> и /resources; /realms/master и /admin — нет (docs/embedding-guide.md).
     command: ${AUTH_KEYCLOAK_COMMAND:-start}
     ports:
       - "${AUTH_BIND:-127.0.0.1}:${AUTH_KEYCLOAK_PORT:-8180}:8180"
