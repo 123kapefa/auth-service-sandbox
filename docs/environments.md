@@ -50,7 +50,7 @@
 | `Keycloak:PreviousClientSecret` | прежний секрет — только на время смены ([secrets.md](secrets.md#секрет-bff)) | — | так же | так же |
 | `DataProtection:Certificate` / `CertificatePath`, `CertificatePassword` | сертификат ключей DataProtection: PFX в base64 или файл | — (ключи не шифруются) | из хранилища; без него ключи не шифруются | обязателен (`RequireCertificate`) |
 | `DataProtection:PreviousCertificate*` | прежний сертификат — только на время смены ([secrets.md](secrets.md#сертификат-dataprotection)) | — | так же | так же |
-| `Cookies:Secure` / `Domain` | cookie входа | `false` / — | `false` / — | `true` / `.auth-sandbox.example` |
+| `Cookies:Secure` | cookie входа (только для хоста сервиса входа, `Domain` нет) | `false` | `false` | `true` |
 | `ReturnUrls:AllowedOrigins` | куда вернуть после входа | `localhost:5080/3000/5173` | `localhost:8080/3000/5173` | приложения платформы |
 | `Logging:LogLevel` | ASP.NET Core | Debug | Debug для `AuthService`, фреймворк — Warning | Warning |
 
@@ -63,7 +63,7 @@
 
 То же с Keycloak: браузер и `iss` в токенах — `http://localhost:8180` (`Authentication:Authority`), а контейнер
 скачивает ключи с `http://keycloak:8180` (`Authentication:MetadataAddress`). Подробно —
-[keycloak/02-token-api.md](keycloak/02-token-api.md).
+[tech/pitfalls.md](tech/pitfalls.md#realm-и-keycloak).
 
 ## Запуск
 
@@ -116,7 +116,7 @@ Back-channel logout Keycloak в Development не работает: Keycloak из
 | `DataProtection:CertificatePath` и пароль | файл из Secret `<релиз>-data-protection`, пароль — `AUTH_DATA_PROTECTION_CERT_PASSWORD` |
 | `AllowedHosts` | `service.allowedHosts`, по умолчанию домен `publicUrls.service` и `localhost` (пробы kubelet) |
 | `ForwardedHeaders:TrustedNetworks` | `service.trustedNetworks` — сеть подов, по умолчанию `10.0.0.0/8` |
-| `Cookies:Secure` / `Domain` | `service.cookies.*` |
+| `Cookies:Secure` | `service.cookies.secure` (`Domain` нет: cookie только для хоста сервиса входа) |
 | `ReturnUrls:AllowedOrigins` | `service.returnOrigins` |
 | остальное | `service.extraEnv` |
 

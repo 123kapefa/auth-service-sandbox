@@ -15,7 +15,7 @@ import io.micrometer.core.instrument.Metrics;
  *   <li>platform_code_budget_alerts_total{realm,percent} — оповещения о расходе (80, 100);</li>
  *   <li>platform_code_captcha_unavailable_total{realm} — сервис капчи недоступен, капча считалась пройденной.</li>
  * </ul>
- * Оповещение о падении доли введённых — правило Prometheus (docs/keycloak/10-code-limits.md).
+ * Оповещение о падении доли введённых — правило Prometheus.
  */
 final class CodeMetrics {
 

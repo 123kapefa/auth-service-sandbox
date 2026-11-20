@@ -102,6 +102,13 @@ final class CodeDispatcher {
             case CodeRules.SendResult.Sent sent -> {
                 // «Ещё раз» после SMS — снова SMS; иначе на телефон — звонок.
                 CodeDelivery delivery = choose(target, limits, smsRequested || current.delivery() == CodeDelivery.SMS);
+                // Телефонии нет — отказ сразу и одинаковый для любого номера: ни капчи, ни лимитов, ни бюджета, ни паузы
+                // (отправки не было), и по ответу не понять, есть ли аккаунт и включён ли у него способ.
+                if (delivery != CodeDelivery.EMAIL && !phone.available()) {
+                    LOG.warn("Телефония не настроена: код на номер не отправлен (нужен PHONE_PROVIDER_URL)");
+                    metrics.refused(realm.getName(), "no_phone");
+                    yield new Outcome.Failed(current);
+                }
                 CodeLimits.Decision decision = decide(request, limits, delivery, usage, now);
                 if (!(decision instanceof CodeLimits.Decision.Allow)) {
                     yield refuse(request, current, limits, limitStore, today, decision);

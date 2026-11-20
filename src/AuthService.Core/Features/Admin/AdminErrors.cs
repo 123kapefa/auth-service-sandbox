@@ -16,6 +16,12 @@ public static class AdminErrors
     public static Error SelfRole() =>
         Error.Authorization("users.self_role", "Нельзя менять свою роль.");
 
+    /// <summary>Роль выше собственных прав выдать или снять нельзя: в ней есть права, которых нет у меняющего.</summary>
+    public static Error RoleAboveOwnRights(IEnumerable<string> permissions) =>
+        Error.Authorization(
+            "users.role_above_own_rights",
+            "Нельзя выдать или снять роль с правами, которых нет у вас: " + string.Join(", ", permissions.Order(StringComparer.Ordinal)) + ".");
+
     /// <summary>Выдача admin — только после недавнего входа: украденная сессия не раздаст права.</summary>
     public static Error ReauthenticationRequired() =>
         Error.Authorization(

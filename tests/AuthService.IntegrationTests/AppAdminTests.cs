@@ -18,6 +18,8 @@ public sealed class AppAdminTests : IClassFixture<AuthServiceWebFactory>
 
     // В sandbox-api — обычный покупатель, в «Менеджере 1С» — admin.
     private static readonly TestUser _appAdmin = new("админ 1С", Guid.NewGuid(), "+79990000007", [AuthModes.CUSTOMER], AuthModes.CUSTOMER);
+    // Админ приложения с урезанной ролью: может выдавать роли (users.roles.manage), но своих прав — только orders.view.
+    private static readonly TestUser _lead = new("старший 1С", Guid.NewGuid(), "+79990000009", [AuthModes.CUSTOMER], AuthModes.CUSTOMER);
     private static readonly TestUser _operator = new("оператор 1С", Guid.NewGuid(), "+79990000008", [AuthModes.CUSTOMER], AuthModes.CUSTOMER);
 
     private readonly AuthServiceWebFactory _factory;
@@ -294,6 +296,75 @@ public sealed class AppAdminTests : IClassFixture<AuthServiceWebFactory>
 
     private static string[] Strings(JsonElement element, string property) =>
         [.. element.GetProperty(property).EnumerateArray().Select(item => item.GetString()!)];
+
+    // Старший 1С заводится только тестам, которым он нужен: его роли попадают в списки ролей и пользователей приложения.
+    private void GivenLead()
+    {
+        _keycloak.AddAppRole(FakeIdentityAdmin.MANAGER_1C, "lead", "orders.view", "users.roles.manage");
+        _keycloak.AddAppRole(FakeIdentityAdmin.MANAGER_1C, "viewer", "orders.view");
+        _keycloak.Add(_lead, []);
+        _keycloak.SetAppRoles(_lead, FakeIdentityAdmin.MANAGER_1C, "lead");
+    }
+
+    [Theory]
+    [InlineData("operator")]    // orders.edit — у старшего его нет
+    [InlineData("accountant")]  // reports.view — нет
+    [InlineData("admin")]
+    public async Task AppAdmin_RoleAboveOwnRights_Forbidden_NothingChanged(string role)
+    {
+        GivenLead();
+        HttpResponseMessage response = await SendAsync(_lead, HttpMethod.Put, $"{APP}/users/{TestUser.Customer.Id}/roles", new { roles = new[] { role } });
+
+        await AssertErrorAsync(response, HttpStatusCode.Forbidden, "users.role_above_own_rights");
+        Assert.Empty(_keycloak.RoleChanges);
+    }
+
+    [Fact]
+    public async Task AppAdmin_RoleWithinOwnRights_Ok()
+    {
+        GivenLead();
+        JsonElement roles = await ResultAsync(await SendAsync(_lead, HttpMethod.Put, $"{APP}/users/{TestUser.Customer.Id}/roles", new { roles = new[] { "viewer" } }));
+
+        Assert.Equal(["viewer"], [.. roles.GetProperty("roles").EnumerateArray().Select(role => role.GetString()!)]);
+    }
+
+    [Theory]
+    [InlineData("viewer")]
+    [InlineData("admin")]
+    public async Task ProjectRoleManager_RoleInOtherApp_Forbidden_NoFreeHandInProjectApps(string role)
+    {
+        // users.roles.manage в токене открывает ему приложения проекта, но своих прав там у него нет: выдать роль с правами,
+        // которых у него нет (а в чужом приложении их нет совсем), он не может — иначе выдал бы admin приложения второму аккаунту.
+        GivenLead();
+        var roleManager = new TestUser("менеджер ролей", Guid.NewGuid(), "+79990000010", [AuthModes.CUSTOMER, "role-manager"], "role-manager");
+        _keycloak.AddAppRole("sandbox-api", "role-manager", "profile.view", "users.view", "users.roles.manage");
+        _keycloak.Add(roleManager, ["role-manager"]);
+
+        HttpResponseMessage response = await SendAsync(roleManager, HttpMethod.Put, $"{APP}/users/{TestUser.Customer.Id}/roles", new { roles = new[] { role } });
+
+        await AssertErrorAsync(response, HttpStatusCode.Forbidden, "users.role_above_own_rights");
+        Assert.Empty(_keycloak.RoleChanges);
+    }
+
+    [Fact]
+    public async Task AppAdmin_WithRolesManage_RoleWithNewRight_Ok()
+    {
+        // Админ приложения (у него roles.manage) определяет и выдаёт роль с правом, которого нет в его собственной роли.
+        _keycloak.AddAppRole(FakeIdentityAdmin.MANAGER_1C, "exporter", "orders.export");
+
+        JsonElement roles = await ResultAsync(await SendAsync(_appAdmin, HttpMethod.Put, $"{APP}/users/{TestUser.Customer.Id}/roles", new { roles = new[] { "exporter" } }));
+
+        Assert.Equal(["exporter"], [.. roles.GetProperty("roles").EnumerateArray().Select(role => role.GetString()!)]);
+    }
+
+    [Fact]
+    public async Task ProjectAdmin_AnyRoleInProjectApp_Ok()
+    {
+        // Админ проекта управляет приложениями проекта по праву из токена; своих прав в «Менеджере 1С» у него нет.
+        HttpResponseMessage response = await SendAsync(TestUser.AdminInAdminMode, HttpMethod.Put, $"{APP}/users/{TestUser.Customer.Id}/roles", new { roles = new[] { "admin" } });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
 
     private async Task<HttpResponseMessage> SendAsync(TestUser caller, HttpMethod method, string path, object? body = null, TimeSpan? loggedInAgo = null)
     {

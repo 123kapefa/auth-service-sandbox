@@ -100,10 +100,11 @@ spec:
               value: /run/secrets/data-protection/previous.pfx
             {{- include "auth.secretEnv" (dict "root" . "name" "DataProtection__PreviousCertificatePassword" "key" "AUTH_DATA_PROTECTION_PREVIOUS_CERT_PASSWORD" "optional" true) | nindent 12 }}
             {{- end }}
+            {{- if .Values.service.cookies.domain }}
+            {{- fail "service.cookies.domain убран: cookie с токенами только для хоста сервиса входа (иначе токены уходят на все поддомены). Удалите значение; приложениям проекта — вход по PKCE и токен в заголовке." }}
+            {{- end }}
             - name: Cookies__Secure
               value: {{ .Values.service.cookies.secure | quote }}
-            - name: Cookies__Domain
-              value: {{ .Values.service.cookies.domain | quote }}
             {{- range $i, $origin := (required "нужен service.returnOrigins — адреса приложений проекта" .Values.service.returnOrigins) }}
             - name: ReturnUrls__AllowedOrigins__{{ $i }}
               value: {{ $origin | quote }}

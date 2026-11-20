@@ -171,8 +171,9 @@ public sealed class InfrastructureFixture : IAsyncLifetime
         ["YANDEX_AUTHORIZATION_URL"] = "http://idp-stub.invalid/yandex/authorize",
         ["YANDEX_TOKEN_URL"] = "http://idp-stub.invalid/yandex/token",
         ["YANDEX_USER_INFO_URL"] = "http://idp-stub.invalid/yandex/info?format=json",
-        // Телефония стенда не нужна: коды пишутся в лог Keycloak.
+        // Провайдера телефонии нет: заглушка записывает коды в лог Keycloak (без явного PHONE_STUB телефонии нет вовсе).
         ["KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__PHONE_PROVIDER_URL"] = string.Empty,
+        ["KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__PHONE_STUB"] = "true",
     };
 }
 

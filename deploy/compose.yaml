@@ -5,7 +5,7 @@
 # Порты публикуются на 127.0.0.1 (AUTH_BIND): снаружи — только через прокси с https.
 # Только готовые образы (scripts/package/build-images.sh или реестр компании), без сборки. Имена — с префиксом auth-,
 # чтобы не столкнуться с сервисами проекта. Проект (realm) создаётся после запуска: scripts/project/create-project.sh,
-# первый админ — add-admin.py, приложения — add-app.py (docs/keycloak/06a-embedding.md).
+# первый админ — add-admin.py, приложения — add-app.py.
 name: ${AUTH_COMPOSE_PROJECT:-platform-auth}
 
 services:
@@ -46,10 +46,13 @@ services:
       KC_PROXY_TRUSTED_ADDRESSES: ${AUTH_KEYCLOAK_PROXY_TRUSTED:-172.16.0.0/12,127.0.0.1}
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
-      # Капча перед отправкой кода (Яндекс SmartCaptcha, docs/keycloak/10-code-limits.md). Без ключа после 2 отправок
+      # Капча перед отправкой кода (Яндекс SmartCaptcha). Без ключа после 2 отправок
       # за час с одного IP или на один номер код не уходит.
       KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_SERVER_KEY: ${AUTH_SMARTCAPTCHA_SERVER_KEY:-}
       KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_SITE_KEY: ${AUTH_SMARTCAPTCHA_SITE_KEY:-}
+      # Телефония: адрес провайдера звонков и SMS (с ключом). Пусто — телефонии нет: коды по номеру не отправляются
+      # (код входа в лог не пишется), вход по коду на почту работает.
+      KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__PHONE_PROVIDER_URL: ${AUTH_PHONE_PROVIDER_URL:-}
       KC_BOOTSTRAP_ADMIN_USERNAME: ${AUTH_KEYCLOAK_ADMIN:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${AUTH_KEYCLOAK_ADMIN_PASSWORD:?нужен AUTH_KEYCLOAK_ADMIN_PASSWORD}
     healthcheck:
@@ -141,6 +144,8 @@ services:
       DataProtection__PreviousCertificate: ${AUTH_DATA_PROTECTION_PREVIOUS_CERT:-}
       DataProtection__PreviousCertificatePassword: ${AUTH_DATA_PROTECTION_PREVIOUS_CERT_PASSWORD:-}
       Cookies__Secure: ${AUTH_COOKIES_SECURE:-true}
+      # Домена у cookie нет (задача 12.1). Переменная пробрасывается только затем, чтобы старое значение остановило сервис
+      # с понятным сообщением в логе, а не было молча забыто (Compose сам отказать на непустое значение не умеет).
       Cookies__Domain: ${AUTH_COOKIES_DOMAIN:-}
       ReturnUrls__AllowedOrigins__0: ${AUTH_RETURN_ORIGIN:?нужен AUTH_RETURN_ORIGIN — адрес приложения проекта}
       ReturnUrls__Default: ${AUTH_RETURN_DEFAULT:-/account/}

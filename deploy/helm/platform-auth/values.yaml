@@ -22,7 +22,7 @@ publicUrls:
 # Секреты — один Secret с именами как в хранилище (docs/secrets.md):
 #   AUTH_DB_PASSWORD, AUTH_KEYCLOAK_DB_PASSWORD, AUTH_KEYCLOAK_ADMIN_PASSWORD, AUTH_BFF_CLIENT_SECRET,
 #   AUTH_DATA_PROTECTION_CERT_PASSWORD; необязательные — AUTH_REGISTRATION_TOKEN, AUTH_BFF_CLIENT_SECRET_PREVIOUS,
-#   AUTH_DATA_PROTECTION_PREVIOUS_CERT_PASSWORD, AUTH_SMARTCAPTCHA_SERVER_KEY.
+#   AUTH_DATA_PROTECTION_PREVIOUS_CERT_PASSWORD, AUTH_SMARTCAPTCHA_SERVER_KEY, AUTH_PHONE_PROVIDER_URL.
 # Сертификат DataProtection — файлом из второго Secret (dataProtection ниже).
 secrets:
   # Имя Secret; пусто — <релиз>-secrets.
@@ -82,8 +82,6 @@ service:
   returnDefault: /account/
   cookies:
     secure: true
-    # Родительский домен приложений проекта — вход виден всем поддоменам (SSO).
-    domain: ""
   # X-Forwarded-* принимаются только из этих сетей — сети подов кластера, где Ingress-контроллер.
   trustedNetworks: [10.0.0.0/8]
   # Тип и nodePort Service — для стенда без Ingress (kind); в бою ClusterIP.

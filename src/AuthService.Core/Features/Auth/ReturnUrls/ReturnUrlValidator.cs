@@ -1,10 +1,12 @@
+using System.Globalization;
+using System.Text;
 using Microsoft.Extensions.Options;
 
 namespace AuthService.Core.Features.Auth.ReturnUrls;
 
 /// <summary>
 /// Разрешает относительный путь этого сервиса или абсолютный адрес с origin из белого списка.
-/// Всё остальное (чужой домен, //evil.com, javascript:, user@host) заменяется адресом по умолчанию.
+/// Всё остальное (чужой домен, //evil.com, javascript:, user@host, управляющие и невидимые символы) заменяется адресом по умолчанию.
 /// </summary>
 public sealed class ReturnUrlValidator(IOptions<ReturnUrlOptions> options)
 {
@@ -14,7 +16,7 @@ public sealed class ReturnUrlValidator(IOptions<ReturnUrlOptions> options)
 
     public bool IsAllowed(string? returnTo)
     {
-        if (string.IsNullOrWhiteSpace(returnTo))
+        if (string.IsNullOrWhiteSpace(returnTo) || ContainsHiddenCharacters(returnTo))
         {
             return false;
         }
@@ -31,6 +33,28 @@ public sealed class ReturnUrlValidator(IOptions<ReturnUrlOptions> options)
             && string.IsNullOrEmpty(uri.UserInfo)
             && _options.AllowedOrigins.Any(origin => IsSameOrigin(uri, origin));
     }
+
+    /// <summary>
+    /// Адрес для заголовка Location. В заголовке допустим только ASCII (Kestrel иначе отвечает 500 уже после успешного входа),
+    /// поэтому буквы не из ASCII ("/заказы/1") записываются процентами в UTF-8; остальное остаётся как есть. Хост из белого
+    /// списка с не-ASCII (IDN) тоже уйдёт процентами — браузер понимает такую запись. Принимает только проверенный адрес
+    /// (после Resolve): сам CR/LF и прочее не отсекает.
+    /// </summary>
+    public static string ToLocation(string returnTo)
+    {
+        ArgumentNullException.ThrowIfNull(returnTo);
+        return string.Concat(returnTo.EnumerateRunes().Select(static rune =>
+            rune.IsAscii ? rune.ToString() : Uri.EscapeDataString(rune.ToString())));
+    }
+
+    // Браузер выбрасывает TAB, LF и CR из адреса, поэтому "/<TAB>/evil.example" он читает как "//evil.example" — чужой хост.
+    // Значение приходит уже декодированным (%09 → TAB) — из query и из cookie состояния входа. Управляющие символы (в том числе CR/LF, из-за которых Location
+    // не отправляется), любые пробелы и невидимые символы (нулевой ширины, направления письма) в адресе возврата не нужны.
+    private static bool ContainsHiddenCharacters(string value) =>
+        value.EnumerateRunes().Any(static rune =>
+            Rune.IsControl(rune)
+            || Rune.IsWhiteSpace(rune)
+            || Rune.GetUnicodeCategory(rune) is UnicodeCategory.Format or UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator);
 
     private static bool IsSameOrigin(Uri uri, string origin) =>
         Uri.TryCreate(origin, UriKind.Absolute, out Uri? allowed)

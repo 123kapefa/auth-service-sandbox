@@ -60,6 +60,6 @@ final class AccountNotices {
     /** Телефония кодов (настройки плагина входа по коду). */
     static PhoneProvider phoneProvider(KeycloakSession session) {
         Object factory = session.getKeycloakSessionFactory().getProviderFactory(Authenticator.class, CodeLoginAuthenticatorFactory.PROVIDER_ID);
-        return factory instanceof CodeLoginAuthenticatorFactory codeLogin ? codeLogin.phone() : new LogPhoneProvider();
+        return factory instanceof CodeLoginAuthenticatorFactory codeLogin ? codeLogin.phone() : new NoPhoneProvider();
     }
 }

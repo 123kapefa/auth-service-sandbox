@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Проверка этапа 4 (docs/keycloak/04-admin.md): режимы и администрирование через API сервиса.
+# Проверка этапа 4: режимы и администрирование через API сервиса.
 # Запуск: сервис и Keycloak подняты, затем
 #   scripts/keycloak/check-admin.sh                            # Docker: http://localhost:8080
 #   API=http://localhost:5080 scripts/keycloak/check-admin.sh    # Development: dotnet run

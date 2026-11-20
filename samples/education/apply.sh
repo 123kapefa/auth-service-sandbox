@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Существующий проект: education-platform (этап 6а.5, docs/keycloak/06a-embedding.md#существующий-проект) —
+# Существующий проект: education-platform (docs/embedding-guide.md, раздел «Пример: education-platform») —
 # подключить их сервисы к нашему сервису входа. Создаёт realm «education», добавляет приложение «Education» и
 # «Теги» (только права ключей), выдаёт ключи tag-service и content-service (education-service), выводит env-переменные
 # для docker-compose.keycloak.yml в archforge-testbed/education-platform.

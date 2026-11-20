@@ -28,7 +28,7 @@ public sealed class AuthCookieWriter(IOptions<AuthCookieOptions> options)
     {
         ArgumentNullException.ThrowIfNull(response);
 
-        // Domain и Path — те же, что при установке, иначе браузер не удалит cookie.
+        // Path — тот же, что при установке, иначе браузер не удалит cookie. Domain нет: cookie только для этого хоста.
         response.Cookies.Delete(AuthCookies.ACCESS_TOKEN, Build("/", expires: null));
         response.Cookies.Delete(AuthCookies.REFRESH_TOKEN, Build(AUTH_PATH, expires: null));
     }
@@ -47,7 +47,6 @@ public sealed class AuthCookieWriter(IOptions<AuthCookieOptions> options)
         HttpOnly = true,
         Secure = _options.Secure,
         SameSite = _options.SameSite,
-        Domain = string.IsNullOrWhiteSpace(_options.Domain) ? null : _options.Domain,
         Path = path,
         Expires = expires,
     };

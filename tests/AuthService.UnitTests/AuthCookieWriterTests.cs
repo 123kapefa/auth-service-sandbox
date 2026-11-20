@@ -34,11 +34,12 @@ public sealed class AuthCookieWriterTests
     }
 
     [Fact]
-    public void Domain_AppliedToBoth_ForSsoAcrossSubdomains()
+    public void SetTokens_HostOnly_NoDomainSoSubdomainsNeverGetTokens()
     {
-        IList<SetCookieHeaderValue> cookies = SetTokens(new AuthCookieOptions { Domain = ".example.com" });
+        IList<SetCookieHeaderValue> cookies = SetTokens(new AuthCookieOptions());
 
-        Assert.All(cookies, cookie => Assert.Equal(".example.com", cookie.Domain.ToString()));
+        Assert.Equal(2, cookies.Count);
+        Assert.All(cookies, cookie => Assert.False(cookie.Domain.HasValue));
     }
 
     [Fact]
@@ -50,17 +51,17 @@ public sealed class AuthCookieWriterTests
     }
 
     [Fact]
-    public void Clear_ExpiresBothWithSamePathAndDomain()
+    public void Clear_ExpiresBothWithSamePathAndNoDomain()
     {
         var context = new DefaultHttpContext();
-        new AuthCookieWriter(Options.Create(new AuthCookieOptions { Domain = ".example.com" })).Clear(context.Response);
+        new AuthCookieWriter(Options.Create(new AuthCookieOptions())).Clear(context.Response);
 
         IList<SetCookieHeaderValue> cookies = SetCookieHeaderValue.ParseList(context.Response.Headers.SetCookie);
         Assert.Equal("/", Cookie(cookies, AuthCookies.ACCESS_TOKEN).Path.ToString());
         Assert.Equal("/auth/", Cookie(cookies, AuthCookies.REFRESH_TOKEN).Path.ToString());
         Assert.All(cookies, cookie =>
         {
-            Assert.Equal(".example.com", cookie.Domain.ToString());
+            Assert.False(cookie.Domain.HasValue);
             Assert.True(cookie.Expires < DateTimeOffset.UtcNow);
         });
     }

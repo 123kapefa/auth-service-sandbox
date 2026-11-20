@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Проверка этапа 6а.5 (docs/keycloak/06a-embedding.md#существующий-проект): education-platform на сервисе входа —
-# realm education, ключи tag-service и content-service, структура токенов; журнал трений — 06a-friction.md.
+# Проверка примера «Существующий проект» (docs/embedding-guide.md, «Пример: education-platform»): education-platform на сервисе входа —
+# realm education, ключи tag-service и content-service, структура токенов, вход PKCE, вызовы настоящих сервисов; трения — docs/tech/pitfalls.md.
 # Запуск: стенд песочницы поднят (docker compose up -d --build --wait), затем
 #   scripts/keycloak/check-education-platform.sh
 # SKIP_SETUP=1 — realm уже создан (apply.sh уже запускался).

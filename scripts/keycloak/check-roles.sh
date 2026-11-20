@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Проверка этапа 4а (docs/keycloak/04a-roles.md): роли и права приложений в Keycloak, роли пользователей.
+# Проверка этапа 4а: роли и права приложений в Keycloak, роли пользователей.
 # Запуск: сервис и Keycloak подняты, затем
 #   scripts/keycloak/check-roles.sh                            # Docker: http://localhost:8080
 #   API=http://localhost:5080 scripts/keycloak/check-roles.sh    # Development: dotnet run
