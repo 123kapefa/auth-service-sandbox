@@ -13,7 +13,7 @@
 | Keycloak (`<релиз>-keycloak`) | Deployment, 2 реплики, PodDisruptionBudget, `start` | реплики образуют кластер, подробнее ниже |
 | Мигратор базы сервиса (`<релиз>-migrator`) | Job-хук: `pre-upgrade`, при установке — `post-install` | схему обновляет до раскатки новой версии |
 | Мигратор настроек проектов (`<релиз>-realm-migrator`) | Job-хук `post-install`, `post-upgrade` | работает после того, как поднялся новый Keycloak |
-| Ingress | https на обоих доменах, у Keycloak наружу открыты только `/realms` и `/resources` | мастер-админка снаружи не нужна |
+| Ingress | https на обоих доменах, у Keycloak наружу открыты только `/realms/<код проекта>` и `/resources` | мастер-админка и realm master снаружи не нужны |
 | Секреты | оператор Infisical (`InfisicalSecret`) или Secret, созданный заранее | [secrets.md](secrets.md) |
 
 Postgres (базы сервиса и Keycloak) и Redis внешние: адреса задаются в values. Для стенда они ставятся внутри чарта
@@ -66,6 +66,11 @@ Job остаётся до следующего развёртывания, и в
 Заголовки принимаются только из сетей подов кластера: `service.trustedNetworks` (это `ForwardedHeaders:TrustedNetworks`)
 и `keycloak.trustedProxies` (это `KC_PROXY_TRUSTED_ADDRESSES`), по умолчанию `10.0.0.0/8`. Если в вашем кластере
 другая сеть подов, её нужно указать там. Для nginx чарт увеличивает буфер заголовков: у Keycloak большие cookie.
+
+Ingress публикует Keycloak только по путям `/realms/<код проекта>` (`realm`) и `/resources`. Realm master (`/realms/master`) и
+мастер-админка Keycloak (`/admin`) снаружи недоступны: к ним ходят через `kubectl port-forward`. Чарт не принимает `realm: master`
+и код проекта не того вида, а также аннотации `use-regex` и `rewrite-target` (они ослабили бы сравнение путей). CI проверяет
+пути Ingress и эти отказы.
 
 Сервис ходит к Keycloak по внутреннему адресу `http://<релиз>-keycloak:8180` за ключами и токенами, а `iss` в токенах
 остаётся внешним (`publicUrls.keycloak`).

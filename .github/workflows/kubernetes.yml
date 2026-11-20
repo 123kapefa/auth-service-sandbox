@@ -53,6 +53,21 @@ jobs:
                 --set secrets.infisical.serviceAccount=auth)
           helm lint --strict deploy/helm/platform-auth "${prod[@]}"
           helm template auth deploy/helm/platform-auth "${prod[@]}" > /dev/null
+          # Ingress публикует Keycloak только по realm проекта: ни /realms целиком, ни realm master, ни /admin.
+          paths=$(helm template auth deploy/helm/platform-auth "${prod[@]}" | grep -E '^[[:space:]]+- path: ' | sed -E 's/^[[:space:]]+- path: //' | sort)
+          echo "$paths"
+          test "$paths" = "$(printf '%s\n' / /realms/shop /resources | sort)" || { echo "::error::Ingress публикует лишние пути"; exit 1; }
+          # realm master и неверный код проекта шаблон не принимает (иначе Ingress опубликовал бы master).
+          for bad in master Master 'a/../master' 'a: b'; do
+            if helm template auth deploy/helm/platform-auth "${prod[@]}" --set "realm=$bad" > /dev/null 2>&1; then
+              echo "::error::Шаблон принял realm «$bad»"; exit 1
+            fi
+          done
+          # Аннотации, превращающие пути в регулярные выражения, тоже не принимаются.
+          if helm template auth deploy/helm/platform-auth "${prod[@]}" \
+               --set-string 'ingress.annotations.nginx\.ingress\.kubernetes\.io/use-regex=true' > /dev/null 2>&1; then
+            echo "::error::Шаблон принял use-regex"; exit 1
+          fi
           helm lint --strict deploy/helm/platform-auth -f scripts/k8s/kind-values.yaml \
             --set secrets.create=true --set secrets.values.AUTH_DATA_PROTECTION_CERT=cGZ4 \
             --set-file keycloak.realmImport=infra/keycloak/realm/sandbox-realm.json

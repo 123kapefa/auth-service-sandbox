@@ -52,3 +52,16 @@ Host={{ include "auth.dbHost" . }};Port={{ .Values.database.port }};Database={{ 
 {{- end -}}
 
 {{- define "auth.keycloakInternalUrl" -}}http://{{ include "auth.name" . }}-keycloak:8180{{- end -}}
+
+{{/* Код проекта (realm Keycloak). Проверяется один раз для всех шаблонов: тот же вид, что у scripts/project/new-project.py, и не
+     master — realm master наружу публиковать нельзя (Ingress), а Authority сервиса на нём не имеет смысла. */}}
+{{- define "auth.realm" -}}
+{{- $realm := required "нужен realm — код проекта" .Values.realm -}}
+{{- if not (regexMatch "^[a-z][a-z0-9-]*[a-z0-9]$" $realm) -}}
+{{- fail (printf "realm «%s»: код проекта — строчная латиница, цифры и дефис, с буквы (как у scripts/project/new-project.py)" $realm) -}}
+{{- end -}}
+{{- if eq $realm "master" -}}
+{{- fail "realm не может быть master: это мастер-realm Keycloak, его нельзя ни публиковать, ни брать кодом проекта" -}}
+{{- end -}}
+{{- $realm -}}
+{{- end -}}

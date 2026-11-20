@@ -107,7 +107,7 @@ kubectl -n auth create secret docker-registry ghcr --docker-server=ghcr.io \
    `AUTH_REGISTRATION_TOKEN`.
 4. **Перезапустить сервис** — он сверит права с новым проектом и возьмёт разрешение на ключи:
    `kubectl -n auth rollout restart deploy/auth-service`.
-5. **Проверить:** `https://auth.example.com/health/ready` → `Healthy`, вход админа на `https://auth.example.com/admin/`.
+5. **Проверить:** `https://auth.example.com/health/ready` → `Healthy`, вход админа в админку сервиса входа на `https://auth.example.com/admin/` (это не мастер-админка Keycloak, она снаружи закрыта).
 
 ### Новая версия
 

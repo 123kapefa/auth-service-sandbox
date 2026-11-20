@@ -79,10 +79,10 @@ spec:
             - name: Keycloak__ClientId
               value: {{ .Values.service.clientId | quote }}
             - name: Authentication__Authority
-              value: {{ printf "%s/realms/%s" (required "нужен publicUrls.keycloak — внешний адрес сервера входа" .Values.publicUrls.keycloak) (required "нужен realm — код проекта" .Values.realm) | quote }}
+              value: {{ printf "%s/realms/%s" (required "нужен publicUrls.keycloak — внешний адрес сервера входа" .Values.publicUrls.keycloak) (include "auth.realm" .) | quote }}
             # Ключи и адреса сервера входа — по внутреннему адресу кластера; iss остаётся внешним (Authority).
             - name: Authentication__MetadataAddress
-              value: {{ printf "%s/realms/%s/.well-known/openid-configuration" (include "auth.keycloakInternalUrl" .) .Values.realm | quote }}
+              value: {{ printf "%s/realms/%s/.well-known/openid-configuration" (include "auth.keycloakInternalUrl" .) (include "auth.realm" .) | quote }}
             - name: Authentication__RequireHttpsMetadata
               value: "false"
             {{- include "auth.secretEnv" (dict "root" . "name" "Keycloak__ClientSecret" "key" "AUTH_BFF_CLIENT_SECRET") | nindent 12 }}
