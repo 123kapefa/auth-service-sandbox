@@ -268,6 +268,32 @@ public sealed class LoginFlowTests : IClassFixture<AuthServiceWebFactory>
         Assert.Equal("/account/", response.Headers.Location!.ToString());
     }
 
+    [Theory]
+    [InlineData("/\t/evil.example")]     // браузер читает это как //evil.example
+    [InlineData("/\r/evil.example")]     // раньше — 500 (CR в заголовке Location)
+    [InlineData("/\n/evil.example")]
+    [InlineData("/\u200B/evil.example")]
+    public async Task Callback_ReturnToWithHiddenCharacters_ReturnsToDefault(string returnTo)
+    {
+        (HttpClient browser, string loginCookie) = await StartLoginAsync(returnTo);
+
+        HttpResponseMessage response = await Callback(browser, loginCookie, $"code=c&state={_keycloak.LastAuthorization!.State}");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/account/", response.Headers.Location!.ToString());
+    }
+
+    [Fact]
+    public async Task Callback_NonAsciiReturnTo_LocationEncoded_NotServerError()
+    {
+        (HttpClient browser, string loginCookie) = await StartLoginAsync("/заказы/1");
+
+        HttpResponseMessage response = await Callback(browser, loginCookie, $"code=c&state={_keycloak.LastAuthorization!.State}");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/%D0%B7%D0%B0%D0%BA%D0%B0%D0%B7%D1%8B/1", response.Headers.Location!.OriginalString);
+    }
+
     [Fact]
     public async Task Callback_WrongState_Rejected_NoTokens()
     {
