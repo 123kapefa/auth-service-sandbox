@@ -80,7 +80,7 @@ kubectl -n auth create secret docker-registry ghcr --docker-server=ghcr.io \
 ### Установка
 
 1. **Values** — `my-values.yaml` по образцу в [kubernetes.md](kubernetes.md#установка): код проекта (`realm`), внешние
-   адреса, базы, Redis, адреса приложений, домен cookie, Infisical, Ingress. Проверить — `helm template auth
+   адреса, базы, Redis, адреса приложений, Infisical, Ingress. Проверить — `helm template auth
    deploy/helm/platform-auth -f my-values.yaml > /dev/null` (пропущенное обязательное значение — ошибка с подсказкой).
 2. **Поставить:**
 

@@ -7,10 +7,9 @@ public sealed class AuthCookieOptions
 {
     public const string SECTION_NAME = "Cookies";
 
-    /// <summary>
-    /// Родительский домен (.example.com), чтобы вход видели все поддомены. Пусто — cookie только для текущего хоста.
-    /// </summary>
-    public string? Domain { get; init; }
+    // Domain нет намеренно: cookie с токенами только для хоста сервиса входа. Родительский домен отправлял бы
+    // refresh-токен (Path=/auth/) и access-токен на любой поддомен проекта — любое приложение получило бы сессию человека.
+    // Приложения проекта входят сами (PKCE, /sdk/platform-login.js) и носят токен в заголовке Authorization.
 
     /// <summary>Только по https. false — локально (http).</summary>
     public bool Secure { get; init; } = true;

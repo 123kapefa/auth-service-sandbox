@@ -82,8 +82,6 @@ service:
   returnDefault: /account/
   cookies:
     secure: true
-    # Родительский домен приложений проекта — вход виден всем поддоменам (SSO).
-    domain: ""
   # X-Forwarded-* принимаются только из этих сетей — сети подов кластера, где Ingress-контроллер.
   trustedNetworks: [10.0.0.0/8]
   # Тип и nodePort Service — для стенда без Ingress (kind); в бою ClusterIP.
