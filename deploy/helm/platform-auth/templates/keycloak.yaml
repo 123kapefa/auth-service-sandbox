@@ -93,7 +93,7 @@ spec:
             - name: KC_BOOTSTRAP_ADMIN_USERNAME
               value: {{ .Values.keycloak.admin | quote }}
             {{- include "auth.secretEnv" (dict "root" . "name" "KC_BOOTSTRAP_ADMIN_PASSWORD" "key" "AUTH_KEYCLOAK_ADMIN_PASSWORD") | nindent 12 }}
-            # Капча перед отправкой кода (docs/keycloak/10-code-limits.md).
+            # Капча перед отправкой кода.
             {{- include "auth.secretEnv" (dict "root" . "name" "KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_SERVER_KEY" "key" "AUTH_SMARTCAPTCHA_SERVER_KEY" "optional" true) | nindent 12 }}
             {{- with .Values.keycloak.extraEnv }}
             {{- toYaml . | nindent 12 }}

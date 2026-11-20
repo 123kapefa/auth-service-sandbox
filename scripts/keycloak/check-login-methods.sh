@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Проверка этапа 3а (docs/keycloak/03a-login-methods.md): способы входа на странице Keycloak.
+# Проверка этапа 3а: способы входа на странице Keycloak.
 # Запуск: сервис, Keycloak и Mailpit подняты, затем
 #   scripts/keycloak/check-login-methods.sh                            # Docker: http://localhost:8080
 #   API=http://localhost:5080 scripts/keycloak/check-login-methods.sh    # Development: dotnet run

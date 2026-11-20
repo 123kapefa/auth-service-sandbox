@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Проверка этапа 2 (docs/keycloak/02-token-api.md): матрица доступа на настоящих токенах Keycloak.
+# Проверка этапа 2: матрица доступа на настоящих токенах Keycloak.
 # Запуск: сервис и Keycloak подняты, затем
 #   scripts/keycloak/check-api.sh                          # Docker: http://localhost:8080
 #   API=http://localhost:5080 scripts/keycloak/check-api.sh  # Development: dotnet run

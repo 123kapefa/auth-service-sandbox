@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Проверка этапа 3 (docs/keycloak/03-login.md): вход в приложение через настоящую страницу Keycloak.
+# Проверка этапа 3: вход в приложение через настоящую страницу Keycloak.
 # Запуск: сервис и Keycloak подняты, затем
 #   scripts/keycloak/check-login.sh                            # Docker: http://localhost:8080
 #   API=http://localhost:5080 scripts/keycloak/check-login.sh    # Development: dotnet run

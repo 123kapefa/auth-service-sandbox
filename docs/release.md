@@ -1,7 +1,7 @@
 # Выпуск версии и развёртывание в Kubernetes
 
-Этап 11.8. Пошагово: выпустить версию тегом и поставить её в кластер. Как устроены части по отдельности — CI и релиз
-([этап 11](keycloak/11-infrastructure.md)), секреты ([secrets.md](secrets.md)), миграции ([migrations.md](migrations.md)),
+Пошагово: выпустить версию тегом и поставить её в кластер. Как устроены части по отдельности — CI и релиз
+([архитектура](tech/architecture.md#инфраструктура)), секреты ([secrets.md](secrets.md)), миграции ([migrations.md](migrations.md)),
 чарт ([kubernetes.md](kubernetes.md)).
 
 ## Выпустить версию

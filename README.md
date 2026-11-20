@@ -6,16 +6,17 @@ Keycloak отвечает за вход (пароль, почта, телефо�
 роли и режимы, операции админки через Admin API Keycloak, свои данные в PostgreSQL.
 
 > Исходная реализация на OpenIddict сохранена тегом `openiddict-baseline`.
-> Цели и этапы: [docs/keycloak/README.md](docs/keycloak/README.md). Итог — [выводы](docs/keycloak/08-conclusions.md) и [решения (ADR)](docs/adr/README.md).
+> Документация: [docs/README.md](docs/README.md). Для разработчиков сервиса — [техническая документация](docs/tech/README.md) и [решения (ADR)](docs/tech/adr/README.md).
 
 ## Состояние
 
-Идёт перестройка по архитектурной документации платформы (Clean Architecture,
-4 слоя + Api). Сейчас сервис ведёт вход через страницу Keycloak (code + PKCE), держит сессию в cookie
-`accessToken`/`refreshToken` с обновлением и выходом (этап 3), проверяет токены и пускает к эндпоинтам
-по ролям, активному режиму и правам (этап 2). Способы входа (этап 3а): телефон или почта с паролем,
-сброс пароля по почте, 2FA по желанию, ключ доступа (passkey). Демо-страница для проверки — http://localhost:8080.
-Сервис собирается и проверяется в CI, выпускается тегом и ставится через Docker Compose или в Kubernetes (этап 11).
+Сервис ведёт вход через страницу Keycloak (code + PKCE), держит сессию в cookie `accessToken`/`refreshToken` с
+обновлением и выходом, проверяет токены и пускает к эндпоинтам по ролям, режимам и правам приложений. Способы входа:
+телефон или почта с паролем, коды (звонок, SMS, письмо), сброс пароля, 2FA, ключи доступа, Яндекс ID и Госуслуги.
+Есть своя админка, личный кабинет и оформление под проект. Демо-страница — http://localhost:8080. Сервис собирается
+и проверяется в CI, выпускается тегом и ставится через Docker Compose или в Kubernetes.
+
+Что умеет и как пользоваться — [docs/overview.md](docs/overview.md), запуск — [docs/getting-started.md](docs/getting-started.md).
 
 Встроить сервис входа в свой проект — [руководство «Как встроить»](docs/embedding-guide.md).
 
@@ -61,7 +62,7 @@ GitHub. Версия одна на пакеты, образы и чарт (`scri
 Compose ([как встроить](docs/embedding-guide.md)) или в Kubernetes Helm-чартом, секреты берутся из Infisical.
 
 Пошагово, от номера версии до установки в кластер, — [docs/release.md](docs/release.md). Как устроены CI, релиз,
-секреты, миграции и Kubernetes — [этап 11](docs/keycloak/11-infrastructure.md).
+секреты, миграции и Kubernetes — [архитектура](docs/tech/architecture.md#инфраструктура).
 
 ## CI
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Проверка этапа 6 (docs/keycloak/06-bcrypt-migration.md): перенос пользователей «боевого» сервиса с BCrypt-паролями.
+# Проверка этапа 6: перенос пользователей «боевого» сервиса с BCrypt-паролями.
 # Готовит «боевую» базу (scripts/legacy/seed-legacy.sh), удаляет из Keycloak прошлый перенос, переносит заново
 # (AuthService.LegacyImport — нужен .NET SDK) и входит перенесёнными пользователями через страницу Keycloak.
 # Запуск: сервис, Keycloak и Postgres подняты, затем

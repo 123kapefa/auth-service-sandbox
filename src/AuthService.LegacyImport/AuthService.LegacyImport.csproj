@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Перенос пользователей боевого сервиса в Keycloak (этап 6): разовый запуск, см. docs/keycloak/06-bcrypt-migration.md. -->
+  <!-- Перенос пользователей боевого сервиса в Keycloak (этап 6): разовый запуск, см. docs/migrating-users.md. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
   </PropertyGroup>

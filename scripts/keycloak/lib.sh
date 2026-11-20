@@ -139,7 +139,7 @@ code_send_again() {
   feedback "$page"
 }
 
-# Предложение ключа доступа после входа по коду (10.6, docs/keycloak/10-passkey-offer.md): Keycloak переадресует на
+# Предложение ключа доступа после входа по коду (10.6): Keycloak переадресует на
 # действие platform-passkey-offer — страницу регистрации ключа с platformPasskeyOffer.
 # skip_passkey_offer <jar> <html> <заголовки> — если ответ (заголовки) ведёт на предложение, открыть его и нажать
 # «Не сейчас»; ответ — в те же файлы
@@ -150,7 +150,7 @@ skip_passkey_offer() {
   curl -s -o "$2" -D "$3" -b "$1" -c "$1" --data-urlencode "skip=true" "$(form_action "$2")"
 }
 
-# Телефония стенда — заглушка idp-stub (docs/keycloak/10-phone-code.md): звонки и SMS, которые «ушли» на номер.
+# Телефония стенда — заглушка idp-stub: звонки и SMS, которые «ушли» на номер.
 PHONE_STUB="${PHONE_STUB:-http://localhost:${IDP_STUB_PORT:-8190}/phone}"
 # phone_code <логин> — код последнего звонка (последние 4 цифры номера, с которого звонят) или SMS (6 цифр) на номер
 phone_code() {

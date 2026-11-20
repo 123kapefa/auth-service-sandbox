@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# «Боевая» база для спайка этапа 6 (docs/keycloak/06-bcrypt-migration.md): отдельная база legacy_auth в Postgres
+# «Боевая» база для спайка этапа 6: отдельная база legacy_auth в Postgres
 # песочницы, таблица users со схемой боевого auth-service и выдуманные пользователи. Пересоздаёт таблицу каждый раз.
 #   scripts/legacy/seed-legacy.sh            — 9 пользователей на все случаи переноса (infra/legacy/seed.sql)
 #   scripts/legacy/seed-legacy.sh --bulk N   — плюс N покупателей +7997XXXXXXX (пароль Legacy-1!) — замерить время переноса
