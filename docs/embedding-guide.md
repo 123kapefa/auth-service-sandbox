@@ -194,7 +194,35 @@ builder.Services.AddHttpClient<NotificationsClient>(c => c.BaseAddress = new Uri
 Порядок тот же, плюс перенос пользователей: пароли BCrypt принимаются как есть
 ([migrating-users.md](migrating-users.md)), при первом входе пароль перехешируется. Сервисы меняют
 проверку своего токена на `AddPlatformJwtAuthentication`, роли и права переезжают в каталог приложения из кода.
-Перенос реального проекта ещё не проверяли ([планы](tech/roadmap.md#что-не-проверено)).
+Перенос пользователей реального проекта ещё не проверяли ([планы](tech/roadmap.md#что-не-проверено)); переход проверки токенов
+и входа проверен на тестовой копии education-platform (ниже).
+
+### Пример: education-platform
+
+LMS с собственным сервером входа (OpenIddict + ASP.NET Core Identity), десять сервисов, фронтенд на Next.js. Проверены
+на настоящих сервисах два (`tag-service` и `education-service`) и вход фронтенда на страницы входа проекта.
+
+| Слой | Было | Стало |
+|---|---|---|
+| Вход в браузере | NextAuth → `/connect/authorize` своего сервера | NextAuth → `/protocol/openid-connect/auth` (realm проекта, клиент `education-web`, PKCE) |
+| Проверка токенов | `OpenIddict.Validation` | `Platform.Authentication` (+ `Platform.Authentication.Redis` — мгновенный отзыв) |
+| Вызовы сервис сервису | роль `platform-service` из токена Identity | ключи `service-tag`, `service-content` (токен по `client_credentials`) |
+
+В коде проекта поменялось: подключение пакетов и три строки регистрации в `Shared/Authentication`, провайдер NextAuth
+на `oidc` (роли из claim `role`), override-файл Compose с `AUTHENTICATION__*`. Роли и права остались в коде проекта.
+
+Запуск: `samples/education/apply.sh` (realm, приложения, ключи, `.env`-блок для проекта), затем сервисы проекта через
+свой `docker-compose.keycloak.yml` (профили `infra` и `app`/`frontend`). Проверка — `scripts/keycloak/check-education-platform.sh`
+(29 проверок: токены, вход PKCE, изоляция проектов, вызовы настоящих сервисов).
+
+Что надо знать, если у вас похоже:
+- сервисы проекта проверяют адресата (`aud`): ключу нужно право в том приложении, чьё имя они ждут (`education:internal.access`),
+  иначе все вызовы между сервисами — 401;
+- их внутренние endpoint'ы проверяют роль `platform-service` в токене ключа — её добавляет маппер Keycloak, привязанный к клиенту
+  ключа; ключ, выданный заново, приходит без маппера (запустить `apply.sh` снова);
+- собственная сборка проекта с именем `Authentication` не конфликтует с пакетом (имя сборки пакета — `Platform.Authentication`),
+  а проверки здоровья пакета не занимают общее имя `redis` (`token-revocation-redis`).
+Подробно — [pitfalls.md](tech/pitfalls.md#существующий-проект-education-platform).
 
 ## Частые ошибки
 

@@ -31,7 +31,7 @@ CODE=$(curl -s -o /dev/stderr -w '%{http_code}' -X POST -H "Authorization: Beare
 [ "$CODE" = 201 ] || { echo "Keycloak не создал realm: $CODE" >&2; exit 1; }
 
 cat <<INFO
-Проект «$NAME» создан: realm $REALM, клиенты auth-api и auth-bff.
+Проект «${NAME}» создан: realm $REALM, клиенты auth-api и auth-bff.
 Сервис входа проекта — тот же образ, настройки:
   Authentication__Authority=${AUTH_KEYCLOAK_URL:-$KC}/realms/$REALM
   Authentication__Audience=auth-api

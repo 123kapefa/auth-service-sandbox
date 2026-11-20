@@ -2,6 +2,7 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <PackageId>Platform.Authentication.Redis</PackageId>
+    <AssemblyName>Platform.Authentication.Redis</AssemblyName>
     <Description>Мгновенный отзыв токенов и «доступ изменился» — отметки сервиса входа в Redis.</Description>
   </PropertyGroup>
   <PropertyGroup>

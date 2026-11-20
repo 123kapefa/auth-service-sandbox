@@ -168,3 +168,29 @@
 10. Много адресов в настройках → `InternalAuthority`.
 11. Клиент API тянет стиль ошибок платформы (`Result<T, Error>`, `Platform.SharedKernel`) — принято как стандарт.
 12. Правила сборки корня действуют на примеры ниже по дереву — в отдельном репозитории проекта не мешает.
+
+### Существующий проект: education-platform
+
+Тестовая копия LMS (OpenIddict, десять сервисов, Next.js), подключена пакетами `Platform.*`. Проверка —
+`scripts/keycloak/check-education-platform.sh`. Что мешало:
+
+13. **Внутренние endpoint'ы требуют роль `platform-service` в токене ключа** (`RequireAnyRole`, плоский claim `role`).
+    `oidc-hardcoded-role-mapper` пишет в `realm_access.roles`, не подходит → `oidc-hardcoded-claim-mapper` на клиент
+    ключа (`apply.sh`, шаг 3).
+14. **NextAuth ждал endpoint'ы OpenIddict** (`/connect/userinfo`, внутренний адрес сервера) → provider `oidc` с двумя
+    адресами (issuer снаружи, wellKnown изнутри), нужные claims вручную.
+15. **Override Compose для среды каждого сервиса** — YAML-якорь `&keycloak-auth` (`extends:` environment не объединяет).
+16. **`depends_on: !reset []` для фронтенда**: override не убирает отдельные зависимости, только сбрасывает все.
+17. **Токен ключа не проходил проверку адресата (все внутренние вызовы — 401)**: сервисы принимают только `aud=education`, а у ключа
+    без прав в приложении `aud=auth-api` → служебное право `education:internal.access`, выданное ключам. Скрипт по одним токенам
+    этого не видел — нашлось только на настоящих сервисах.
+18. **Пакет Redis занимал имя проверки здоровья `redis`** (у проекта такая уже есть; «Duplicate health checks») → имя
+    `token-revocation-redis`.
+19. **Сборка пакета называлась `Authentication`, как проект** (CS1704) → `AssemblyName` = `PackageId`.
+20. **Скрипты падают на macOS (bash 3.2)** на `«$NAME»`: байт `»` попадает в имя переменной → `«${NAME}»`.
+21. **Маппер роли привязан к клиенту Keycloak, не к ключу**: ключ, выданный заново, приходит без него и внутренние
+    endpoint'ы молча отвечают 403 → повторный `apply.sh`; проверка смотрит `role` в токенах обоих ключей. Хотелось бы выдавать
+    ключ с готовым маппером из сервиса входа.
+
+Что прошло гладко: замена `OpenIddict.Validation.*` на пакеты — одна строка в `Authentication.csproj` и три строки
+регистрации; мгновенный отзыв — один пакет; вход через страницы проекта — PKCE в NextAuth без своего кода.
