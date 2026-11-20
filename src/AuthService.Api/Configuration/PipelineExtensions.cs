@@ -10,7 +10,9 @@ public static class PipelineExtensions
         // Первым: всё, что дальше читает IP клиента или схему запроса, должно видеть настоящие значения.
         app.UseAuthServiceForwardedHeaders();
 
-        // Демо-страница для разработчика (wwwroot/dev/index.html на /dev/), админка на /admin и кабинет на /account.
+        // Демо-страница разработчика открыта только на стенде и в разработке, в остальных окружениях закрывается до раздачи
+        // файлов. Админка и кабинет лежат на своих путях, о них заботится заголовок безопасности ниже.
+        app.CloseDemoPageUnlessEnabled();
         app.UseFrontendSecurityHeaders();
         app.UseDefaultFiles();
         app.UseStaticFiles();

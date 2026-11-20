@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using AuthService.IntegrationTests.Infrastructure;
 using Xunit;
@@ -36,6 +37,8 @@ public sealed class FrontendTests(AuthServiceWebFactory factory) : IClassFixture
 
         HttpResponseMessage response = await client.GetAsync(new Uri("/dev/", UriKind.Relative));
 
+        // Страница открыта (Development): без 200 проверка отсутствия CSP проходила бы и на закрытой странице.
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.False(response.Headers.Contains("Content-Security-Policy"));
     }
 
