@@ -12,8 +12,18 @@ using Validation;
 
 namespace AuthService.Core.Features.Admin.UseCases.AppUserRoles;
 
-/// <summary>Кто меняет роли: id и когда вошёл (auth_time).</summary>
-public sealed record RoleChangeActor(Guid? Id, DateTimeOffset? AuthenticatedAt);
+/// <summary>
+/// Кто меняет роли: id, когда вошёл (auth_time) и права из его токена в активном режиме. Права нужны только выдаче ролей
+/// (нельзя выдать роль выше собственных прав); остальным действиям они не важны, поэтому по умолчанию пусты.
+/// </summary>
+public sealed record RoleChangeActor(Guid? Id, DateTimeOffset? AuthenticatedAt, IReadOnlySet<string>? Permissions = null)
+{
+    public static RoleChangeActor From(CurrentUser caller)
+    {
+        ArgumentNullException.ThrowIfNull(caller);
+        return new RoleChangeActor(caller.Id, caller.AuthenticatedAt, caller.Permissions);
+    }
+}
 
 /// <summary>
 /// Роли пользователя в приложении: сколько угодно ролей, роль = режим. Выдача роли с управлением ролями
@@ -121,13 +131,28 @@ public sealed class UserRolesHandler(
             return UnitResult.Success<Error>(); // уже такие роли
         }
 
-        Result<bool, Error> privileged = await AnyPrivilegedAsync(clientId, grant, cancellationToken);
-        if (privileged.IsFailure)
+        Result<IReadOnlySet<string>, Error> granted = await PermissionsOfAsync(clientId, grant, cancellationToken);
+        if (granted.IsFailure)
         {
-            return privileged.Error;
+            return granted.Error;
         }
 
-        if (privileged.Value && (actor.AuthenticatedAt is not { } loggedIn || timeProvider.GetUtcNow() - loggedIn > RecentLogin))
+        Result<IReadOnlySet<string>, Error> revoked = await PermissionsOfAsync(clientId, revoke, cancellationToken);
+        if (revoked.IsFailure)
+        {
+            return revoked.Error;
+        }
+
+        // Нельзя выдать (и снять) роль, в которой есть права, которых нет у самого выдающего: иначе обладатель
+        // users.roles.manage выдал бы admin — второму аккаунту или кому угодно — или забрал бы его у настоящего админа.
+        UnitResult<Error> withinOwn = await WithinOwnRightsAsync(actor, clientId, new HashSet<string>(granted.Value.Union(revoked.Value), StringComparer.Ordinal), cancellationToken);
+        if (withinOwn.IsFailure)
+        {
+            return withinOwn;
+        }
+
+        bool privileged = granted.Value.Overlaps(_privileged);
+        if (privileged && (actor.AuthenticatedAt is not { } loggedIn || timeProvider.GetUtcNow() - loggedIn > RecentLogin))
         {
             return AdminErrors.ReauthenticationRequired();
         }
@@ -147,8 +172,10 @@ public sealed class UserRolesHandler(
         return UnitResult.Success<Error>();
     }
 
-    private async Task<Result<bool, Error>> AnyPrivilegedAsync(string clientId, IEnumerable<string> grant, CancellationToken cancellationToken)
+    // Права в составе выдаваемых ролей (без повторов).
+    private async Task<Result<IReadOnlySet<string>, Error>> PermissionsOfAsync(string clientId, IEnumerable<string> grant, CancellationToken cancellationToken)
     {
+        HashSet<string> permissions = new(StringComparer.Ordinal);
         foreach (string role in grant)
         {
             Result<IReadOnlyList<string>, Error> composites = await identityAdmin.GetRoleCompositesAsync(clientId, role, cancellationToken);
@@ -157,13 +184,53 @@ public sealed class UserRolesHandler(
                 return composites.Error;
             }
 
-            if (composites.Value.Intersect(_privileged, StringComparer.Ordinal).Any())
+            permissions.UnionWith(composites.Value);
+        }
+
+        return permissions;
+    }
+
+    // Права выдающего. В приложении сервиса — из его токена (активный режим). В другом приложении — по его действующим ролям
+    // в этом приложении. Не ограничиваем того, у кого есть roles.manage (в токене — админ проекта, во всех приложениях
+    // проекта; в роли приложения — админ приложения): он и так определяет любую роль с любыми правами, запрет выдачи ему
+    // ничего бы не дал, а честную работу (выдать роль с новым правом приложения) ломал. Правило — против того, у кого
+    // есть users.roles.manage, но нет roles.manage: он меняет только роли в пределах собственных прав — ни выдать выше, ни
+    // снять роль сильнее своей (иначе такой человек мог бы отобрать admin у настоящего админа).
+    private async Task<UnitResult<Error>> WithinOwnRightsAsync(RoleChangeActor actor, string clientId, IReadOnlySet<string> touched, CancellationToken cancellationToken)
+    {
+        if (touched.Count == 0)
+        {
+            return UnitResult.Success<Error>();
+        }
+
+        IReadOnlySet<string> own = actor.Permissions ?? new HashSet<string>(StringComparer.Ordinal);
+        if (own.Contains(AuthServicePermissions.Roles.MANAGE))
+        {
+            return UnitResult.Success<Error>();
+        }
+
+        if (!IsServiceApp(clientId))
+        {
+            if (actor.Id is not { } actorId)
             {
-                return true;
+                return AdminErrors.RoleAboveOwnRights(touched);
+            }
+
+            Result<IReadOnlyList<string>, Error> effective = await identityAdmin.GetEffectiveClientRolesAsync(actorId, clientId, cancellationToken);
+            if (effective.IsFailure)
+            {
+                return effective.Error;
+            }
+
+            own = new HashSet<string>(effective.Value, StringComparer.Ordinal);
+            if (own.Contains(AuthServicePermissions.Roles.MANAGE))
+            {
+                return UnitResult.Success<Error>();
             }
         }
 
-        return false;
+        string[] above = [.. touched.Where(permission => !own.Contains(permission))];
+        return above.Length == 0 ? UnitResult.Success<Error>() : AdminErrors.RoleAboveOwnRights(above);
     }
 
     private async Task<UnitResult<Error>> ApplyAsync(

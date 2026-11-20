@@ -21,6 +21,7 @@ public static class RealmPermissions
         {
             AuthModes.CUSTOMER => [AuthServicePermissions.Profiles.VIEW],
             AuthModes.MANAGER => [AuthServicePermissions.Profiles.VIEW, AuthServicePermissions.Users.VIEW, AuthServicePermissions.Users.BLOCK],
+            "role-manager" => [AuthServicePermissions.Profiles.VIEW, AuthServicePermissions.Users.VIEW, AuthServicePermissions.Users.MANAGE_ROLES],
             AuthModes.ADMIN =>
             [
                 AuthServicePermissions.Profiles.VIEW,

@@ -26,7 +26,7 @@ public sealed class SetRoleEndpoint : IEndpoint
         CancellationToken cancellationToken)
     {
         Result<UserDetailResponse, Error> result = await handler.Handle(
-            new RoleChangeActor(caller.Id, caller.AuthenticatedAt),
+            RoleChangeActor.From(caller),
             userId,
             request,
             cancellationToken);

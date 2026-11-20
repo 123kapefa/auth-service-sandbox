@@ -17,6 +17,10 @@ public sealed class UserRolesTests : IClassFixture<AuthServiceWebFactory>
     private static readonly TestUser _staff =
         new("сотрудник", Guid.NewGuid(), "+70000000003", [AuthModes.CUSTOMER, AuthModes.MANAGER, "support"], "support");
 
+    // Своя роль с правом выдавать роли, но без остальных админских прав (users.view, profile.view, users.roles.manage).
+    private static readonly TestUser _roleManager =
+        new("менеджер ролей", Guid.NewGuid(), "+70000000004", [AuthModes.CUSTOMER, "role-manager"], "role-manager");
+
     private readonly AuthServiceWebFactory _factory;
     private readonly FakeIdentityAdmin _keycloak;
 
@@ -33,6 +37,13 @@ public sealed class UserRolesTests : IClassFixture<AuthServiceWebFactory>
         _keycloak.Add(TestUser.Customer, []);
         _keycloak.Add(TestUser.AdminInAdminMode, [AuthModes.ADMIN]);
         _keycloak.Add(_staff, [AuthModes.MANAGER, "support"]);
+    }
+
+    // Менеджер ролей заводится только тем тестам, которым он нужен: его роль попадает в списки ролей приложения.
+    private void GivenRoleManager()
+    {
+        _keycloak.AddAppRole("sandbox-api", "role-manager", "profile.view", "users.view", "users.roles.manage");
+        _keycloak.Add(_roleManager, ["role-manager"]);
     }
 
     [Fact]
@@ -170,6 +181,110 @@ public sealed class UserRolesTests : IClassFixture<AuthServiceWebFactory>
         JsonElement result = await ResultAsync(response);
         Assert.Equal("manager", result.GetProperty("activeMode").GetString());
         Assert.Equal(["customer", "manager", "support"], Strings(result, "availableRoles"));
+    }
+
+    [Theory]
+    [InlineData("admin")]                      // почти все права проекта
+    [InlineData("auditor")]                    // audit.view и roles.manage — у выдающего их нет
+    [InlineData("manager")]                    // users.block — у выдающего его нет
+    public async Task Set_RoleAboveOwnRights_Forbidden_NothingChanged(string role)
+    {
+        GivenRoleManager();
+        HttpResponseMessage response = await SendAsync(HttpMethod.Put, TestUser.Customer, new { roles = new[] { role } }, caller: _roleManager);
+
+        await AssertErrorAsync(response, HttpStatusCode.Forbidden, "users.role_above_own_rights");
+        Assert.Empty(_keycloak.RoleChanges);
+        Assert.Empty(_factory.AuditLog.Entries);
+    }
+
+    [Fact]
+    public async Task Set_RoleAboveOwnRights_MessageNamesMissingRights()
+    {
+        GivenRoleManager();
+        HttpResponseMessage response = await SendAsync(HttpMethod.Put, TestUser.Customer, new { roles = new[] { "auditor" } }, caller: _roleManager);
+
+        using JsonDocument body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        string message = body.RootElement.GetProperty("error").GetProperty("messages")[0].GetProperty("message").GetString()!;
+        Assert.Contains("audit.view", message, StringComparison.Ordinal);
+        Assert.Contains("roles.manage", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("users.view", message, StringComparison.Ordinal); // это право у него есть
+    }
+
+    [Fact]
+    public async Task Set_SeveralRoles_OneAboveOwnRights_NoneGranted()
+    {
+        GivenRoleManager();
+        HttpResponseMessage response = await SendAsync(HttpMethod.Put, TestUser.Customer, new { roles = new[] { "support", "admin" } }, caller: _roleManager);
+
+        await AssertErrorAsync(response, HttpStatusCode.Forbidden, "users.role_above_own_rights");
+        Assert.Empty(_keycloak.RoleChanges);
+    }
+
+    [Fact]
+    public async Task Set_RoleWithinOwnRights_Ok()
+    {
+        GivenRoleManager();
+        HttpResponseMessage response = await SendAsync(HttpMethod.Put, TestUser.Customer, new { roles = new[] { "support" } }, caller: _roleManager);
+
+        JsonElement roles = await ResultAsync(response);
+        Assert.Equal(["support"], Strings(roles, "roles"));
+    }
+
+    [Fact]
+    public async Task Set_Admin_ByAdmin_Ok()
+    {
+        HttpResponseMessage response = await SendAsync(HttpMethod.Put, TestUser.Customer, new { roles = new[] { "admin" } });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Revoke_RoleAboveOwnRights_Forbidden_NothingChanged()
+    {
+        // Понизить сильнее себя нельзя: иначе обладатель users.roles.manage отобрал бы admin у настоящего админа.
+        GivenRoleManager();
+        await SendAsync(HttpMethod.Put, TestUser.Customer, new { roles = new[] { "auditor" } });
+        _keycloak.RoleChanges.Clear();
+
+        HttpResponseMessage response = await SendAsync(HttpMethod.Put, TestUser.Customer, new { roles = Array.Empty<string>() }, caller: _roleManager);
+
+        await AssertErrorAsync(response, HttpStatusCode.Forbidden, "users.role_above_own_rights");
+        Assert.Empty(_keycloak.RoleChanges);
+    }
+
+    [Fact]
+    public async Task Revoke_RoleWithinOwnRights_Ok()
+    {
+        GivenRoleManager();
+        await SendAsync(HttpMethod.Put, TestUser.Customer, new { roles = new[] { "support" } });
+
+        HttpResponseMessage response = await SendAsync(HttpMethod.Put, TestUser.Customer, new { roles = Array.Empty<string>() }, caller: _roleManager);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Set_RoleAboveOwnRights_OldLogin_Forbidden_NotAskedToReauthenticate()
+    {
+        // Отказ по правам — раньше просьбы войти заново: чужую роль не раздать и после повторного входа.
+        GivenRoleManager();
+
+        HttpResponseMessage response = await SendAsync(
+            HttpMethod.Put, TestUser.Customer, new { roles = new[] { "admin" } }, loggedInAgo: TimeSpan.FromHours(1), caller: _roleManager);
+
+        await AssertErrorAsync(response, HttpStatusCode.Forbidden, "users.role_above_own_rights");
+    }
+
+    [Fact]
+    public async Task SetRole_AboveOwnRights_Forbidden_NothingChanged()
+    {
+        GivenRoleManager();
+        using HttpClient client = _factory.CreateClientFor(_roleManager, DateTimeOffset.UtcNow);
+
+        HttpResponseMessage response = await client.PutAsJsonAsync(new Uri($"/auth/admin/users/{TestUser.Customer.Id}/role", UriKind.Relative), new { role = "admin" });
+
+        await AssertErrorAsync(response, HttpStatusCode.Forbidden, "users.role_above_own_rights");
+        Assert.Empty(_keycloak.RoleChanges);
     }
 
     private static string[] Strings(JsonElement element, string property) =>
