@@ -6,9 +6,18 @@ import org.keycloak.models.KeycloakSession;
 
 /**
  * Провайдер телефонии: звонок-сброс и SMS. Настоящий провайдер (выбирается до боя) — ещё одна реализация;
- * на стенде — заглушка (HttpPhoneProvider → idp-stub), без настроек — запись в лог (LogPhoneProvider).
+ * на стенде — заглушка (HttpPhoneProvider → idp-stub) или запись в лог по явному PHONE_STUB (LogPhoneProvider),
+ * без настроек — телефонии нет (NoPhoneProvider), код никуда не пишется. Выбор — PhoneProviders.
  */
 interface PhoneProvider {
+
+    /**
+     * Есть ли чем звонить и слать SMS. false (NoPhoneProvider) — диспетчер отказывает сразу, до проверки капчи и лимитов и
+     * до списания бюджета: иначе каждая попытка тратила бы бюджет SMS и ставила паузу на несуществующую отправку.
+     */
+    default boolean available() {
+        return true;
+    }
 
     /**
      * Звонок-сброс на номер (логин, 79990000001): человеку звонят, отвечать не нужно.

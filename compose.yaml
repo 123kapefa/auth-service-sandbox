@@ -166,6 +166,9 @@ services:
       # Код на телефон — звонок-сброс, затем SMS. Телефония стенда — заглушка idp-stub:
       # звонки и SMS видны на http://localhost:8190/phone. Пусто — звонки и SMS пишутся в лог Keycloak.
       KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__PHONE_PROVIDER_URL: ${PHONE_PROVIDER_URL-http://idp-stub:8190/phone}
+      # Без адреса провайдера телефонии нет. PHONE_LOG_STUB=true (по умолчанию на стенде) — звонки и SMS с кодами пишутся в
+      # лог Keycloak; в бою этого флага нет.
+      KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__PHONE_STUB: ${PHONE_LOG_STUB:-true}
       # Метрики Prometheus (/metrics на порту управления 9000): отправки кодов, расход, отказы.
       KC_METRICS_ENABLED: "true"
     volumes:
