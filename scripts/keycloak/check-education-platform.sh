@@ -73,6 +73,12 @@ CONTENT_TOKEN=$(curl -s -d grant_type=client_credentials -d client_id=service-co
   "$KC/realms/$REALM/protocol/openid-connect/token" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("access_token",""))')
 check "получен access_token content-service" "$([ -n "$CONTENT_TOKEN" ] && echo да)" да
 [ -z "$CONTENT_TOKEN" ] && { echo "✗ токен ключа content-service пуст — проверки claims пропущены"; summary; exit 1; }
+check "токен ключа content-service содержит claim role: platform-service (маппер пережил выдачу ключа)" \
+  "$(python3 -c '
+import json,base64,sys
+p=sys.argv[1].split(".")[1]; p+="="*(4-len(p)%4)
+r=json.loads(base64.urlsafe_b64decode(p)).get("role",[])
+print("platform-service" in (r if isinstance(r,list) else [r]))' "$CONTENT_TOKEN")" True
 check "claim client_id = service-content" \
   "$(python3 -c 'import json,base64,sys; p=sys.argv[1].split(".")[1]; p+="="*(4-len(p)%4); print(json.loads(base64.urlsafe_b64decode(p)).get("client_id",""))' "$CONTENT_TOKEN")" service-content
 
@@ -117,15 +123,18 @@ check "токен приложения education не годится для API 
 check "сервисный токен (client_id) — 403 на пользовательском endpoint'е" \
   "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TAG_TOKEN" "$API/me/")" 403
 
-echo "6. Изоляция: токены другого realm не проходят"
-SANDBOX_TOKEN=$(curl -s -d grant_type=password -d client_id=auth-bff -d "client_secret=${AUTH_BFF_CLIENT_SECRET:-}" \
-  -d "username=71234567890" -d "password=$PASSWORD" \
-  "$KC/realms/sandbox/protocol/openid-connect/token" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("access_token",""))' 2>/dev/null || echo "")
+echo "6. Изоляция: токены другого realm (sandbox) не проходят"
+SANDBOX_API="${SANDBOX_API:-http://localhost:8080}"
+SB_JAR="$WORK/sandbox"; : > "$SB_JAR"
+API="$SANDBOX_API" login "$SB_JAR" /me/ 1234567890 > /dev/null
+SANDBOX_TOKEN=$(awk '$6=="accessToken"{print $7}' "$SB_JAR")
 if [ -n "$SANDBOX_TOKEN" ]; then
+  check "токен sandbox годится в своём сервисе — 200 (контроль)" \
+    "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $SANDBOX_TOKEN" "$SANDBOX_API/me/")" 200
   check "токен sandbox не принимается сервисом входа education — 401" \
     "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $SANDBOX_TOKEN" "$API/me/")" 401
 else
-  echo "  (пропуск: пользователь sandbox не доступен — стенд не поднят или нет такого пользователя)"
+  echo "  (пропуск: войти в сервис песочницы $SANDBOX_API не удалось — стенд не поднят?)"
 fi
 
 echo "7. Настоящие сервисы education-platform принимают наши токены (tag-service :8007, education-service :8001)"
@@ -136,10 +145,11 @@ if [ "$(curl -s -o /dev/null -w '%{http_code}' "$TAG_API/health/ready")" = 200 ]
   check "tag-service: внутренний endpoint без токена — 401" "$(post "$TAG_API/internal/search/entity-tags/batch" "$BODY")" 401
   check "tag-service: токен человека (студент) на внутреннем endpoint'е — 403" "$(post "$TAG_API/internal/search/entity-tags/batch" "$BODY" "$USER_TOKEN")" 403
   check "tag-service: токен ключа service-content на внутреннем endpoint'е — 200" "$(post "$TAG_API/internal/search/entity-tags/batch" "$BODY" "$CONTENT_TOKEN")" 200
+  [ -n "${SANDBOX_TOKEN:-}" ] && check "tag-service: токен другого realm (sandbox) — 401" "$(post "$TAG_API/internal/search/entity-tags/batch" "$BODY" "$SANDBOX_TOKEN")" 401
   check "tag-service: студент без права courses.manage не создаёт тег — 403" "$(post "$TAG_API/tags" '{"title":"check","kind":"Topic"}' "$USER_TOKEN")" 403
-  check "education-service: внутренний endpoint ключом service-tag — не 401 и не 403" \
-    "$(post "$EDU_API/internal/issues/course-bindings" '{"issueIds":["11111111-1111-1111-1111-111111111111"]}' "$TAG_TOKEN" | grep -qE '^(401|403)$' && echo отказ || echo принят)" принят
-  check "education-service: токен человека на внутреннем endpoint'е — 403" "$(post "$EDU_API/internal/issues/course-bindings" '{"issueIds":["11111111-1111-1111-1111-111111111111"]}' "$USER_TOKEN")" 403
+  EDU_BODY='{"ids":["11111111-1111-1111-1111-111111111111"]}'
+  check "education-service: внутренний endpoint ключом service-tag — 200" "$(post "$EDU_API/internal/issues/course-bindings" "$EDU_BODY" "$TAG_TOKEN")" 200
+  check "education-service: токен человека на внутреннем endpoint'е — 403" "$(post "$EDU_API/internal/issues/course-bindings" "$EDU_BODY" "$USER_TOKEN")" 403
 else
   echo "  (пропуск: tag-service не запущен — docker compose -f docker-compose.yml -f docker-compose.keycloak.yml --profile infra --profile app up -d tag-service education-service)"
 fi

@@ -47,7 +47,7 @@ trap 'project > /dev/null; rm -rf "$WORK"' EXIT
 echo "1. Вход звонком: код — последние 4 цифры номера, с которого звонят"
 check "настройки проекта приняты (пауза 1 с)" "$(project cooldowns=1)" 204
 PHONE=$(new_phone); JAR="$WORK/jar1"; : > "$JAR"
-check "экран: «Вам звонят на +$PHONE»" "$(code_start "$JAR" "$PHONE")" "Вам звонят на +$PHONE."
+check "экран: «Вам звонят на +${PHONE}»" "$(code_start "$JAR" "$PHONE")" "Вам звонят на +$PHONE."
 check "код из 4 цифр, есть «Прислать SMS»" "$(screen_attr codeLength) $(screen_attr codeSmsAvailable)" "4 true"
 check "заглушка: звонок на номер" "$(last_kind "$PHONE")" call
 FROM=$(curl -s "$PHONE_STUB/messages?to=$PHONE" | python3 -c 'import json,sys; print(json.load(sys.stdin)[-1]["from"])')

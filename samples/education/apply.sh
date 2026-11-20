@@ -70,13 +70,15 @@ save_secret tag "$TAG_SECRET"
 # content-service (EducationContentService): читает пользователей и объявляет права/роли «Education».
 CONTENT_SECRET=$(issue_key content "EducationContentService" '["service.users.read","service.catalog.declare","education:internal.access"]')
 save_secret content "$CONTENT_SECRET"
-echo "service-tag — service.users.read, service.catalog.declare"
-echo "service-content — service.users.read, service.catalog.declare"
+echo "service-tag — service.users.read, service.catalog.declare, education:internal.access"
+echo "service-content — service.users.read, service.catalog.declare, education:internal.access"
 echo "секреты — samples/education/.secrets"
 
 echo "3. Маппер platform-service: образование-platform ищет роль в токене ключа (трение №13)"
 # education-platform проверяет RequireAnyRole("platform-service") во всех internal/-endpoint'ах.
 # Наш токен ключа роли не содержит — добавляем hardcoded mapper к каждому ключу напрямую в Keycloak.
+# Маппер привязан к клиенту Keycloak: ключ, выданный заново из админки, придёт без него (внутренние endpoint'ы — 403).
+# Лечение — повторный запуск apply.sh; check-education-platform.sh ловит это проверкой role в токенах обоих ключей.
 add_service_role_mapper() {
   local client_id="service-$1"
   local kc_id

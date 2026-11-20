@@ -117,7 +117,7 @@ check "без настроенной 2FA код не спрашивают" "$(lo
 status "$JAR" POST /auth/logout > /dev/null
 JAR="$WORK/jar6"; : > "$JAR"
 R=$(otp_login "$JAR" 79990000006 000000)
-check "с 2FA: неверный код отклонён — «$R»" "${R:0:9}" keycloak:
+check "с 2FA: неверный код отклонён — «${R}»" "${R:0:9}" keycloak:
 JAR="$WORK/jar7"; : > "$JAR"
 check "с 2FA: после пароля спрашивают код, верный код → вход" "$(otp_login "$JAR" 79990000006 "$(fresh_totp sandbox-otp-test-secret)")" /me/
 check "вошёл пользователь с 2FA" "$(me_phone "$JAR")" +79990000006
@@ -126,12 +126,12 @@ status "$JAR" POST /auth/logout > /dev/null
 echo "5. Номер приводится к логину на сервере (форма получает номер как набрали, без скрипта темы)"
 for PHONE in "+7 (999) 000-00-01" "8 999 000 00 01" "9990000001"; do
   JAR="$WORK/jar-phone"; : > "$JAR"
-  check "«$PHONE» → вход" "$(login "$JAR" /me/ "$PHONE")" /me/
-  check "«$PHONE» → пользователь 79990000001" "$(me_phone "$JAR")" +79990000001
+  check "«${PHONE}» → вход" "$(login "$JAR" /me/ "$PHONE")" /me/
+  check "«${PHONE}» → пользователь 79990000001" "$(me_phone "$JAR")" +79990000001
   status "$JAR" POST /auth/logout > /dev/null
 done
 JAR="$WORK/jar-unknown"; : > "$JAR"
 R=$(login "$JAR" /me/ "+7 999 000-99-99")
-check "неизвестный номер — ошибка входа — «$R»" "${R:0:9}" keycloak:
+check "неизвестный номер — ошибка входа — «${R}»" "${R:0:9}" keycloak:
 
 summary

@@ -140,7 +140,7 @@ docker compose -f docker-compose.yml -f docker-compose.keycloak.yml --profile in
 docker compose -f docker-compose.yml -f docker-compose.keycloak.yml --profile infra --profile frontend up -d frontend
 ```
 
-Проверка: `scripts/keycloak/check-education-platform.sh` — realm, ключи, структура токенов, вход PKCE и **вызовы настоящих сервисов education-platform** (26 проверок; последний раздел идёт, если сервисы запущены).
+Проверка: `scripts/keycloak/check-education-platform.sh` — realm, ключи, структура токенов, вход PKCE и **вызовы настоящих сервисов education-platform** (29 проверок, включая изоляцию realm; последний раздел идёт, если сервисы запущены).
 
 ## Права и роли приложения из кода
 
