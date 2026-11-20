@@ -136,11 +136,11 @@ samples/education/apply.sh
 # Выводит env-блок для archforge-testbed/education-platform/.env, а также сохраняет секреты в samples/education/.secrets/
 
 # Шаг 2 — в archforge-testbed/education-platform: добавить переменные в .env, затем
-docker compose -f docker-compose.yml -f docker-compose.keycloak.yml --profile app up -d tag-service education-service
-docker compose -f docker-compose.yml -f docker-compose.keycloak.yml --profile frontend up -d frontend
+docker compose -f docker-compose.yml -f docker-compose.keycloak.yml --profile infra --profile app up -d tag-service education-service
+docker compose -f docker-compose.yml -f docker-compose.keycloak.yml --profile infra --profile frontend up -d frontend
 ```
 
-Проверка: `scripts/keycloak/check-education-platform.sh` — realm, ключи, структура токенов (19 проверок).
+Проверка: `scripts/keycloak/check-education-platform.sh` — realm, ключи, структура токенов, вход PKCE и **вызовы настоящих сервисов education-platform** (26 проверок; последний раздел идёт, если сервисы запущены).
 
 ## Права и роли приложения из кода
 

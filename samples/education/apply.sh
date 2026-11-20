@@ -49,6 +49,10 @@ echo "2. Ключи сервисов"
 JAR="$WORK/admin"; : > "$JAR"
 expect "$(login "$JAR" /admin/ "$ADMIN_PHONE")" /admin/ "вход админа проекта"
 
+# Сервисы education-platform проверяют aud=education. Адресат приложения попадает в токен ключа, только если у ключа есть
+# право в этом приложении (трение №2/№17) — заводим служебное право и выдаём его ключам.
+expect "$(admin_api POST /auth/admin/apps/education/permissions '{"name":"internal.access","description":"Вызовы между сервисами"}' | sed 's/^409.*/200 уже есть/')" 200 "право education:internal.access"
+
 issue_key() {
   admin_api DELETE "/auth/admin/services/$1" > /dev/null
   local r
@@ -61,10 +65,10 @@ SECRETS="$ROOT/samples/education/.secrets"
 mkdir -p "$SECRETS"
 save_secret() { printf '%s' "$2" > "$SECRETS/$1.key"; chmod 644 "$SECRETS/$1.key"; }
 # tag-service: читает пользователей и объявляет права/роли приложения «Теги».
-TAG_SECRET=$(issue_key tag "TagService" '["service.users.read","service.catalog.declare"]')
+TAG_SECRET=$(issue_key tag "TagService" '["service.users.read","service.catalog.declare","education:internal.access"]')
 save_secret tag "$TAG_SECRET"
 # content-service (EducationContentService): читает пользователей и объявляет права/роли «Education».
-CONTENT_SECRET=$(issue_key content "EducationContentService" '["service.users.read","service.catalog.declare"]')
+CONTENT_SECRET=$(issue_key content "EducationContentService" '["service.users.read","service.catalog.declare","education:internal.access"]')
 save_secret content "$CONTENT_SECRET"
 echo "service-tag — service.users.read, service.catalog.declare"
 echo "service-content — service.users.read, service.catalog.declare"
@@ -125,6 +129,6 @@ ENV
 cat <<INFO
 Готово. Realm «education» на http://localhost:8180, сервис входа проекта — http://localhost:8083.
 Дальше в education-platform:
-  docker compose -f docker-compose.yml -f docker-compose.keycloak.yml --profile app up -d tag-service education-service
-  docker compose -f docker-compose.yml -f docker-compose.keycloak.yml --profile frontend up -d frontend
+  docker compose -f docker-compose.yml -f docker-compose.keycloak.yml --profile infra --profile app up -d tag-service education-service
+  docker compose -f docker-compose.yml -f docker-compose.keycloak.yml --profile infra --profile frontend up -d frontend
 INFO
