@@ -20,7 +20,7 @@ src/login/i18n.ts      — свои тексты и тексты realm для с
 src/login/pages/       — Login (шаги: логин → пароль или способы входа; ключ доступа, Госуслуги, Яндекс ID; при
                          привязке к аккаунту — только пароль), CodeLogin (экран кода: звонок, SMS, письмо, «Проверка» с
                          капчей), UpdatePhone (смена номера), LoginOtp (код из приложения, 2FA), PasskeyRegister
-                         (добавление ключа доступа: из кабинета и «Входите без кода»); экраны — docs/keycloak/10-login-theme.md
+                         (добавление ключа доступа: из кабинета и «Входите без кода»)
 src/login/components/  — LoginBox (логин в рамке с «Изменить»), Divider («или»), CodeCells (ячейки кода), Captcha
                          (SmartCaptcha; на стенде, ключ sandbox-stub, — галочка «Я не робот»)
 src/login/lib/phone.ts — «+» перед номером, логин цифрами

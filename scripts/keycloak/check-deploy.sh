@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Проверка этапа 6а (docs/keycloak/06a-embedding.md): поставка как компонент — deploy/compose.yaml только из образов,
+# Проверка этапа 6а: поставка как компонент — deploy/compose.yaml только из образов,
 # в боевом режиме. Как у чужого проекта: свой compose-файл подключает deploy/compose.yaml через include: со своим
 # env-файлом, перед сервисами — прокси с https (Caddy со своим локальным сертификатом). Keycloak — start за прокси,
 # проект — без DEV (sslRequired external, https), сервис — Production с сертификатом DataProtection, не root.

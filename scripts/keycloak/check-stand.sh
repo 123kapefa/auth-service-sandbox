@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Проверка этапа 1 (docs/keycloak/01-stand.md): Keycloak поднят, realm `sandbox` импортирован,
+# Проверка этапа 1: Keycloak поднят, realm `sandbox` импортирован,
 # токен содержит контракт. Запуск: docker compose up -d --wait keycloak && scripts/keycloak/check-stand.sh
 set -uo pipefail
 

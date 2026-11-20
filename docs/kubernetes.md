@@ -1,6 +1,6 @@
 # Запуск в Kubernetes
 
-Этап 11.7. Сервис входа в кластере ставится Helm-чартом `deploy/helm/platform-auth`. Docker Compose остаётся для
+Сервис входа в кластере ставится Helm-чартом `deploy/helm/platform-auth`. Docker Compose остаётся для
 одной машины (`deploy/compose.yaml`) и для разработки (`compose.yaml`).
 
 ## Что ставит чарт
@@ -114,7 +114,7 @@ ingress:
 
 Остальное с пояснениями описано в `deploy/helm/platform-auth/values.yaml`. Образы берутся из GHCR (релиз по тегу, 11.2),
 тег по умолчанию — версия чарта. После установки проект создаётся теми же скриптами, что и при Docker
-([06a-embedding](keycloak/06a-embedding.md)), Keycloak для них доступен через
+([embedding-guide.md](embedding-guide.md)), Keycloak для них доступен через
 `kubectl port-forward svc/auth-keycloak 8180`.
 
 ## Стенд в kind

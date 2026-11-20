@@ -63,7 +63,7 @@
 
 То же с Keycloak: браузер и `iss` в токенах — `http://localhost:8180` (`Authentication:Authority`), а контейнер
 скачивает ключи с `http://keycloak:8180` (`Authentication:MetadataAddress`). Подробно —
-[keycloak/02-token-api.md](keycloak/02-token-api.md).
+[tech/pitfalls.md](tech/pitfalls.md#realm-и-keycloak).
 
 ## Запуск
 
