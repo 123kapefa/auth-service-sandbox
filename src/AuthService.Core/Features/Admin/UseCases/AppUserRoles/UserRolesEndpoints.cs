@@ -38,7 +38,7 @@ public sealed class UserRolesEndpoints : IEndpoint
         CancellationToken cancellationToken)
     {
         Result<UserRolesResponse, Error> result = await handler.SetAsync(
-            new RoleChangeActor(caller.Id, caller.AuthenticatedAt), clientId, userId, request, cancellationToken);
+            RoleChangeActor.From(caller), clientId, userId, request, cancellationToken);
         return result;
     }
 }
