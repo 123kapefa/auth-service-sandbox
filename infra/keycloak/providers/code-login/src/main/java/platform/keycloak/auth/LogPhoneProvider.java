@@ -7,8 +7,9 @@ import org.jboss.logging.Logger;
 import org.keycloak.models.KeycloakSession;
 
 /**
- * Телефония без провайдера: звонки и SMS пишутся в лог Keycloak (настоящих звонков нет).
- * В проде вместо неё — клиент провайдера, а код в лог не попадает.
+ * Заглушка стенда: звонки и SMS пишутся в лог Keycloak (настоящих звонков нет). Включается только явно (PHONE_STUB=true,
+ * PhoneProviders), потому что код входа в логе — это вход под любым номером для всякого, кто читает логи.
+ * В проде вместо неё — клиент провайдера (PHONE_PROVIDER_URL), код в лог не попадает.
  */
 final class LogPhoneProvider implements PhoneProvider {
 

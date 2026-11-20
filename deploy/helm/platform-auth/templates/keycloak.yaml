@@ -95,6 +95,8 @@ spec:
             {{- include "auth.secretEnv" (dict "root" . "name" "KC_BOOTSTRAP_ADMIN_PASSWORD" "key" "AUTH_KEYCLOAK_ADMIN_PASSWORD") | nindent 12 }}
             # Капча перед отправкой кода.
             {{- include "auth.secretEnv" (dict "root" . "name" "KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_SERVER_KEY" "key" "AUTH_SMARTCAPTCHA_SERVER_KEY" "optional" true) | nindent 12 }}
+            # Телефония (адрес провайдера с ключом). Нет — коды по номеру не отправляются, в лог не пишутся.
+            {{- include "auth.secretEnv" (dict "root" . "name" "KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__PHONE_PROVIDER_URL" "key" "AUTH_PHONE_PROVIDER_URL" "optional" true) | nindent 12 }}
             {{- with .Values.keycloak.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

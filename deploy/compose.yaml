@@ -50,6 +50,9 @@ services:
       # за час с одного IP или на один номер код не уходит.
       KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_SERVER_KEY: ${AUTH_SMARTCAPTCHA_SERVER_KEY:-}
       KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_SITE_KEY: ${AUTH_SMARTCAPTCHA_SITE_KEY:-}
+      # Телефония: адрес провайдера звонков и SMS (с ключом). Пусто — телефонии нет: коды по номеру не отправляются
+      # (код входа в лог не пишется), вход по коду на почту работает.
+      KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__PHONE_PROVIDER_URL: ${AUTH_PHONE_PROVIDER_URL:-}
       KC_BOOTSTRAP_ADMIN_USERNAME: ${AUTH_KEYCLOAK_ADMIN:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${AUTH_KEYCLOAK_ADMIN_PASSWORD:?нужен AUTH_KEYCLOAK_ADMIN_PASSWORD}
     healthcheck:

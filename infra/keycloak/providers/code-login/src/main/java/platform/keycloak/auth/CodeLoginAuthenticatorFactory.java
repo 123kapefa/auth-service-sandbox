@@ -21,7 +21,8 @@ import org.keycloak.provider.ProviderConfigProperty;
  * (настройки проекта, их пишет API админки — 10.7), иначе из настроек плагина Keycloak, иначе — по умолчанию.
  * Настройки плагина — переменные KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__КЛЮЧ (например, …__IP_PER_HOUR=1000);
  * там же капча: CAPTCHA_SERVER_KEY и CAPTCHA_SITE_KEY (Яндекс SmartCaptcha) или CAPTCHA_STUB=true (только стенд),
- * и телефония: PHONE_PROVIDER_URL (HttpPhoneProvider; нет — звонки и SMS пишутся в лог, LogPhoneProvider).
+ * и телефония: PHONE_PROVIDER_URL (HttpPhoneProvider) или PHONE_STUB=true (только стенд: звонки и SMS пишутся в лог,
+ * LogPhoneProvider); нет ни того, ни другого — телефонии нет, коды по номеру не уходят (NoPhoneProvider).
  */
 public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory {
 
@@ -35,7 +36,7 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
     private CaptchaVerifier captcha = CaptchaVerifier.NONE;
     private CodeMetrics metrics;
     private String captchaSiteKey;
-    private PhoneProvider phone = new LogPhoneProvider();
+    private PhoneProvider phone = new NoPhoneProvider();
 
     @Override
     public String getId() {
@@ -125,9 +126,11 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
             // Тема рисует вместо виджета Яндекса галочку заглушки (её токен — STUB_TOKEN).
             captchaSiteKey = CaptchaVerifier.STUB_SITE_KEY;
         }
-        String phoneUrl = config.get("phone-provider-url");
-        if (phoneUrl != null && !phoneUrl.isBlank()) {
-            phone = new HttpPhoneProvider(phoneUrl);
+        phone = PhoneProviders.choose(config.get("phone-provider-url"), config.getBoolean("phone-stub", false));
+        if (phone instanceof LogPhoneProvider) {
+            LOG.warn("Телефония — заглушка стенда (phone-stub): звонки и SMS с кодами пишутся в лог; в бою нужен phone-provider-url");
+        } else if (phone instanceof NoPhoneProvider) {
+            LOG.warn("Телефония не настроена (phone-provider-url): коды по номеру и SMS-уведомления не отправляются");
         }
     }
 
