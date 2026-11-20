@@ -57,7 +57,7 @@ public sealed class CallbackEndpoint : IEndpoint
             cancellationToken);
         if (completed.IsFailure && AuthErrors.IsLostLogin(completed.Error))
         {
-            return Results.Redirect(returnUrls.Resolve(null));
+            return Results.Redirect(ReturnUrlValidator.ToLocation(returnUrls.Resolve(null)));
         }
 
         if (completed.IsFailure)
@@ -77,6 +77,7 @@ public sealed class CallbackEndpoint : IEndpoint
         }
 
         cookies.SetTokens(httpContext.Response, completed.Value.Tokens);
-        return Results.Redirect(completed.Value.ReturnTo);
+        // Адрес возврата проверяется ещё раз: он лежит в cookie, выданной до обновления правил проверки (cookie живёт 10 минут).
+        return Results.Redirect(ReturnUrlValidator.ToLocation(returnUrls.Resolve(completed.Value.ReturnTo)));
     }
 }
