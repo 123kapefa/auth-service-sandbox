@@ -1,0 +1,44 @@
+# Существующий проект: education-platform (realm education) — свой экземпляр сервиса входа из того же образа.
+# Создать проект и запустить:
+#   AUTH_BFF_CLIENT_SECRET=education-bff-secret scripts/project/create-project.sh education "Education Platform" \
+#       http://localhost:8083 http://auth-service-education:8080
+#   docker compose -f compose.yaml -f infra/projects/education/compose.yaml up -d --wait auth-service-education
+services:
+  auth-migrator-education:
+    image: auth_service-api:local
+    entrypoint: ["./efbundle", "--connection", "Host=postgres;Port=5432;Database=auth_education;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"]
+    depends_on:
+      education-db:
+        condition: service_completed_successfully
+
+  # База сервиса проекта — своя (в общем Postgres песочницы — отдельная база).
+  education-db:
+    image: postgres:17-alpine
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    entrypoint: ["sh", "-c", "psql -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB} -tAc \"SELECT 1 FROM pg_database WHERE datname = 'auth_education'\" | grep -q 1 || psql -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c 'CREATE DATABASE auth_education'"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  auth-service-education:
+    image: auth_service-api:local
+    init: true
+    ports:
+      - "8083:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__AuthDb: Host=postgres;Port=5432;Database=auth_education;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      ConnectionStrings__Redis: redis:6379
+      Authentication__Authority: http://localhost:8180/realms/education
+      Authentication__MetadataAddress: http://keycloak:8180/realms/education/.well-known/openid-configuration
+      Authentication__Audience: auth-api
+      Keycloak__ClientId: auth-bff
+      Keycloak__ClientSecret: ${EDUCATION_BFF_CLIENT_SECRET:-education-bff-secret}
+      Keycloak__RegistrationToken: ${EDUCATION_REGISTRATION_TOKEN:-}
+      ReturnUrls__AllowedOrigins__0: http://localhost:8083
+    depends_on:
+      redis:
+        condition: service_healthy
+      auth-migrator-education:
+        condition: service_completed_successfully

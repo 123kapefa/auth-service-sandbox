@@ -2,6 +2,7 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <PackageId>Platform.Authentication</PackageId>
+    <AssemblyName>Platform.Authentication</AssemblyName>
     <Description>Проверка токенов сервиса входа (Keycloak): JWT, права из токена, RequireUser/RequireService, CurrentUser; токен сервиса по ключу доступа (ServiceToken).</Description>
   </PropertyGroup>
   <PropertyGroup>

@@ -25,7 +25,7 @@ public static class TokenRevocationExtensions
         services.AddSingleton<ITokenRevocationStore, CacheInvalidatingRevocationStore>();
         services.AddSingleton<ITokenRevocationChecker, TokenRevocationChecker>();
         services.AddHybridCache();
-        services.AddHealthChecks().AddCheck<RedisHealthCheck>("redis", tags: ["ready"]);
+        services.AddHealthChecks().AddCheck<RedisHealthCheck>("token-revocation-redis", tags: ["ready"]);
         return services;
     }
 }

@@ -58,7 +58,7 @@ check "страница входа — тема platform" \
 echo "2. Вход по коду существующего пользователя (номер как набрали, без скрипта темы)"
 JAR="$WORK/jar2"; : > "$JAR"
 SCREEN=$(code_start_fresh "$JAR" "8 (999) 000-00-03")
-check "экран кода: «$SCREEN»" "$SCREEN" "Вам звонят на +79990000003."
+check "экран кода: «${SCREEN}»" "$SCREEN" "Вам звонят на +79990000003."
 check "экран знает длину кода (4 цифры звонка) и паузу до повтора" "$(kc "$WORK/page.html" 'c["codeLength"] + " " + str(0 < int(c["codeResendAfter"]) <= 60)')" "4 True"
 check "неверный код отклонён" "$(code_submit "$JAR" 0000)" "keycloak: Неверный код. Осталось попыток: 4."
 check "повтор раньше 60 с — не отправляется" "$(starts "$(code_send_again "$JAR")" "Код уже отправлен")" "Код уже отправлен"
@@ -90,7 +90,7 @@ echo "5. Вход по коду из письма"
 curl -s -o /dev/null -X DELETE "$MAILPIT/api/v1/messages"
 JAR="$WORK/jar8"; : > "$JAR"
 SCREEN=$(code_start_fresh "$JAR" " Customer@Sandbox.test ")
-check "экран кода: «$SCREEN»" "$SCREEN" "Отправили код письмом на customer@sandbox.test."
+check "экран кода: «${SCREEN}»" "$SCREEN" "Отправили код письмом на customer@sandbox.test."
 check "письмо «Код для входа» пришло" "$(mail_subject customer@sandbox.test)" "Код для входа"
 CODE=$(mail_code customer@sandbox.test)
 # Письмо — шаблон темы писем (platform-login-code.ftl): HTML-часть с кодом и подписью темы.
