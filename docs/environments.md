@@ -50,6 +50,7 @@
 | `Keycloak:PreviousClientSecret` | прежний секрет — только на время смены ([secrets.md](secrets.md#секрет-bff)) | — | так же | так же |
 | `DataProtection:Certificate` / `CertificatePath`, `CertificatePassword` | сертификат ключей DataProtection: PFX в base64 или файл | — (ключи не шифруются) | из хранилища; без него ключи не шифруются | обязателен (`RequireCertificate`) |
 | `DataProtection:PreviousCertificate*` | прежний сертификат — только на время смены ([secrets.md](secrets.md#сертификат-dataprotection)) | — | так же | так же |
+| `DemoPage:Enabled` | демо-страница разработчика `/dev/` | `true` | `true` | нет: `/dev/` — 404, включить нельзя (старт остановится) |
 | `Cookies:Secure` | cookie входа (только для хоста сервиса входа, `Domain` нет) | `false` | `false` | `true` |
 | `ReturnUrls:AllowedOrigins` | куда вернуть после входа | `localhost:5080/3000/5173` | `localhost:8080/3000/5173` | приложения платформы |
 | `Logging:LogLevel` | ASP.NET Core | Debug | Debug для `AuthService`, фреймворк — Warning | Warning |

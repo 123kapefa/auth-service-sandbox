@@ -1,5 +1,6 @@
 using System.Net;
 using AuthService.IntegrationTests.Infrastructure;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
 namespace AuthService.IntegrationTests;
@@ -30,6 +31,50 @@ public sealed class DemoPageTests(AuthServiceWebFactory factory) : IClassFixture
         Assert.Contains("<title>Auth Sandbox</title>", html, StringComparison.Ordinal);
         Assert.Contains("/auth/login?return_to=/dev/", html, StringComparison.Ordinal);
         Assert.Contains("/auth/account", html, StringComparison.Ordinal);
+    }
+
+    // Демо-страница нужна только разработчику (стенд, разработка). В бою она закрыта целиком, а модуль входа для чужих
+    // страниц (/sdk/) остаётся: им пользуются приложения проекта.
+    [Theory]
+    [InlineData("/dev/")]
+    [InlineData("/dev")]
+    [InlineData("/dev/index.html")]
+    [InlineData("/DEV/")]
+    [InlineData("/Dev/Index.html")]
+    public async Task DemoPageDisabled_NotServed(string path)
+    {
+        using WebApplicationFactory<Program> closed = factory.WithWebHostBuilder(builder => builder.UseSetting("DemoPage:Enabled", "false"));
+        using HttpClient browser = closed.CreateClient();
+
+        HttpResponseMessage response = await browser.GetAsync(new Uri(path, UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("HEAD")]
+    [InlineData("POST")]
+    [InlineData("OPTIONS")]
+    public async Task DemoPageDisabled_AnyMethod_NotServed(string method)
+    {
+        using WebApplicationFactory<Program> closed = factory.WithWebHostBuilder(builder => builder.UseSetting("DemoPage:Enabled", "false"));
+        using HttpClient browser = closed.CreateClient();
+        using var request = new HttpRequestMessage(new HttpMethod(method), new Uri("/dev/index.html", UriKind.Relative));
+
+        HttpResponseMessage response = await browser.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DemoPageDisabled_LoginModuleStillServed()
+    {
+        using WebApplicationFactory<Program> closed = factory.WithWebHostBuilder(builder => builder.UseSetting("DemoPage:Enabled", "false"));
+        using HttpClient browser = closed.CreateClient();
+
+        HttpResponseMessage response = await browser.GetAsync(new Uri("/sdk/platform-login.js", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
