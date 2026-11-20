@@ -37,6 +37,7 @@ public static class Registration
 {
     public static IServiceCollection AddCore(this IServiceCollection services, IConfiguration configuration)
     {
+        RejectCookieDomain(configuration);
         services.AddEndpoints(typeof(Registration).Assembly);
 
         services.Configure<AuthCookieOptions>(configuration.GetSection(AuthCookieOptions.SECTION_NAME));
@@ -88,5 +89,18 @@ public static class Registration
         services.AddScoped<ProjectSignInHandler>();
 
         return services;
+    }
+
+    // Cookies:Domain убран (задача 12.1): с родительским доменом токены ушли бы на все поддомены проекта. Молча игнорировать
+    // нельзя — оператор решил бы, что общий вход по cookie работает, — поэтому сервис не стартует и объясняет, что делать.
+    private static void RejectCookieDomain(IConfiguration configuration)
+    {
+        if (!string.IsNullOrWhiteSpace(configuration[AuthCookieOptions.SECTION_NAME + ":Domain"]))
+        {
+            throw new InvalidOperationException(
+                "Cookies:Domain больше не поддерживается: cookie с токенами только для хоста сервиса входа, иначе любое приложение "
+                + "на поддомене получило бы сессию человека. Уберите Cookies__Domain (AUTH_COOKIES_DOMAIN); приложениям проекта — "
+                + "вход по PKCE (/sdk/platform-login.js) и токен в заголовке Authorization.");
+        }
     }
 }

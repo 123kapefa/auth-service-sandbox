@@ -141,6 +141,8 @@ services:
       DataProtection__PreviousCertificate: ${AUTH_DATA_PROTECTION_PREVIOUS_CERT:-}
       DataProtection__PreviousCertificatePassword: ${AUTH_DATA_PROTECTION_PREVIOUS_CERT_PASSWORD:-}
       Cookies__Secure: ${AUTH_COOKIES_SECURE:-true}
+      # Домена у cookie нет (задача 12.1). Переменная пробрасывается только затем, чтобы старое значение остановило сервис
+      # с понятным сообщением в логе, а не было молча забыто (Compose сам отказать на непустое значение не умеет).
       Cookies__Domain: ${AUTH_COOKIES_DOMAIN:-}
       ReturnUrls__AllowedOrigins__0: ${AUTH_RETURN_ORIGIN:?нужен AUTH_RETURN_ORIGIN — адрес приложения проекта}
       ReturnUrls__Default: ${AUTH_RETURN_DEFAULT:-/account/}

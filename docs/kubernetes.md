@@ -105,7 +105,6 @@ keycloakDatabase: { host: pg.example.internal }
 redis: redis.example.internal:6379
 service:
   returnOrigins: [https://shop.example.com]
-  cookies: { domain: example.com }
 secrets:
   infisical: { enabled: true, identityId: <id>, serviceAccount: auth }
 ingress:
