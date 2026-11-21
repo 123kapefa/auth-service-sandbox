@@ -52,8 +52,6 @@ snapshot() {
     curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/$REALM$path"
   done | sha256sum | cut -d' ' -f1
 }
-# Защита от перебора пароля мастер-админа (realm master, не проект): включена ли.
-master_brute_force() { curl -s -H "Authorization: Bearer $MASTER" "$KC/admin/realms/master" | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["bruteForceProtected"], r["permanentLockout"], r["failureFactor"])'; }
 # deploy — развёртывание: контейнер мигратора, как при docker compose up. Печатает его вывод.
 deploy() { COMPOSE_IGNORE_ORPHANS=1 docker compose --project-directory "$ROOT" --progress quiet run --rm --no-deps realm-migrator 2>&1; }
 
@@ -63,11 +61,7 @@ echo "1. Стенд из шаблона"
 check "realm — как из шаблона, версия — последняя" "$(migrated) / $(kc_get "" 'r["attributes"].get("platform.realmVersion")')" "$TEMPLATE / $LATEST"
 check "мигратору делать нечего" "$(deploy | sed -n 1p)" "$REALM: версия $LATEST, изменений нет"
 
-check "realm master: защита от перебора пароля включена" "$(master_brute_force)" "True False 5"
-
 echo "2. Realm, созданный до этапа 6б"
-curl -s -o /dev/null -X PUT -H "Authorization: Bearer $MASTER" -H 'Content-Type: application/json' -d '{"bruteForceProtected": false, "failureFactor": 30}' "$KC/admin/realms/master"
-check "до развёртывания: у master защита выключена" "$(master_brute_force)" "False False 30"
 # Свои атрибуты проекта (оформление, настройки кодов) мигратор не трогает: метка — чтобы хоть один был.
 kc_put PUT "" "$(kc_get "" 'json.dumps({"attributes": {**r["attributes"], "platform.check.realm-migrations": "keep"}})')" > /dev/null
 others() { kc_get "" 'json.dumps({k: v for k, v in sorted(r["attributes"].items()) if k != "platform.realmVersion"})'; }
@@ -102,7 +96,6 @@ check "мигратор применил все миграции по поряд
   "$(echo "$OUT" | head -1) / $(echo "$OUT" | sed -n 's/^  \([0-9]*-[a-z0-9-]*\):.*/\1/p' | tr '\n' ' ')" \
   "$REALM: версия 0 → $LATEST / $(cd "$ROOT/scripts/project/realm-migrations" && ls [0-9]*.py | sed 's/\.py$//' | tr '\n' ' ')"
 check "realm — как из шаблона, версия — последняя" "$(migrated) / $(kc_get "" 'r["attributes"].get("platform.realmVersion")')" "$TEMPLATE / $LATEST"
-check "realm master: мигратор включил защиту от перебора пароля" "$(master_brute_force)" "True False 5"
 check "свои атрибуты проекта — не тронуты" "$(others)" "$OTHERS"
 check "CSP — как была, с капчей" "$(kc_get "" 'r["browserSecurityHeaders"]["contentSecurityPolicy"]')" \
   "$(echo "$CSP_OLD" | sed "s#frame-src 'self'#frame-src 'self' $CAPTCHA#")"

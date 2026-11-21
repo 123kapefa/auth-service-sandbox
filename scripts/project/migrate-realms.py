@@ -4,8 +4,7 @@
 Keycloak, которым их ещё не применяли. Применённая версия — в атрибуте realm platform.realmVersion; нет атрибута —
 проект старше миграций (версия 0), получает все. Новые проекты получают последнюю версию из шаблона (new-project.py).
 Миграции идемпотентны: прерванную можно применить ещё раз. Повторный запуск мигратора ничего не меняет.
-Проектом считается realm с клиентом auth-api (в песочнице — sandbox-api); остальные realm не трогаются. Realm master —
-не проект: при каждом запуске (без списка проектов) ему включается защита от перебора пароля мастер-админа (harden_master).
+Проектом считается realm с клиентом auth-api (в песочнице — sandbox-api); остальные realm и master не трогаются.
 
 Запускается при каждом развёртывании (контейнер realm-migrator, infra/realm-migrator) после Keycloak и до сервиса;
 вручную — с машины, где поднят Keycloak (токен мастер-админки — как у остальных скриптов):
@@ -56,25 +55,6 @@ def set_version(admin, number):
     admin.call("PUT", "", {"attributes": {**attributes, ATTRIBUTE: str(number)}})
 
 
-# Защита от перебора пароля мастер-админа: после 5 неверных паролей подряд вход блокируется на минуту, при повторах — до
-# 15 минут (временная блокировка, не постоянная: постоянная давала бы тому, кто знает логин, запереть админа насовсем).
-# Снаружи master закрыт прокси (docs/environments.md, «Прокси»); это вторая линия — на случай ошибки в прокси.
-MASTER_BRUTE_FORCE = {
-    "bruteForceProtected": True, "permanentLockout": False, "failureFactor": 5,
-    "waitIncrementSeconds": 60, "maxFailureWaitSeconds": 900, "minimumQuickLoginWaitSeconds": 60,
-    "quickLoginCheckMilliSeconds": 1000, "maxDeltaTimeSeconds": 43200,
-}
-
-
-def harden_master(admin):
-    """Включает защиту от перебора у realm master. Идемпотентна; PUT с частью полей меняет только их."""
-    current = admin.call("GET", "")
-    if all(current.get(key) == value for key, value in MASTER_BRUTE_FORCE.items()):
-        return "master: защита от перебора пароля уже включена"
-    admin.call("PUT", "", MASTER_BRUTE_FORCE)
-    return "master: защита от перебора пароля мастер-админа включена (5 неверных паролей — блокировка от минуты до 15 минут)"
-
-
 def migrate(admin, steps):
     """Недостающие миграции проекта по порядку; печатает, что сделано. True — что-то применено."""
     current = version(admin)
@@ -117,17 +97,6 @@ def main():
         except SystemExit as error:
             print(f"{realm}: ошибка — {error}", file=sys.stderr, flush=True)
             failed.append(realm)
-    # После проектов: первая строка вывода — всегда первый проект (на неё опираются проверки).
-    if not args.realms:
-        try:
-            if args.status:
-                master = Admin("master").call("GET", "")
-                print(f"master: защита от перебора пароля {'включена' if master.get('bruteForceProtected') else 'ВЫКЛЮЧЕНА'}")
-            else:
-                print(harden_master(Admin("master")), flush=True)
-        except SystemExit as error:
-            print(f"master: ошибка — {error}", file=sys.stderr, flush=True)
-            failed.append("master")
     if changed:
         print("Админам обновлённых проектов — войти заново (новые права придут с новым токеном).")
     if failed:
