@@ -156,4 +156,52 @@ check "Keycloak снова в двух репликах" "$(ready keycloak)" 2
 still_signed_in "обе реплики — новые"
 check "выход" "$(status "$JAR" POST /auth/logout)" 200
 
+echo "5. Ingress: наружу — только realm проекта, realm master и мастер-админка закрыты"
+# Настоящий контроллер (ingress-nginx, манифест для kind): рендер чарта и спецификация Kubernetes ничего не говорят о том,
+# как контроллер сравнивает пути. Проверяется Ingress из самого чарта; хосты — тестовые, запросы идут на узел kind
+# с заголовком Host. Матрица обходов — check-public-paths.sh, та же, что для прокси Compose.
+INGRESS_NGINX="https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.1/deploy/static/provider/kind/deploy.yaml"
+# Кластер с прошлого запуска (KEEP=1) мог быть создан по старому kind.yaml — без метки ingress-ready и портов 8088/8443:
+# тогда контроллер не встанет; такой кластер удалить (kind delete cluster --name auth-kind).
+INSTALLED=нет
+for _ in 1 2 3; do
+  kubectl --context "$KCTX" apply -f "$INGRESS_NGINX" > "$WORK/ingress-install.log" 2>&1 && { INSTALLED=да; break; }
+  sleep 5
+done
+# wait сразу после apply падает, пока ReplicaSet не создал под: ждём появления пода, затем готовности.
+if [ "$INSTALLED" = да ]; then
+  for _ in $(seq 30); do
+    [ -n "$(kubectl --context "$KCTX" -n ingress-nginx get pod --selector=app.kubernetes.io/component=controller -o name 2> /dev/null)" ] && break
+    sleep 2
+  done
+  kubectl --context "$KCTX" -n ingress-nginx wait --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=240s >> "$WORK/ingress-install.log" 2>&1 || INSTALLED=нет
+fi
+if [ "$INSTALLED" = да ]; then
+  ok "ingress-nginx установлен"
+  # Admission-вебхук контроллера отвечает не сразу после готовности пода.
+  APPLIED=нет
+  for _ in $(seq 20); do
+    if helm template "$RELEASE" "$ROOT/deploy/helm/platform-auth" -n "$NS" -f "$ROOT/scripts/k8s/kind-values.yaml" \
+         --set ingress.enabled=true --set-string publicUrls.service=http://auth.test --set-string publicUrls.keycloak=http://id.test \
+         --show-only templates/ingress.yaml 2> /dev/null | kubectl --context "$KCTX" -n "$NS" apply -f - > "$WORK/ingress-apply.log" 2>&1; then
+      APPLIED=да; break
+    fi
+    sleep 3
+  done
+  check "Ingress чарта применён" "$APPLIED" да
+  # Контроллеру нужно время, чтобы подхватить правила.
+  for _ in $(seq 30); do
+    [ "$(curl -sk -o /dev/null -w '%{http_code}' -H 'Host: id.test' https://127.0.0.1:8443/realms/sandbox/.well-known/openid-configuration)" = 200 ] && break
+    sleep 2
+  done
+  if CURL_INSECURE=1 PUBLIC=https://127.0.0.1:8443 HOST_HEADER=id.test DIRECT=http://localhost:8180 REALM=sandbox \
+       "$ROOT/scripts/keycloak/check-public-paths.sh" > "$WORK/paths.log" 2>&1; then
+    ok "check-public-paths.sh: $(tail -1 "$WORK/paths.log")"
+  else
+    bad "check-public-paths.sh"; sed 's/^/    /' "$WORK/paths.log"
+  fi
+else
+  bad "ingress-nginx не установлен: $(tail -3 "$WORK/ingress-install.log" | tr '\n' ' ')"
+fi
+
 finish

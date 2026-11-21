@@ -5,7 +5,7 @@
 | Что | Кто мигрирует | Где записано, что применено |
 |---|---|---|
 | База сервиса (журнал, ключи сервисов, устройства) | `efbundle` из образа сервиса — контейнер `auth-migrator` | таблица `__EFMigrationsHistory` |
-| Настройки проектов (realm): действия, клиенты, роли, права, CSP | `migrate-realms.py` — контейнер `realm-migrator` (`auth-realm-migrator` в `deploy/compose.yaml`) | атрибут realm `platform.realmVersion` |
+| Настройки проектов (realm): действия, клиенты, роли, права, CSP; у realm master — защита от перебора пароля | `migrate-realms.py` — контейнер `realm-migrator` (`auth-realm-migrator` в `deploy/compose.yaml`) | атрибут realm `platform.realmVersion` |
 | База Keycloak | сам Keycloak при старте новой версии | его таблицы (`databasechangelog`) |
 
 Оба мигратора отрабатывают и завершаются при каждом `docker compose up`; сервис стартует только после их успеха
@@ -70,7 +70,9 @@ Realm импортируется из JSON только в пустую базу
 | `0004-close-account-console` | кабинет Keycloak закрыт: клиенты `account` и `account-console` выключены (только свой кабинет `/account/`) | — |
 
 **Как работает.** Мигратор (`scripts/project/migrate-realms.py`) проходит по всем realm Keycloak. Проект — realm с
-клиентом `auth-api` (в песочнице `sandbox-api`); остальные и `master` не трогаются. Версия проекта — атрибут realm
+клиентом `auth-api` (в песочнице `sandbox-api`); остальные не трогаются. Realm `master` — не проект и версий не имеет: при каждом
+запуске (без списка проектов) мигратор лишь включает ему временную блокировку после 5 неверных паролей мастер-админа
+(идемпотентно; [ADR 0014](tech/adr/0014-master-realm-closed-at-proxy.md)). Версия проекта — атрибут realm
 `platform.realmVersion`; нет атрибута — проект старше миграций (версия 0). Недостающие миграции применяются по порядку,
 после каждой версия записывается: прервался на третьей — две первые не повторятся. Новые проекты (`new-project.py`)
 получают последнюю версию сразу, realm песочницы — из JSON. Версия realm новее мигратора (развернули старую версию

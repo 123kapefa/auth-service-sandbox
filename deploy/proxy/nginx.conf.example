@@ -1,0 +1,34 @@
+# Прокси перед Keycloak для Compose (docs/environments.md, «Прокси»): наружу — только realm проекта и ресурсы тем.
+# Realm master (вход мастер-админа, пароль которого иначе можно перебирать из интернета) и /admin закрыты: к ним ходят
+# с машины развёртывания, напрямую на 127.0.0.1:AUTH_KEYCLOAK_PORT. Замените id.shop.example.com, shop (код проекта)
+# и пути сертификата. Проверяется на каждый релиз: scripts/keycloak/check-deploy.sh, матрица обходов —
+# scripts/keycloak/check-public-paths.sh.
+server {
+	listen 443 ssl;
+	server_name id.shop.example.com;
+	ssl_certificate     /etc/nginx/certs/tls.crt;
+	ssl_certificate_key /etc/nginx/certs/tls.key;
+
+	# Страницы и ответы Keycloak несут большие заголовки (cookie сессии, токены): стандартного буфера мало.
+	proxy_buffer_size 128k;
+	proxy_buffers 4 256k;
+	proxy_busy_buffers_size 256k;
+
+	proxy_http_version 1.1;
+	proxy_set_header Host              $host;
+	proxy_set_header X-Forwarded-For   $remote_addr;
+	proxy_set_header X-Forwarded-Proto $scheme;
+	proxy_set_header X-Forwarded-Host  $host;
+	proxy_set_header X-Forwarded-Port  $server_port;
+
+	# Точное совпадение и префикс со слешем: /realms/shop-test сюда не попадает. Пути сравниваются после декодирования
+	# и нормализации («..», «//», %2e, %2f), поэтому обходы вида /realms/shop/../master уходят в «location /».
+	# Адрес контейнера Keycloak — из deploy/compose.yaml (auth-keycloak:8180); proxy_pass без пути: Keycloak получает
+	# адрес ровно таким, каким он пришёл.
+	location = /realms/shop { proxy_pass http://auth-keycloak:8180; }
+	location /realms/shop/  { proxy_pass http://auth-keycloak:8180; }
+	location /resources/    { proxy_pass http://auth-keycloak:8180; }
+
+	# Остальное — не Keycloak: 404 без единого запроса к нему.
+	location / { return 404; }
+}
