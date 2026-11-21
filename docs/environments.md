@@ -38,7 +38,7 @@
 | Настройка | Кто читает | Development | Docker | Production |
 |---|---|---|---|---|
 | `ConnectionStrings:AuthDb` | Infrastructure; без неё сервис не стартует | в файле, `localhost:5432` | из `compose.yaml` (`.env`), `postgres:5432` | переменная окружения |
-| `ConnectionStrings:Redis` | мгновенный отзыв токенов (`Shared/Authentication.Redis`); без неё сервис не стартует | в файле, `localhost:6379` | из `compose.yaml`, `redis:6379` | переменная окружения |
+| `ConnectionStrings:Redis` | мгновенный отзыв токенов (`Shared/Authentication.Redis`); `host:port[,user=…,password=…]` ([ACL](#redis-пользователи)); без неё сервис не стартует | в файле, `localhost:6379` | из `compose.yaml`, `redis:6379` | переменная окружения |
 | `TokenRevocation:TokenLifetime` / `LocalCache` | сколько хранить отметку / кэш проверки в памяти | по умолчанию в коде: 16 мин / 2 с | так же | так же; `LocalCache` держать короткой |
 | `AllowedHosts` | ASP.NET Core; чужой `Host` → 400 | `*` (база) | `*` (база) | `auth-sandbox.example;localhost` |
 | `ForwardedHeaders:TrustedNetworks` | `ForwardedHeadersConfiguration` | по умолчанию в коде: `172.16.0.0/12`, `127.0.0.0/8` | так же | так же; задать, если прокси в другой сети |
@@ -54,6 +54,38 @@
 | `Cookies:Secure` | cookie входа (только для хоста сервиса входа, `Domain` нет) | `false` | `false` | `true` |
 | `ReturnUrls:AllowedOrigins` | куда вернуть после входа | `localhost:5080/3000/5173` | `localhost:8080/3000/5173` | приложения платформы |
 | `Logging:LogLevel` | ASP.NET Core | Debug | Debug для `AuthService`, фреймворк — Warning | Warning |
+| `TokenRevocation:OnStoreFailure` | что делать, когда Redis с отметками отзыва недоступен: `Open` / `Closed` | `Open` | `Open` | `Open` по умолчанию; `Closed` — см. «Сбои Redis и капчи» |
+| `KC_SPI_…_CAPTCHA_ON_OUTAGE` (Keycloak) | что делать, когда SmartCaptcha недоступна: `pass` / `reject` | `pass` | `pass` | `pass` по умолчанию; `reject` — см. ниже |
+| `KC_SPI_…_ALLOW_STUBS` (Keycloak) | разрешить заглушки стенда (`CAPTCHA_STUB`, `PHONE_STUB`) вне `start-dev` | — (в `start-dev` не нужен) | — | нет: заглушка в бою останавливает старт Keycloak |
+
+## Сбои Redis и капчи: открыто или закрыто
+
+Две защиты зависят от внешней системы. Когда она недоступна, нужно выбрать: **не мешать входу** (открыто) или **не терять защиту**
+(закрыто). Оба режима явные настройки, по умолчанию — «открыто», как было.
+
+| Что недоступно | Открыто (по умолчанию) | Закрыто |
+|---|---|---|
+| **Redis с отметками отзыва** (`TokenRevocation:OnStoreFailure`) | токен пропускается (он живёт не дольше 15 минут), в лог — предупреждение. Вход и API работают, но **отзыв на это время не действует**: заблокированный или разлогиненный человек ещё входит | `Closed`: токен не принимается, ответ **503** с `Retry-After: 5` и кодом `auth.revocation_unavailable`. Отзыв не обойти, но недоступность Redis кладёт и API |
+| **Яндекс SmartCaptcha** (`CAPTCHA_ON_OUTAGE`) | `pass`: капча считается пройденной, лимиты кодов действуют (так советует Яндекс) | `reject`: капча не пройдена, пока сервис недоступен; там, где лимиты требуют капчу, код не отправляется |
+
+Как выбрать: если важнее непрерывность входа — «открыто» (токены и так живут 15 минут, а лимиты остаются). Если отзыв — требование безопасности
+(например, блокировка должна действовать немедленно всегда) — «закрыто», но держите Redis отказоустойчивым (реплики, управляемая база).
+Ошибка в значении (`Clsed`, `closed` для капчи) останавливает старт, а не молча остаётся «открыто». Метрика отказов капчи — `platform_code_captcha_unavailable_total`.
+
+**Заглушки стенда** (`CAPTCHA_STUB`: капча «галочкой»; `PHONE_STUB`: коды в лог) работают только в `start-dev` или с явным `ALLOW_STUBS=true`
+(kind и закрытый стенд). Перенесённый в бой флаг без разрешения останавливает старт Keycloak с понятным сообщением.
+
+## Redis: пользователи
+
+В Redis лежат отметки отзыва токенов (ключи `auth:revoked:*` и `auth:changed:*`). Писать их должен только сервис входа; сервисам проекта
+(пакет `Platform.Authentication.Redis`) нужно только читать. Если Redis общий и без пользователей, любой сервис проекта может стереть отметки
+(`DEL`, `FLUSHALL`) или выставить фальшивые — и мгновенный отзыв перестанет работать. Поэтому:
+
+- пример в [`deploy/redis/redis.conf.example`](../deploy/redis/redis.conf.example): `default` выключен, `auth-service` читает и пишет только эти ключи,
+  `project-readonly` только читает (`MGET`, `GET`, `PING` и то, что клиент делает при подключении). Пароли замените и держите в хранилище секретов;
+- сервис входа: `ConnectionStrings__Redis=host:6379,user=auth-service,password=…` (в Helm — `redisFromSecret: true` и ключ `AUTH_REDIS` в Secret);
+- сервисы проекта: то же с пользователем `project-readonly`;
+- пример проверяется тестом на настоящем Redis (`RedisAclTests`): запись, `DEL`, `FLUSHALL`, `KEYS` и чужие ключи у `project-readonly` — отказ.
 
 ## Почему у Development и Docker разные адреса
 

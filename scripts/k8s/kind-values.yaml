@@ -65,3 +65,5 @@ keycloak:
     - { name: KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__DAILY_BUDGET, value: "0" }
     - { name: KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_STUB, value: "true" }
     - { name: KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__PHONE_STUB, value: "true" }
+    # kind работает в обычном start, а не start-dev: заглушки стенда без явного разрешения останавливают старт Keycloak.
+    - { name: KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__ALLOW_STUBS, value: "true" }

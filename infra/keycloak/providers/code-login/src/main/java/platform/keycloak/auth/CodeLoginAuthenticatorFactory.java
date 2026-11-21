@@ -8,6 +8,7 @@ import org.jboss.logging.Logger;
 import org.keycloak.Config;
 import org.keycloak.authentication.Authenticator;
 import org.keycloak.authentication.AuthenticatorFactory;
+import org.keycloak.common.util.Environment;
 import org.keycloak.models.AuthenticationExecutionModel.Requirement;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
@@ -23,6 +24,8 @@ import org.keycloak.provider.ProviderConfigProperty;
  * там же капча: CAPTCHA_SERVER_KEY и CAPTCHA_SITE_KEY (Яндекс SmartCaptcha) или CAPTCHA_STUB=true (только стенд),
  * и телефония: PHONE_PROVIDER_URL (HttpPhoneProvider) или PHONE_STUB=true (только стенд: звонки и SMS пишутся в лог,
  * LogPhoneProvider); нет ни того, ни другого — телефонии нет, коды по номеру не уходят (NoPhoneProvider).
+ * Заглушки (CAPTCHA_STUB, PHONE_STUB) работают только в start-dev или при ALLOW_STUBS=true (StubPolicy), иначе Keycloak не стартует.
+ * CAPTCHA_ON_OUTAGE=pass|reject — что делать, когда SmartCaptcha недоступна (по умолчанию pass).
  */
 public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory {
 
@@ -111,10 +114,17 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
         // Проверяем настройки при старте: с опечаткой в лимитах Keycloak не поднимется, а не пропустит коды.
         CodeLimitPolicy.from(config::get, CodeLimitPolicy.DEFAULTS);
         metrics = CodeMetrics.global();
+        boolean captchaStub = config.getBoolean("captcha-stub", false);
+        boolean phoneStub = config.getBoolean("phone-stub", false);
+        // Заглушки — только start-dev или явный allow-stubs: перенесённый в бой флаг останавливает старт.
+        StubPolicy.require(Environment.isDevMode(), config.getBoolean("allow-stubs", false), captchaStub, phoneStub);
+        // Режим при сбое капчи проверяем всегда: опечатка не должна пройти молча, даже если ключ капчи не подхватился.
+        CaptchaVerifier.OnOutage onOutage = CaptchaVerifier.OnOutage.parse(config.get("captcha-on-outage"));
         String serverKey = config.get("captcha-server-key");
         if (serverKey != null && !serverKey.isBlank()) {
-            captcha = CaptchaVerifier.smartCaptcha(serverKey, config.get("captcha-url", SMART_CAPTCHA_URL), metrics);
-        } else if (config.getBoolean("captcha-stub", false)) {
+            captcha = CaptchaVerifier.smartCaptcha(
+                serverKey, config.get("captcha-url", SMART_CAPTCHA_URL), metrics, onOutage);
+        } else if (captchaStub) {
             captcha = CaptchaVerifier.STUB;
             LOG.warn("Капча кодов — заглушка стенда (captcha-stub): в бою нужен captcha-server-key");
         } else {
@@ -126,7 +136,7 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
             // Тема рисует вместо виджета Яндекса галочку заглушки (её токен — STUB_TOKEN).
             captchaSiteKey = CaptchaVerifier.STUB_SITE_KEY;
         }
-        phone = PhoneProviders.choose(config.get("phone-provider-url"), config.getBoolean("phone-stub", false));
+        phone = PhoneProviders.choose(config.get("phone-provider-url"), phoneStub);
         if (phone instanceof LogPhoneProvider) {
             LOG.warn("Телефония — заглушка стенда (phone-stub): звонки и SMS с кодами пишутся в лог; в бою нужен phone-provider-url");
         } else if (phone instanceof NoPhoneProvider) {

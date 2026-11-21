@@ -93,7 +93,7 @@ GitHub, право `read:packages`), фида компании или локал
   "InternalAuthority": "http://auth-keycloak:8180/realms/shop",
   "Audience": "orders"
 },
-"ConnectionStrings": { "Redis": "auth-redis:6379" },
+"ConnectionStrings": { "Redis": "auth-redis:6379" },   // с ACL — "auth-redis:6379,user=project-readonly,password=…"
 "AuthService": { "BaseUrl": "http://auth-service:8080/" },
 "ServiceToken": { "ClientId": "service-orders" }
 ```

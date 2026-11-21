@@ -1,6 +1,9 @@
 package platform.keycloak.auth;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -39,5 +42,24 @@ class CaptchaVerifierTest {
     void serverError_unavailable() {
         assertEquals(CaptchaVerifier.Answer.UNAVAILABLE, CaptchaVerifier.answer(500, null));
         assertEquals(CaptchaVerifier.Answer.UNAVAILABLE, CaptchaVerifier.answer(503, null));
+    }
+
+    @Test
+    void passes_outageMode_decidesOnlyForUnavailable() {
+        for (CaptchaVerifier.OnOutage mode : CaptchaVerifier.OnOutage.values()) {
+            assertTrue(CaptchaVerifier.passes(CaptchaVerifier.Answer.PASSED, mode));
+            assertFalse(CaptchaVerifier.passes(CaptchaVerifier.Answer.FAILED, mode));
+        }
+        assertTrue(CaptchaVerifier.passes(CaptchaVerifier.Answer.UNAVAILABLE, CaptchaVerifier.OnOutage.PASS));
+        assertFalse(CaptchaVerifier.passes(CaptchaVerifier.Answer.UNAVAILABLE, CaptchaVerifier.OnOutage.REJECT));
+    }
+
+    @Test
+    void onOutage_parse_defaultPass_caseInsensitive_typoIsAnError() {
+        assertEquals(CaptchaVerifier.OnOutage.PASS, CaptchaVerifier.OnOutage.parse(null));
+        assertEquals(CaptchaVerifier.OnOutage.PASS, CaptchaVerifier.OnOutage.parse("  "));
+        assertEquals(CaptchaVerifier.OnOutage.PASS, CaptchaVerifier.OnOutage.parse("pass"));
+        assertEquals(CaptchaVerifier.OnOutage.REJECT, CaptchaVerifier.OnOutage.parse("Reject"));
+        assertThrows(IllegalArgumentException.class, () -> CaptchaVerifier.OnOutage.parse("closed"));
     }
 }

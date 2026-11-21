@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using AuthService.Core.Abstractions;
 using AuthService.IntegrationTests.Infrastructure;
 using CSharpFunctionalExtensions;
+using Microsoft.AspNetCore.Mvc.Testing;
 using PlatformAuth;
 using SharedKernel;
 using Xunit;
@@ -147,6 +149,58 @@ public sealed class RevocationTests : IClassFixture<AuthServiceWebFactory>
         _factory.Revocations.Broken = true;
 
         Assert.Equal(HttpStatusCode.OK, await MeAsync(_factory.CreateToken(TestUser.Customer)));
+    }
+
+    // Режим при сбое: TokenRevocation:OnStoreFailure=Closed — недоступное хранилище отзывов не пропускает токены (503), а не молчит.
+    [Fact]
+    public async Task StoreUnavailable_ClosedMode_Rejected503_WithRetryAfter()
+    {
+        using WebApplicationFactory<Program> closed = ClosedMode();
+        _factory.Revocations.Broken = true;
+
+        using HttpResponseMessage response = await MeAsync(closed, _factory.CreateToken(TestUser.Customer));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("5", response.Headers.RetryAfter?.Delta?.TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        using JsonDocument body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("auth.revocation_unavailable", body.RootElement.GetProperty("error").GetProperty("messages")[0].GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task StoreWorks_ClosedMode_TokenAccepted_RevokedStillRejected()
+    {
+        using WebApplicationFactory<Program> closed = ClosedMode();
+        string good = _factory.CreateToken(TestUser.Customer);
+        string old = _factory.CreateToken(TestUser.Customer, issuedAt: _issuedEarlier);
+        await _factory.Revocations.RevokeUserAsync(TestUser.Customer.Id.ToString(), DateTimeOffset.UtcNow, CancellationToken.None);
+
+        using HttpResponseMessage revoked = await MeAsync(closed, old);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, revoked.StatusCode);
+        _factory.Revocations.Reset();
+        using HttpResponseMessage accepted = await MeAsync(closed, good);
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+    }
+
+    [Fact]
+    public async Task StoreUnavailable_ExplicitOpen_TokenAccepted()
+    {
+        using WebApplicationFactory<Program> open = _factory.WithWebHostBuilder(builder => builder.UseSetting("TokenRevocation:OnStoreFailure", "Open"));
+        _factory.Revocations.Broken = true;
+
+        using HttpResponseMessage response = await MeAsync(open, _factory.CreateToken(TestUser.Customer));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    private WebApplicationFactory<Program> ClosedMode() =>
+        _factory.WithWebHostBuilder(builder => builder.UseSetting("TokenRevocation:OnStoreFailure", "Closed"));
+
+    private static async Task<HttpResponseMessage> MeAsync(WebApplicationFactory<Program> factory, string token)
+    {
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        return await client.GetAsync(new Uri("/me/", UriKind.Relative));
     }
 
     private async Task<HttpStatusCode> MeAsync(string token)

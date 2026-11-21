@@ -72,8 +72,14 @@ spec:
             {{- include "auth.secretEnv" (dict "root" . "name" "AUTH_DB_PASSWORD" "key" "AUTH_DB_PASSWORD") | nindent 12 }}
             - name: ConnectionStrings__AuthDb
               value: {{ include "auth.dbConnection" . | quote }}
+            {{- if .Values.redisFromSecret }}
+            {{- include "auth.secretEnv" (dict "root" . "name" "ConnectionStrings__Redis" "key" "AUTH_REDIS") | nindent 12 }}
+            {{- else }}
             - name: ConnectionStrings__Redis
               value: {{ include "auth.redis" . | quote }}
+            {{- end }}
+            - name: TokenRevocation__OnStoreFailure
+              value: {{ .Values.service.revocationOnStoreFailure | quote }}
             - name: Authentication__Audience
               value: {{ .Values.service.audience | quote }}
             - name: Keycloak__ClientId
