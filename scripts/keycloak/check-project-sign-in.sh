@@ -25,7 +25,7 @@ UNTIL=$(python3 -c 'import datetime as d, zoneinfo; print((d.datetime.now(zonein
 
 # Запросы к Keycloak — «с нового IP»: прошлые проверки не упрутся в капчу (KC_PROXY_HEADERS стенда).
 IP="10.$((RANDOM % 250)).$((RANDOM % 250)).$((RANDOM % 250 + 1))"
-curl() { command curl -H "X-Forwarded-For: $IP" "$@"; }
+curl() { command curl -H "$CSRF_HEADER" -H "X-Forwarded-For: $IP" "$@"; }
 
 admin_api() { command curl -s -H "Authorization: Bearer $(master_token)" -H 'Content-Type: application/json' "$@"; }
 user_id() { admin_api "$KC/admin/realms/$REALM/users?username=$1&exact=true" | python3 -c 'import json,sys; u=json.load(sys.stdin); print(u[0]["id"] if u else "")'; }

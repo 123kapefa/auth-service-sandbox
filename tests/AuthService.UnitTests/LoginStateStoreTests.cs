@@ -17,15 +17,40 @@ public sealed class LoginStateStoreTests
         TimeProvider.System);
 
     [Fact]
-    public void Saved_IsEncryptedLaxCookieUnderAuthPath()
+    public void Saved_IsEncryptedLaxHostPrefixedCookie()
     {
         SetCookieHeaderValue cookie = Save();
 
-        Assert.Equal(LoginStateStore.COOKIE_NAME, cookie.Name.ToString());
+        Assert.Equal("__Host-auth_login", cookie.Name.ToString());
         Assert.DoesNotContain("verifier-1", cookie.Value.ToString(), StringComparison.Ordinal);
-        Assert.Equal("/auth/", cookie.Path.ToString());
+        Assert.Equal("/", cookie.Path.ToString()); // __Host- требует Path=/
+        Assert.True(cookie.Secure);
+        Assert.False(cookie.Domain.HasValue);
         Assert.Equal(Microsoft.Net.Http.Headers.SameSiteMode.Lax, cookie.SameSite);
         Assert.True(cookie.HttpOnly);
+    }
+
+    [Fact]
+    public void LocalHttp_PlainNameUnderAuthPath()
+    {
+        var local = new LoginStateStore(new EphemeralDataProtectionProvider(), Options.Create(new AuthCookieOptions { Secure = false }), TimeProvider.System);
+        var context = new DefaultHttpContext();
+        local.Save(context.Response, _state);
+
+        SetCookieHeaderValue cookie = Assert.Single(SetCookieHeaderValue.ParseList(context.Response.Headers.SetCookie));
+        Assert.Equal(LoginStateStore.COOKIE_NAME, cookie.Name.ToString());
+        Assert.Equal("/auth/", cookie.Path.ToString());
+        Assert.False(cookie.Secure);
+    }
+
+    [Fact]
+    public void Https_UnprefixedCookie_NotRead()
+    {
+        string payload = Save().Value.ToString();
+        var context = new DefaultHttpContext();
+        context.Request.Headers.Cookie = $"{LoginStateStore.COOKIE_NAME}={payload}"; // подброшена с поддомена без приставки
+
+        Assert.Null(_store.Take(context.Request, context.Response));
     }
 
     [Fact]
@@ -33,7 +58,7 @@ public sealed class LoginStateStoreTests
     {
         string payload = Save().Value.ToString();
         var context = new DefaultHttpContext();
-        context.Request.Headers.Cookie = $"{LoginStateStore.COOKIE_NAME}={payload}";
+        context.Request.Headers.Cookie = $"{_store.CookieName}={payload}";
 
         LoginState? state = _store.Take(context.Request, context.Response);
 
@@ -50,7 +75,7 @@ public sealed class LoginStateStoreTests
         var context = new DefaultHttpContext();
         if (payload is not null)
         {
-            context.Request.Headers.Cookie = $"{LoginStateStore.COOKIE_NAME}={payload}";
+            context.Request.Headers.Cookie = $"{_store.CookieName}={payload}";
         }
 
         Assert.Null(_store.Take(context.Request, context.Response));
@@ -62,7 +87,7 @@ public sealed class LoginStateStoreTests
         string payload = Save().Value.ToString();
         var otherStore = new LoginStateStore(new EphemeralDataProtectionProvider(), Options.Create(new AuthCookieOptions()), TimeProvider.System);
         var context = new DefaultHttpContext();
-        context.Request.Headers.Cookie = $"{LoginStateStore.COOKIE_NAME}={payload}";
+        context.Request.Headers.Cookie = $"{_store.CookieName}={payload}";
 
         Assert.Null(otherStore.Take(context.Request, context.Response));
     }

@@ -26,7 +26,7 @@ public sealed class RefreshEndpoint : IEndpoint
         [FromServices] AuthCookieWriter cookies,
         CancellationToken cancellationToken)
     {
-        Result<TokenSet, Error> tokens = await handler.Handle(AuthCookieWriter.ReadRefreshToken(httpContext.Request), cancellationToken);
+        Result<TokenSet, Error> tokens = await handler.Handle(cookies.ReadRefreshToken(httpContext.Request), cancellationToken);
         if (tokens.IsFailure)
         {
             if (tokens.Error.Type == ErrorType.AUTHENTICATION)
@@ -37,7 +37,7 @@ public sealed class RefreshEndpoint : IEndpoint
             return Result.Failure<RefreshResponse, Error>(tokens.Error);
         }
 
-        httpContext.Request.Cookies.TryGetValue(AuthCookies.ACCESS_TOKEN, out string? previous);
+        string? previous = cookies.ReadAccessToken(httpContext.Request);
         cookies.SetTokens(httpContext.Response, tokens.Value);
         return Result.Success<RefreshResponse, Error>(
             new RefreshResponse(tokens.Value.AccessTokenExpiresAt, AccessDiff.Between(previous, tokens.Value.AccessToken)));

@@ -8,6 +8,7 @@ using CSharpFunctionalExtensions;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Net.Http.Headers;
 using PlatformAuth;
+using PlatformAuth.Csrf;
 using SharedKernel;
 using Xunit;
 
@@ -445,6 +446,7 @@ public sealed class LoginFlowTests : IClassFixture<AuthServiceWebFactory>
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative));
         request.Headers.Add("Cookie", $"{AuthCookies.REFRESH_TOKEN}={refreshToken}");
+        request.Headers.Add(CsrfHeaderMiddleware.HEADER_NAME, "XMLHttpRequest"); // как браузер: интерфейсы сервиса ставят заголовок сами
         return await browser.SendAsync(request);
     }
 

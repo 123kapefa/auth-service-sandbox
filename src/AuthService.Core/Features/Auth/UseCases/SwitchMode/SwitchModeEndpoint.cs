@@ -44,7 +44,7 @@ public sealed class SwitchModeEndpoint : IEndpoint
         Result<ModeSwitched, Error> switched = await handler.Handle(
             user.Id,
             request,
-            AuthCookieWriter.ReadRefreshToken(httpContext.Request),
+            cookies.ReadRefreshToken(httpContext.Request),
             cancellationToken);
         if (switched.IsFailure)
         {

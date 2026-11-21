@@ -151,6 +151,12 @@ ADMIN="$WORK/admin"; : > "$ADMIN"
 check "админ проекта вошёл через сервис из образа" "$(login "$ADMIN" /admin/ "$ADMIN_PHONE")" /admin/
 # Файл cookie curl: 4-я колонка — Secure (строки HttpOnly начинаются с «#HttpOnly_», комментарии — с «# »).
 check "все cookie (сервиса и Keycloak) — только по https" "$(awk 'NF >= 7 && $1 != "#" { print $4 }' "$ADMIN" | sort -u | tr '\n' ' ' | sed 's/ $//')" TRUE
+# __Host- (12.8): браузер принимает такую cookie только с Secure, Path=/ и без Domain — с соседнего поддомена её не подменить.
+check "cookie с токенами — с приставкой __Host-, Path=/" \
+  "$(awk 'NF >= 7 && $1 != "#" && $6 ~ /(access|refresh)Token$/ { print $6 ":" $3 }' "$ADMIN" | sort | tr '\n' ' ' | sed 's/ $//')" \
+  "__Host-accessToken:/ __Host-refreshToken:/"
+check "меняющий запрос с cookie без X-Requested-With — 403" \
+  "$(command curl -s -o /dev/null -w '%{http_code}' -b "$ADMIN" -X POST "$API/auth/refresh")" 403
 check "админка отдаётся" "$(curl -s -o /dev/null -w '%{http_code}' -b "$ADMIN" "$API/admin/services")" 200
 check "«кто я»: админ проекта" \
   "$(curl -s -b "$ADMIN" "$API/auth/admin/me" | python3 -c 'import json,sys; print("services.manage" in json.load(sys.stdin)["result"]["permissions"])')" True
