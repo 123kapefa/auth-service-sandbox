@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using AuthService.Domain.AuditLog;
 using AuthService.IntegrationTests.Infrastructure;
+using PlatformAuth;
 using Xunit;
 
 namespace AuthService.IntegrationTests;
@@ -10,6 +11,13 @@ namespace AuthService.IntegrationTests;
 /// <summary>Ключи сервисов проекта: выдать, перевыпустить, отозвать — только админ проекта; Keycloak подменён.</summary>
 public sealed class ServiceKeysTests : IClassFixture<AuthServiceWebFactory>
 {
+    // Право выпускать ключи (services.manage) без остальных админских прав: без users.view и с users.view.
+    private static readonly TestUser _keyManager =
+        new("менеджер ключей", Guid.NewGuid(), "+70000000011", [AuthModes.CUSTOMER, "key-manager"], "key-manager");
+
+    private static readonly TestUser _keyReader =
+        new("менеджер ключей с users.view", Guid.NewGuid(), "+70000000012", [AuthModes.CUSTOMER, "key-reader"], "key-reader");
+
     private readonly AuthServiceWebFactory _factory;
 
     public ServiceKeysTests(AuthServiceWebFactory factory)
@@ -207,6 +215,192 @@ public sealed class ServiceKeysTests : IClassFixture<AuthServiceWebFactory>
         Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(HttpMethod.Get, "/auth/admin/services", caller)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await IssueAsync("orders", "Заказы", caller)).StatusCode);
         Assert.Empty(_factory.ServiceRegistry.ClientIds);
+    }
+
+    // Ключ не даёт больше, чем есть у выпускающего (OwnRights): service.users.read и service.access.check — это users.view,
+    // service.catalog.declare — roles.manage, «приложение:право» — это право в приложении. Иначе держатель services.manage без
+    // остальных прав выпустил бы ключ, читающий пользователей, и получил бы его секрет.
+    [Theory]
+    [InlineData("service.users.read")]
+    [InlineData("service.access.check")]
+    [InlineData("service.catalog.declare")]
+    [InlineData("manager-1c:orders.view")]
+    public async Task Issue_RightsAboveOwn_Forbidden_NothingRegistered(string permission)
+    {
+        GivenKeyManagers();
+
+        HttpResponseMessage response = await IssueAsync("orders", "Заказы", _keyManager, [permission]);
+
+        await AssertErrorAsync(null, response, HttpStatusCode.Forbidden, "services.key_above_own_rights");
+        Assert.Empty(_factory.ServiceRegistry.ClientIds);
+        Assert.Empty(_factory.IdentityAdmin.RoleChanges);
+    }
+
+    [Fact]
+    public async Task Issue_RightsAboveOwn_MessageNamesMissingRights()
+    {
+        GivenKeyManagers();
+
+        HttpResponseMessage response = await IssueAsync("orders", "Заказы", _keyManager, ["service.users.read", "manager-1c:orders.view"]);
+
+        using JsonDocument body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        string message = body.RootElement.GetProperty("error").GetProperty("messages")[0].GetProperty("message").GetString()!;
+        Assert.Contains("service.users.read", message, StringComparison.Ordinal);
+        Assert.Contains("manager-1c:orders.view", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Issue_UsersRead_ByHolderOfUsersView_Ok()
+    {
+        GivenKeyManagers();
+
+        HttpResponseMessage response = await IssueAsync("orders", "Заказы", _keyReader, ["service.users.read", "service.access.check"]);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Issue_CatalogDeclare_ByHolderOfUsersView_StillForbidden()
+    {
+        GivenKeyManagers();
+
+        HttpResponseMessage response = await IssueAsync("orders", "Заказы", _keyReader, ["service.catalog.declare"]);
+
+        await AssertErrorAsync(null, response, HttpStatusCode.Forbidden, "services.key_above_own_rights");
+    }
+
+    [Fact]
+    public async Task Issue_AnyRights_ByProjectAdmin_Ok()
+    {
+        // У админа проекта roles.manage: ограничения нет, ключ с правами в приложениях проекта и каталогом — как раньше.
+        HttpResponseMessage response = await IssueAsync("orders", "Заказы", permissions: ["service.users.read", "service.catalog.declare", "manager-1c:orders.view"]);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Rotate_KeyWithRightsAboveOwn_Forbidden_SecretNotChanged()
+    {
+        // Перевыпуск отдаёт новый секрет, то есть права ключа: без проверки перевыпуск чужого сильного ключа был бы обходом.
+        GivenKeyManagers();
+        await IssueAsync("orders", "Заказы", permissions: ["service.users.read"]);
+        string? secretBefore = _factory.ServiceRegistry.SecretOf("service-orders");
+
+        HttpResponseMessage response = await SendAsync(HttpMethod.Post, "/auth/admin/services/orders/rotate", _keyManager);
+
+        await AssertErrorAsync(null, response, HttpStatusCode.Forbidden, "services.key_above_own_rights");
+        Assert.Equal(secretBefore, _factory.ServiceRegistry.SecretOf("service-orders"));
+    }
+
+    [Fact]
+    public async Task Rotate_KeyWithinOwnRights_Ok()
+    {
+        GivenKeyManagers();
+        await IssueAsync("orders", "Заказы", permissions: ["service.users.read"]);
+
+        HttpResponseMessage response = await SendAsync(HttpMethod.Post, "/auth/admin/services/orders/rotate", _keyReader);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Rotate_KeyWithoutRights_ByAnyHolder_Ok()
+    {
+        GivenKeyManagers();
+        await IssueAsync("orders", "Заказы");
+
+        HttpResponseMessage response = await SendAsync(HttpMethod.Post, "/auth/admin/services/orders/rotate", _keyManager);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("grant")]     // выдать ключу право выше своих
+    [InlineData("revoke")]    // забрать у ключа право выше своих
+    public async Task SetPermissions_AboveOwn_Forbidden_NothingChanged(string direction)
+    {
+        GivenKeyManagers();
+        await IssueAsync("orders", "Заказы", permissions: direction == "revoke" ? ["service.users.read"] : []);
+        _factory.IdentityAdmin.RoleChanges.Clear();
+        string[] wanted = direction == "grant" ? ["service.users.read"] : [];
+
+        using HttpClient client = _factory.CreateClientFor(_keyManager);
+        HttpResponseMessage response = await client.PutAsJsonAsync(new Uri("/auth/admin/services/orders/permissions", UriKind.Relative), new { permissions = wanted });
+
+        await AssertErrorAsync(null, response, HttpStatusCode.Forbidden, "services.key_above_own_rights");
+        Assert.Empty(_factory.IdentityAdmin.RoleChanges);
+    }
+
+    [Fact]
+    public async Task SetPermissions_WithinOwn_Ok()
+    {
+        GivenKeyManagers();
+        await IssueAsync("orders", "Заказы");
+
+        using HttpClient client = _factory.CreateClientFor(_keyReader);
+        HttpResponseMessage response = await client.PutAsJsonAsync(new Uri("/auth/admin/services/orders/permissions", UriKind.Relative), new { permissions = new[] { "service.users.read" } });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Issue_RightsAboveOwn_MessageNamesOnlyMissingRights()
+    {
+        // users.view есть (service.users.read — в пределах), права в приложении 1С нет — в сообщении только оно.
+        GivenKeyManagers();
+
+        HttpResponseMessage response = await IssueAsync("orders", "Заказы", _keyReader, ["service.users.read", "manager-1c:orders.view"]);
+
+        using JsonDocument body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        string message = body.RootElement.GetProperty("error").GetProperty("messages")[0].GetProperty("message").GetString()!;
+        Assert.Contains("manager-1c:orders.view", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.users.read", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Issue_AppRight_ByHolderOfRolesManageInThatApp_Ok()
+    {
+        // Админ приложения (roles.manage в его роли) определяет любые роли приложения: ключу с правом в нём ограничения нет.
+        GivenKeyManagers();
+        _factory.IdentityAdmin.SetAppRoles(_keyReader, FakeIdentityAdmin.MANAGER_1C, "admin");
+
+        HttpResponseMessage response = await IssueAsync("orders", "Заказы", _keyReader, ["manager-1c:orders.view"]);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Issue_AppRight_ByHolderOfThatRightInApp_Ok()
+    {
+        GivenKeyManagers();
+        _factory.IdentityAdmin.AddAppRole(FakeIdentityAdmin.MANAGER_1C, "viewer", "orders.view");
+        _factory.IdentityAdmin.SetAppRoles(_keyReader, FakeIdentityAdmin.MANAGER_1C, "viewer");
+
+        HttpResponseMessage ok = await IssueAsync("orders", "Заказы", _keyReader, ["manager-1c:orders.view"]);
+        HttpResponseMessage above = await IssueAsync("orders2", "Заказы 2", _keyReader, ["manager-1c:orders.edit"]);
+
+        Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
+        await AssertErrorAsync(null, above, HttpStatusCode.Forbidden, "services.key_above_own_rights");
+    }
+
+    [Fact]
+    public async Task Revoke_StrongKey_ByWeakHolder_Ok_EmergencyStop()
+    {
+        // Отзыв — аварийное действие: утёкший сильный ключ гасится любым держателем services.manage; прав он не даёт.
+        GivenKeyManagers();
+        await IssueAsync("orders", "Заказы", permissions: ["service.users.read", "service.catalog.declare"]);
+
+        HttpResponseMessage response = await SendAsync(HttpMethod.Delete, "/auth/admin/services/orders", _keyManager);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.DoesNotContain("service-orders", _factory.ServiceRegistry.ClientIds);
+    }
+
+    // Менеджеры ключей заводятся только тестам, которым они нужны.
+    private void GivenKeyManagers()
+    {
+        _factory.IdentityAdmin.Add(_keyManager, []);
+        _factory.IdentityAdmin.Add(_keyReader, []);
     }
 
     [Fact]

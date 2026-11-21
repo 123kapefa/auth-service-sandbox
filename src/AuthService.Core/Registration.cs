@@ -69,6 +69,7 @@ public static class Registration
         services.AddScoped<RolesHandler>();
         services.AddScoped<AppCatalog>();
         services.AddScoped<UserAppRoles>();
+        services.AddScoped<OwnRights>();
         services.AddScoped<UserRolesHandler>();
         services.AddScoped<AppUsersHandler>();
         services.AddScoped<ManagedApps>();

@@ -38,6 +38,7 @@ public sealed class UserRolesHandler(
     IOptions<JwtAuthenticationOptions> authentication,
     AccessChanges accessChanges,
     AdminAudit audit,
+    OwnRights ownRights,
     TimeProvider timeProvider)
 {
     /// <summary>Сколько после входа можно выдавать роли с управлением ролями без повторного входа.</summary>
@@ -190,47 +191,17 @@ public sealed class UserRolesHandler(
         return permissions;
     }
 
-    // Права выдающего. В приложении сервиса — из его токена (активный режим). В другом приложении — по его действующим ролям
-    // в этом приложении. Не ограничиваем того, у кого есть roles.manage (в токене — админ проекта, во всех приложениях
-    // проекта; в роли приложения — админ приложения): он и так определяет любую роль с любыми правами, запрет выдачи ему
-    // ничего бы не дал, а честную работу (выдать роль с новым правом приложения) ломал. Правило — против того, у кого
-    // есть users.roles.manage, но нет roles.manage: он меняет только роли в пределах собственных прав — ни выдать выше, ни
-    // снять роль сильнее своей (иначе такой человек мог бы отобрать admin у настоящего админа).
+    // Нельзя выдать и снять роль выше собственных прав (OwnRights): иначе обладатель users.roles.manage без roles.manage выдал бы
+    // admin второму аккаунту или забрал бы его у настоящего админа.
     private async Task<UnitResult<Error>> WithinOwnRightsAsync(RoleChangeActor actor, string clientId, IReadOnlySet<string> touched, CancellationToken cancellationToken)
     {
-        if (touched.Count == 0)
+        Result<string[], Error> missing = await ownRights.MissingAsync(actor.Id, actor.Permissions, clientId, touched, cancellationToken);
+        if (missing.IsFailure)
         {
-            return UnitResult.Success<Error>();
+            return missing.Error;
         }
 
-        IReadOnlySet<string> own = actor.Permissions ?? new HashSet<string>(StringComparer.Ordinal);
-        if (own.Contains(AuthServicePermissions.Roles.MANAGE))
-        {
-            return UnitResult.Success<Error>();
-        }
-
-        if (!IsServiceApp(clientId))
-        {
-            if (actor.Id is not { } actorId)
-            {
-                return AdminErrors.RoleAboveOwnRights(touched);
-            }
-
-            Result<IReadOnlyList<string>, Error> effective = await identityAdmin.GetEffectiveClientRolesAsync(actorId, clientId, cancellationToken);
-            if (effective.IsFailure)
-            {
-                return effective.Error;
-            }
-
-            own = new HashSet<string>(effective.Value, StringComparer.Ordinal);
-            if (own.Contains(AuthServicePermissions.Roles.MANAGE))
-            {
-                return UnitResult.Success<Error>();
-            }
-        }
-
-        string[] above = [.. touched.Where(permission => !own.Contains(permission))];
-        return above.Length == 0 ? UnitResult.Success<Error>() : AdminErrors.RoleAboveOwnRights(above);
+        return missing.Value.Length == 0 ? UnitResult.Success<Error>() : AdminErrors.RoleAboveOwnRights(missing.Value);
     }
 
     private async Task<UnitResult<Error>> ApplyAsync(
