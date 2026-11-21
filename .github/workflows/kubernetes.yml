@@ -15,6 +15,9 @@ on:
       - deploy/helm/**
       - scripts/k8s/**
       - scripts/keycloak/master-token.sh
+      - scripts/keycloak/check-public-paths.sh
+      - deploy/proxy/**
+      - scripts/keycloak/lib.sh
       - .github/workflows/kubernetes.yml
 
 permissions:
