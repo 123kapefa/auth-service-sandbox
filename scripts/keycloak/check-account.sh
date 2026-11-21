@@ -189,4 +189,28 @@ check "удалить его Id из своей сессии — без подт
   "/account/?action=delete-credential&action_status=error"
 check "его приложение на месте" "$(credential_id otp "$OTHER_PHONE")" "$OTHER_OTP"
 
+echo "Кабинет Keycloak закрыт (миграция 0004): только свой кабинет"
+check "страница кабинета Keycloak — 404" "$(curl -s -o /dev/null -w '%{http_code}' "$KC/realms/$REALM/account/")" 404
+check "клиенты account и account-console выключены" \
+  "$(for c in account account-console; do admin_api "$KC/admin/realms/$REALM/clients?clientId=$c" | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["enabled"])'; done | tr '\n' ' ')" "False False "
+# Вход клиентом account-console (PKCE, как делает кабинет Keycloak) не доходит до формы входа.
+VERIFIER_AC=$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')
+CHALLENGE_AC=$(python3 -c 'import hashlib,base64,sys; print(base64.urlsafe_b64encode(hashlib.sha256(sys.argv[1].encode()).digest()).rstrip(b"=").decode())' "$VERIFIER_AC")
+check "вход клиентом account-console — отказ (400), формы входа нет" \
+  "$(curl -s -o "$WORK/ac.html" -w '%{http_code}' -G "$KC/realms/$REALM/protocol/openid-connect/auth" \
+      --data-urlencode client_id=account-console --data-urlencode response_type=code --data-urlencode scope=openid \
+      --data-urlencode "redirect_uri=$KC/realms/$REALM/account/" --data-urlencode "code_challenge=$CHALLENGE_AC" \
+      --data-urlencode code_challenge_method=S256) $(grep -c 'name="username"' "$WORK/ac.html")" "400 0"
+# REST API кабинета Keycloak — то, чем обходились бы правила нашего кабинета: с токеном человека (прямой вход dev-cli) он не отвечает 200.
+TOKEN_AC=$(curl -s -d grant_type=password -d client_id=dev-cli -d username=1234567890 --data-urlencode "password=$PASSWORD" -d scope=openid \
+  "$KC/realms/$REALM/protocol/openid-connect/token" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("access_token", ""))')
+check "REST кабинета Keycloak с токеном человека — ни один адрес не отвечает 200" \
+  "$([ -n "$TOKEN_AC" ] && for p in "" credentials sessions applications; do
+      curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $TOKEN_AC" -H 'Accept: application/json' "$KC/realms/$REALM/account/$p"
+    done | grep -qx 200 && echo "есть 200" || echo "нет 200")" "нет 200"
+ADMIN_AC="$WORK/admin-ac"; : > "$ADMIN_AC"
+login "$ADMIN_AC" /admin/ 1234567890 > /dev/null
+check "в приложениях пользователя (админка) кабинета Keycloak нет" \
+  "$(curl -s -b "$ADMIN_AC" "$API/auth/admin/users/$(user_id)/apps" | python3 -c 'import json,sys; r=json.load(sys.stdin)["result"]; print(sorted(a["clientId"] for a in r if a["clientId"].startswith("account")))')" "[]"
+
 summary
