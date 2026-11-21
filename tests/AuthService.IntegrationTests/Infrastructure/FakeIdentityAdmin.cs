@@ -17,7 +17,7 @@ public sealed class FakeIdentityAdmin : IIdentityAdmin
     public const string MANAGER_1C = "manager-1c";
 
     /// <summary>Приложения проекта: клиенты с ролью access-denied.</summary>
-    public static readonly string[] Apps = ["account-console", "sandbox-bff"];
+    public static readonly string[] Apps = ["sandbox-bff"]; // кабинет Keycloak (account-console) закрыт — не приложение
 
     private readonly ConcurrentDictionary<Guid, Account> _accounts = new();
 

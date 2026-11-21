@@ -119,11 +119,15 @@ internal sealed partial class KeycloakAdminClient(
 
     public async Task<Result<IReadOnlyList<ClientInfo>, Error>> GetClientsAsync(CancellationToken cancellationToken)
     {
-        // Служебная учётка видит только клиенты, на которые ей дано право (FGAP v2).
+        // Служебная учётка видит только клиенты, на которые ей дано право (FGAP v2). Выключенный клиент — не приложение:
+        // так из списков пропадает закрытый кабинет Keycloak (account, account-console), в который уже не войти.
         Result<ClientRepresentation[], Error> clients = await GetJsonAsync<ClientRepresentation[]>("clients", cancellationToken);
         return clients.IsSuccess
             ? Result.Success<IReadOnlyList<ClientInfo>, Error>(
-                [.. clients.Value.OrderBy(client => client.ClientId, StringComparer.Ordinal).Select(client => new ClientInfo(client.ClientId, DisplayName(client)))])
+                [.. clients.Value
+                    .Where(client => client.Enabled != false)
+                    .OrderBy(client => client.ClientId, StringComparer.Ordinal)
+                    .Select(client => new ClientInfo(client.ClientId, DisplayName(client)))])
             : clients.Error;
     }
 
@@ -223,7 +227,8 @@ internal sealed partial class KeycloakAdminClient(
         }
 
         List<AppAccessInfo> apps = [];
-        foreach (ClientRepresentation client in clients.Value.OrderBy(found => found.ClientId, StringComparer.Ordinal))
+        // Выключенный клиент (закрытый кабинет Keycloak) — не приложение: доступ к нему не показываем и не меняем.
+        foreach (ClientRepresentation client in clients.Value.Where(found => found.Enabled != false).OrderBy(found => found.ClientId, StringComparer.Ordinal))
         {
             string path = $"users/{userId}/role-mappings/clients/{client.Id}";
             Result<RoleRepresentation[], Error> assigned = await GetJsonAsync<RoleRepresentation[]>(path, cancellationToken);
@@ -761,7 +766,8 @@ internal sealed partial class KeycloakAdminClient(
     private sealed record ClientRepresentation(
         [property: JsonPropertyName("id")] string Id,
         [property: JsonPropertyName("clientId")] string ClientId,
-        [property: JsonPropertyName("name")] string? Name);
+        [property: JsonPropertyName("name")] string? Name,
+        [property: JsonPropertyName("enabled")] bool? Enabled = null);
 
     private sealed record SessionRepresentation(
         [property: JsonPropertyName("id")] string Id,
