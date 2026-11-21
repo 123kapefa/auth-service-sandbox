@@ -76,12 +76,25 @@ jobs:
       - name: check-admin
         if: ${{ !cancelled() && steps.token.outcome == 'success' }}
         run: scripts/keycloak/check-admin.sh 2>&1 | tee -a stand-logs/check-admin.log
+      - name: check-roles
+        if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: scripts/keycloak/check-roles.sh 2>&1 | tee -a stand-logs/check-roles.log
+      - name: check-service-keys
+        if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: scripts/keycloak/check-service-keys.sh 2>&1 | tee -a stand-logs/check-service-keys.log
+      # Откатывает realm песочницы к виду «до этапа 6б» и применяет миграции заново: после него realm как из шаблона.
+      - name: check-realm-migrations
+        if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: scripts/keycloak/check-realm-migrations.sh 2>&1 | tee -a stand-logs/check-realm-migrations.log
       - name: check-6b
         if: ${{ !cancelled() && steps.token.outcome == 'success' }}
         run: scripts/keycloak/check-6b.sh 2>&1 | tee -a stand-logs/check-6b.log
       - name: check-10
         if: ${{ !cancelled() && steps.token.outcome == 'success' }}
         run: scripts/keycloak/check-10.sh 2>&1 | tee -a stand-logs/check-10.log
+      - name: check-code-login
+        if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: scripts/keycloak/check-code-login.sh 2>&1 | tee -a stand-logs/check-code-login.log
       - name: check-shop
         if: ${{ !cancelled() && steps.token.outcome == 'success' }}
         run: scripts/keycloak/check-shop.sh 2>&1 | tee -a stand-logs/check-shop.log

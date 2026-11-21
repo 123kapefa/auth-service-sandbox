@@ -89,6 +89,6 @@
 | Логин | `+79991110001` | `79991110001`, `phone` — `+7…` |
 | `available_roles` | строка | массив |
 | Ответы | голые объекты, ProblemDetails | `Envelope` с кодами |
-| Cookie | обе на `Path=/`, живут срок refresh | refresh только на `/auth/`, access живёт как токен |
+| Cookie | обе на `Path=/`, живут срок refresh | по https `__Host-accessToken` и `__Host-refreshToken`, обе на `Path=/`; локально по http refresh только на `/auth/`; access живёт как токен |
 | Сессии при переезде | — | не переносятся: все входят заново |
 | `userAgent`, `deviceLabel` сессии, `loginCount` | есть | нет в Keycloak (события — 30 дней) |

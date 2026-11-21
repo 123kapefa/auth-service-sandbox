@@ -3,6 +3,15 @@
 # с машины развёртывания, напрямую на 127.0.0.1:AUTH_KEYCLOAK_PORT. Замените id.shop.example.com, shop (код проекта)
 # и пути сертификата. Проверяется на каждый релиз: scripts/keycloak/check-deploy.sh, матрица обходов —
 # scripts/keycloak/check-public-paths.sh.
+# Ограничение частоты запросов с одного адреса к страницам входа и токенам realm проекта: замедляет подбор паролей и кодов.
+# 10 запросов в секунду с всплеском до 30 хватает живому человеку и странице входа (она тянет десятки ресурсов из /resources/,
+# те не ограничены). Лишние запросы — 429. Подберите под свою нагрузку. Лимит считается по адресу клиента: за NAT, балансировщиком
+# или CDN адрес общий — тогда верните настоящий (модуль realip: set_real_ip_from + real_ip_header X-Forwarded-For), иначе все
+# клиенты делят один бюджет. Серверные вызовы к токенам и ключам по публичному адресу тоже идут с одного адреса: ключи
+# (/certs) в лимит не входят, токены входят — при частых вызовах бэкендов ходите к Keycloak по внутреннему адресу.
+limit_req_zone $binary_remote_addr zone=keycloak_realm:10m rate=10r/s;
+limit_req_status 429;
+
 server {
 	listen 443 ssl;
 	server_name id.shop.example.com;
@@ -26,7 +35,9 @@ server {
 	# Адрес контейнера Keycloak — из deploy/compose.yaml (auth-keycloak:8180); proxy_pass без пути: Keycloak получает
 	# адрес ровно таким, каким он пришёл.
 	location = /realms/shop { proxy_pass http://auth-keycloak:8180; }
-	location /realms/shop/  { proxy_pass http://auth-keycloak:8180; }
+	location /realms/shop/  { limit_req zone=keycloak_realm burst=30 nodelay; proxy_pass http://auth-keycloak:8180; }
+	# Публичные ключи читают все сервисы проекта при каждой смене ключа: без лимита (подбирать тут нечего).
+	location = /realms/shop/protocol/openid-connect/certs { proxy_pass http://auth-keycloak:8180; }
 	location /resources/    { proxy_pass http://auth-keycloak:8180; }
 
 	# Остальное — не Keycloak: 404 без единого запроса к нему.
