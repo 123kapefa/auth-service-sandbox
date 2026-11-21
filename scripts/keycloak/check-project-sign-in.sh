@@ -20,7 +20,8 @@ MIXED=79990000082         # телефон, почта и пароль
 MIXED_EMAIL=project-sign-in-check@sandbox.test
 NEW=79990000083           # только телефон, заведён уже в переходный период
 UNKNOWN=79990000084       # такого нет: регистрация
-UNTIL=$(TZ=Europe/Moscow date -d '+30 days' +%F)
+# Дата через 30 дней по Москве. Не `date -d`: это GNU-синтаксис, на macOS он не работает.
+UNTIL=$(python3 -c 'import datetime as d, zoneinfo; print((d.datetime.now(zoneinfo.ZoneInfo("Europe/Moscow")) + d.timedelta(days=30)).date().isoformat())')
 
 # Запросы к Keycloak — «с нового IP»: прошлые проверки не упрутся в капчу (KC_PROXY_HEADERS стенда).
 IP="10.$((RANDOM % 250)).$((RANDOM % 250)).$((RANDOM % 250 + 1))"

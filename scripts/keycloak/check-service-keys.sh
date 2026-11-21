@@ -72,7 +72,9 @@ check "в токене сервиса — права, без ролей поль
   "$(claims "$CLIENT" "$SECRET" '",".join(c["permissions"]) + " " + str(c["role"]) + " " + c["client_id"]')" \
   "service.access.check,service.users.read [] service-$CODE"
 check "в списке — без секрета" "$(admin_call "$ADMIN" GET /auth/admin/services | python3 -c 'import json,sys; s=[x for x in json.loads(sys.stdin.read().split(" ",1)[1]) if x["code"]=="'$CODE'"]; print(len(s), "clientSecret" in s[0])')" "1 False"
-check "повторная выдача того же кода — конфликт" "$(admin_call "$ADMIN" POST /auth/admin/services "{\"code\":\"$CODE\",\"name\":\"x\"}")" "409 services.exists"
+# Тело — в переменной: внутри "$(…)" в кавычках bash 3.2 (macOS) режет JSON по запятой (docs/tech/pitfalls.md).
+DUPLICATE="{\"code\":\"$CODE\",\"name\":\"x\"}"
+check "повторная выдача того же кода — конфликт" "$(admin_call "$ADMIN" POST /auth/admin/services "$DUPLICATE")" "409 services.exists"
 check "неверный код — 400" "$(admin_call "$ADMIN" POST /auth/admin/services '{"code":"Заказы","name":"x"}' | cut -d' ' -f1)" 400
 check "токен управления в базе — зашифрован" \
   "$(docker compose exec -T postgres sh -c "psql -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -tAc \"SELECT left(protected_registration_token, 3) FROM auth.service_keys WHERE code = '$CODE'\"" | tr -d '\r')" \

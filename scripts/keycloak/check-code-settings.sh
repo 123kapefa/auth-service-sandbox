@@ -111,8 +111,11 @@ check "в журнале — что поменялось" \
 
 echo "5. Неверное — не сохраняется"
 BODY='"countries":["7"],"dailyBudget":0,"targetPerHour":5,"targetPerDay":10,"ipPerHour":10,"rangePerHour":20,"captchaAfter":2'
-check "без звонков и SMS" "$(api "$ADMIN" PUT /auth/admin/codes/settings "{\"phoneChannels\":[],$BODY}")" "400 value.is.required"
-check "страна с «+»" "$(api "$ADMIN" PUT /auth/admin/codes/settings "{\"phoneChannels\":[\"sms\"],${BODY/\[\"7\"\]/[\"+7\"]}}")" "400 invalid.format"
+# Тела — в переменных: внутри "$(…)" в кавычках bash 3.2 (macOS) режет JSON по запятой (docs/tech/pitfalls.md).
+NO_CHANNELS="{\"phoneChannels\":[],$BODY}"
+PLUS_COUNTRY="{\"phoneChannels\":[\"sms\"],${BODY/\[\"7\"\]/[\"+7\"]}}"
+check "без звонков и SMS" "$(api "$ADMIN" PUT /auth/admin/codes/settings "$NO_CHANNELS")" "400 value.is.required"
+check "страна с «+»" "$(api "$ADMIN" PUT /auth/admin/codes/settings "$PLUS_COUNTRY")" "400 invalid.format"
 check "в сутки меньше, чем в час" \
   "$(api "$ADMIN" PUT /auth/admin/codes/settings '{"phoneChannels":["sms"],"countries":["7"],"dailyBudget":0,"targetPerHour":5,"targetPerDay":3,"ipPerHour":10,"rangePerHour":20,"captchaAfter":2}')" \
   "400 codes.day_below_hour"
