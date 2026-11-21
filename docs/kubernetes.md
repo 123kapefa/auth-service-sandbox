@@ -72,7 +72,10 @@ Job остаётся до следующего развёртывания, и в
 Ingress публикует Keycloak только по путям `/realms/<код проекта>` (`realm`) и `/resources`. Realm master (`/realms/master`) и
 мастер-админка Keycloak (`/admin`) снаружи недоступны: к ним ходят через `kubectl port-forward`. Чарт не принимает `realm: master`
 и код проекта не того вида, а также аннотации `use-regex` и `rewrite-target` (они ослабили бы сравнение путей). CI проверяет
-пути Ingress и эти отказы.
+пути Ingress и эти отказы, а установка в kind — ещё и на настоящем контроллере (ingress-nginx): около сорока обходов пути
+(`..`, `%2e`, `%2f`, двойное кодирование, `//`, регистр, `;`, `/admin`) не доходят до realm master
+(`scripts/keycloak/check-public-paths.sh`). Другой контроллер или облачный балансировщик проверьте этим же скриптом
+([environments.md](environments.md#прокси-к-keycloak-что-пускать-наружу)).
 
 Сервис ходит к Keycloak по внутреннему адресу `http://<релиз>-keycloak:8180` за ключами и токенами, а `iss` в токенах
 остаётся внешним (`publicUrls.keycloak`).

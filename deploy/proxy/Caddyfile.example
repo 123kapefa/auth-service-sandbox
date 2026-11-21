@@ -1,0 +1,16 @@
+# Прокси перед Keycloak для Compose (docs/environments.md, «Прокси»): наружу — только realm проекта и ресурсы тем.
+# Realm master (вход мастер-админа, пароль которого иначе можно перебирать из интернета) и /admin закрыты: к ним ходят
+# с машины развёртывания, напрямую на 127.0.0.1:AUTH_KEYCLOAK_PORT. Замените id.shop.example.com и shop (код проекта).
+# Проверяется на каждый релиз: scripts/keycloak/check-deploy.sh, матрица обходов — scripts/keycloak/check-public-paths.sh.
+id.shop.example.com {
+	# Без «*» на конце: /realms/shop* открыл бы и соседние realm (/realms/shop-test), и всё, что начинается так же.
+	@project path /realms/shop /realms/shop/* /resources/*
+	handle @project {
+		# Адрес контейнера Keycloak из deploy/compose.yaml (auth-keycloak:8180); X-Forwarded-* Caddy ставит сам.
+		reverse_proxy auth-keycloak:8180
+	}
+	# Остальное — не Keycloak: 404 без единого запроса к нему.
+	handle {
+		respond 404
+	}
+}

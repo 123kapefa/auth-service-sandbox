@@ -50,18 +50,20 @@ AUTH_DATA_PROTECTION_CERT=$DP_CERT
 AUTH_DATA_PROTECTION_CERT_PASSWORD=check-pfx
 ENV
 
-cat > "$DIR/Caddyfile" <<CADDY
+# Прокси Keycloak — готовые примеры поставки (deploy/proxy): наружу только realm проекта и /resources, realm master и
+# /admin закрыты. Адрес и код проекта подставляются вместо id.shop.example.com и shop. Сервис входа — за своим сайтом Caddy.
 {
-	local_certs
-	skip_install_trust
-}
-$KC_PUBLIC {
-	reverse_proxy auth-keycloak:8180
-}
-$API {
-	reverse_proxy auth-service:8080
-}
-CADDY
+	printf '{\n\tlocal_certs\n\tskip_install_trust\n}\n'
+	sed -e "s#^id.shop.example.com#$KC_PUBLIC#" -e "s#/realms/shop#/realms/$REALM#g" "$ROOT/deploy/proxy/Caddyfile.example"
+	printf '%s {\n\treverse_proxy auth-service:8080\n}\n' "$API"
+} > "$DIR/Caddyfile"
+# То же — на nginx (свой сертификат, как в бою его положит оператор).
+mkdir -p "$DIR/nginx-certs"
+openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj /CN=localhost -addext "subjectAltName=DNS:localhost" \
+  -keyout "$DIR/nginx-certs/tls.key" -out "$DIR/nginx-certs/tls.crt" > "$DIR/openssl.log" 2>&1 \
+  || { echo "Сертификат для nginx не создан (openssl с -addext, не LibreSSL macOS: brew install openssl):"; cat "$DIR/openssl.log"; exit 2; }
+chmod 644 "$DIR/nginx-certs/tls.key"
+sed -e "s#id.shop.example.com#localhost#" -e "s#/realms/shop#/realms/$REALM#g" "$ROOT/deploy/proxy/nginx.conf.example" > "$DIR/nginx.conf"
 
 # Пути абсолютные: скрипты зовут compose с --project-directory корня репозитория.
 cat > "$DIR/compose.yaml" <<COMPOSE
@@ -77,6 +79,14 @@ services:
     volumes:
       - $DIR/Caddyfile:/etc/caddy/Caddyfile:ro
       - auth_proxy_data:/data
+  auth-proxy-nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "127.0.0.1:18445:443"
+    volumes:
+      - $DIR/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - $DIR/nginx-certs:/etc/nginx/certs:ro
+    depends_on: [auth-keycloak]
 volumes:
   auth_proxy_data:
 COMPOSE
@@ -99,18 +109,27 @@ ready() { for _ in $(seq 1 60); do [ "$(curl -s -o /dev/null -w '%{http_code}' "
 echo "0. Установка из образов: прокси с https, Keycloak, проект, сервис"
 dc down -v > /dev/null 2>&1
 check "Keycloak из образа поднялся в боевом режиме (start)" \
-  "$(dc up -d --wait auth-keycloak auth-proxy > /dev/null 2>&1 && docker inspect --format '{{join .Config.Cmd " "}}' "$(dc ps -q auth-keycloak)")" start
+  "$(dc up -d --wait auth-keycloak auth-proxy auth-proxy-nginx > /dev/null 2>&1 && docker inspect --format '{{join .Config.Cmd " "}}' "$(dc ps -q auth-keycloak)")" start
 # Корневой сертификат прокси — curl доверяет ему, как браузер — сертификату компании.
 for _ in $(seq 1 30); do dc cp auth-proxy:/data/caddy/pki/authorities/local/root.crt "$DIR/proxy-ca.crt" > /dev/null 2>&1 && break; sleep 1; done
 export CURL_CA_BUNDLE="$DIR/proxy-ca.crt"
-check "Keycloak за прокси по https: issuer — внешний адрес" \
-  "$(curl -s "$KC_PUBLIC/realms/master/.well-known/openid-configuration" | python3 -c 'import json,sys; print(json.load(sys.stdin)["issuer"])' 2>&1 | tail -1)" "$KC_PUBLIC/realms/master"
 check "проект создан скриптом (без DEV)" \
   "$(AUTH_KEYCLOAK_URL=$KC_PUBLIC AUTH_BFF_CLIENT_SECRET=$SECRET "$ROOT/scripts/project/create-project.sh" "$REALM" "Проверка поставки" "$API" http://auth-service:8080 2>/dev/null | head -1)" \
   "Проект «Проверка поставки» создан: realm $REALM, клиенты auth-api и auth-bff."
+check "Keycloak за прокси по https: issuer — внешний адрес" \
+  "$(curl -s "$KC_PUBLIC/realms/$REALM/.well-known/openid-configuration" | python3 -c 'import json,sys; print(json.load(sys.stdin)["issuer"])' 2>&1 | tail -1)" "$KC_PUBLIC/realms/$REALM"
 check "проект: https обязателен для внешних адресов, почты нет" \
   "$(curl -s -H "Authorization: Bearer $(master_token)" "$KC/admin/realms/$REALM" | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["sslRequired"], bool(r.get("smtpServer")))')" "external False"
 check "первый админ" "$("$ROOT/scripts/project/add-admin.py" "$REALM" "$ADMIN_PHONE" --password "$PASSWORD" | cut -d' ' -f1-4)" "Админ проекта $REALM: +$ADMIN_PHONE"
+# Мастер-админка снаружи закрыта: матрица обходов пути через оба примера прокси; напрямую (контроль) master на месте.
+cat "$DIR/proxy-ca.crt" "$DIR/nginx-certs/tls.crt" > "$DIR/proxy-ca-all.crt"
+for front in "Caddy|$KC_PUBLIC" "nginx|https://localhost:18445"; do
+  if CURL_CA_BUNDLE="$DIR/proxy-ca-all.crt" PUBLIC="${front#*|}" DIRECT="$KC" REALM="$REALM" "$ROOT/scripts/keycloak/check-public-paths.sh" > "$WORK/paths.log" 2>&1; then
+    ok "${front%%|*}: снаружи только realm проекта и /resources, master и /admin закрыты ($(tail -1 "$WORK/paths.log"))"
+  else
+    bad "${front%%|*}: закрытие master"; sed 's/^/    /' "$WORK/paths.log"
+  fi
+done
 echo "AUTH_REGISTRATION_TOKEN=$(REALM=$REALM "$ROOT/scripts/keycloak/registration-token.sh")" >> "$DIR/auth.env"
 check "сервис входа из образа поднялся (мигратор отработал)" "$(dc up -d --wait auth-service > /dev/null 2>&1 && ready)" 200
 # Мигратор настроек проектов (до сервиса) — токен мастер-админки сам, по внутреннему адресу Keycloak в боевом режиме.
