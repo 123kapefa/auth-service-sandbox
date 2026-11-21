@@ -3,7 +3,7 @@
   "enabled": true,
   "displayName": "Auth Sandbox",
   "attributes": {
-    "platform.realmVersion": "3"
+    "platform.realmVersion": "4"
   },
   "sslRequired": "none",
   "registrationAllowed": false,
@@ -1446,7 +1446,7 @@
       "rootUrl": "${authBaseUrl}",
       "baseUrl": "/realms/sandbox/account/",
       "surrogateAuthRequired": false,
-      "enabled": true,
+      "enabled": false,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
@@ -1479,7 +1479,7 @@
       "rootUrl": "${authBaseUrl}",
       "baseUrl": "/realms/sandbox/account/",
       "surrogateAuthRequired": false,
-      "enabled": true,
+      "enabled": false,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [

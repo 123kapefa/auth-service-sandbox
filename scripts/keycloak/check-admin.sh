@@ -199,12 +199,12 @@ status "$CUSTOMER" POST /auth/logout > /dev/null
 echo "5. Доступ к приложению (аккаунт рабочий, одно приложение закрыто)"
 app_access "$ADMIN" "$ID_CUSTOMER" sandbox-bff true > /dev/null   # на случай прошлого упавшего прогона
 APPS='",".join(a["clientId"] + ":" + str(a["hasAccess"]) for a in r)'
-check "приложения проекта и доступ" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER/apps" "$APPS")" "200 account-console:True,manager-1c:True,sandbox-bff:True"
+check "приложения проекта и доступ" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER/apps" "$APPS")" "200 manager-1c:True,sandbox-bff:True"
 CUSTOMER="$WORK/customer4"; : > "$CUSTOMER"
 login "$CUSTOMER" /me/ 79990000001 > /dev/null
 OLD_ACCESS=$(cookie "$CUSTOMER" accessToken)
 check "менеджер закрывает покупателю демо-приложение" "$(app_access "$MANAGER" "$ID_CUSTOMER" sandbox-bff false)" "200 False"
-check "личный кабинет остаётся открыт" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER/apps" "$APPS")" "200 account-console:True,manager-1c:True,sandbox-bff:False"
+check "кабинет Keycloak закрыт — среди приложений его нет" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_CUSTOMER/apps" "$APPS")" "200 manager-1c:True,sandbox-bff:False"
 check "уже выданный access-токен демо-приложения — 401 сразу" "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: accessToken=$OLD_ACCESS" "$API/me/")" 401
 check "открытая сессия демо-приложения: refresh — 401" "$(status "$CUSTOMER" POST /auth/refresh)" 401
 check "новый вход в демо-приложение — «доступ закрыт»" \
@@ -326,6 +326,21 @@ if m:
     body=json.load(urllib.request.urlopen(sys.argv[1] + "/api/v1/message/" + m[0]["ID"]))
     print("yes" if any("action-token" in l for l in re.findall(r"href=\"([^\"]+)\"", body["HTML"] or "")) else "")' "$MAILPIT")
   [ -n "$link" ] && { echo "$link"; break; }; sleep 1; done)" yes
+# Письмо идёт без клиента (сессия под служебным _system), поэтому закрытие кабинета Keycloak (клиент account) его не ломает.
+# Ссылка → страница «Выполните следующие действия» → один переход по ней → страница смены пароля.
+RESET_JAR="$WORK/reset-link"; : > "$RESET_JAR"
+RESET_LINK=$(curl -s "$MAILPIT/api/v1/search?query=to:customer@sandbox.test" | python3 -c '
+import html,json,re,sys,urllib.request
+m=json.load(sys.stdin)["messages"]
+body=json.load(urllib.request.urlopen(sys.argv[1] + "/api/v1/message/" + m[0]["ID"]))["HTML"] or ""
+print(html.unescape(next((l for l in re.findall(r"href=\"([^\"]+)\"", body) if "action-token" in l), "")))' "$MAILPIT")
+ctx_value() { python3 -c '
+import html,re,sys
+t=open(sys.argv[1],encoding="utf-8").read(); k=re.search(r"\"" + sys.argv[2] + r"\"\s*:\s*\"([^\"]*)\"", t)
+print(html.unescape(k.group(1).replace("\\/", "/")) if k else "")' "$1" "$2"; }
+curl -s -L -b "$RESET_JAR" -c "$RESET_JAR" -o "$WORK/reset1.html" "$RESET_LINK"
+curl -s -L -b "$RESET_JAR" -c "$RESET_JAR" -o "$WORK/reset2.html" "$(ctx_value "$WORK/reset1.html" actionUri)"
+check "ссылка из письма доводит до страницы смены пароля (кабинет Keycloak закрыт)" "$(ctx_value "$WORK/reset2.html" pageId)" login-update-password
 check "ссылка из админки — письмо темы sandbox «Обновите учётную запись»" "$(curl -s "$MAILPIT/api/v1/search?query=to:customer@sandbox.test" | python3 -c 'import json,sys; print(json.load(sys.stdin)["messages"][0]["Subject"])')" "Обновите учётную запись"
 check "в карточке — 2FA включена (79990000006)" "$(admin_get "$ADMIN" "/auth/admin/users/$ID_OTP" 'str(r["hasTwoFactor"])')" "200 True"
 check "2FA нет — отключение без изменений" "$(post_admin "$ADMIN" DELETE "/auth/admin/users/$ID_CUSTOMER/two-factor")" "200 False"

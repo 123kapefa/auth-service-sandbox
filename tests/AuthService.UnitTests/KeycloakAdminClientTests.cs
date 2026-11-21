@@ -23,6 +23,23 @@ public sealed class KeycloakAdminClientTests : IDisposable
     private readonly FakeKeycloak _keycloak = new();
 
     [Fact]
+    public async Task GetClients_DisabledClientsAreNotApps_ClosedAccountConsoleAmongThem()
+    {
+        // Кабинет Keycloak закрыт (клиенты выключены): среди приложений человека и админа его быть не должно.
+        IReadOnlyList<ClientInfo> clients = (await CreateClient().GetClientsAsync(default)).Value;
+
+        Assert.Equal(["manager-1c", "no-flag", "sandbox-bff"], [.. clients.Select(client => client.ClientId)]);
+    }
+
+    [Fact]
+    public async Task GetAppAccess_DisabledClientsAreNotListed()
+    {
+        IReadOnlyList<AppAccessInfo> apps = (await CreateClient().GetAppAccessAsync(_userId, default)).Value;
+
+        Assert.Equal(["manager-1c", "no-flag", "sandbox-bff"], [.. apps.Select(app => app.ClientId)]);
+    }
+
+    [Fact]
     public async Task GetUser_UsesServiceAccountToken_AndInternalAdminApiNextToTokenEndpoint()
     {
         IdentityUser user = (await CreateClient().GetUserAsync(_userId, default)).Value;
@@ -175,8 +192,19 @@ public sealed class KeycloakAdminClientTests : IDisposable
             }
             """;
 
-        // Как отдаёт Admin API: секретов нет, у кодов восстановления в credentialData — счётчики.
-        private const string CREDENTIALS = """
+        // Клиенты как отдаёт Admin API: кабинет Keycloak выключен, у одного клиента поля enabled нет (считается включённым).
+        private const string CLIENTS = """
+        [
+          { "id": "1", "clientId": "sandbox-bff", "name": "Sandbox", "enabled": true },
+          { "id": "2", "clientId": "account", "name": "${client_account}", "enabled": false },
+          { "id": "3", "clientId": "account-console", "name": "${client_account-console}", "enabled": false },
+          { "id": "4", "clientId": "manager-1c", "name": "Менеджер 1С", "enabled": true },
+          { "id": "5", "clientId": "no-flag", "name": "Без поля enabled" }
+        ]
+        """;
+
+    // Как отдаёт Admin API: секретов нет, у кодов восстановления в credentialData — счётчики.
+    private const string CREDENTIALS = """
             [
               { "id": "c-password", "type": "password", "createdDate": 1790000000000, "credentialData": "{\"algorithm\":\"argon2\"}" },
               { "id": "c-otp", "type": "otp", "userLabel": "Телефон", "createdDate": 1790000100000, "credentialData": "{\"subType\":\"totp\"}" },
@@ -215,6 +243,17 @@ public sealed class KeycloakAdminClientTests : IDisposable
                 if (url.EndsWith("/federated-identity", StringComparison.Ordinal))
                 {
                     return Json(HttpStatusCode.OK, """[{ "identityProvider": "yandex", "userId": "y-1", "userName": "a" }, { "identityProvider": "esia", "userId": "e-1" }]""");
+                }
+
+                if (url.EndsWith("/clients", StringComparison.Ordinal))
+                {
+                    return Json(HttpStatusCode.OK, CLIENTS);
+                }
+
+                if (url.Contains("/role-mappings/clients/", StringComparison.Ordinal))
+                {
+                    // Ни одна роль не выдана; закрыть доступ можно у каждого клиента (есть роль access-denied).
+                    return Json(HttpStatusCode.OK, url.EndsWith("/available", StringComparison.Ordinal) ? """[{ "id": "r1", "name": "access-denied" }]""" : "[]");
                 }
 
                 if (url.Contains("/events?", StringComparison.Ordinal))
