@@ -1,0 +1,22 @@
+# Пример конфига Redis с пользователями (ACL) для проекта (docs/environments.md, «Redis: пользователи»). В Redis лежат отметки мгновенного отзыва
+# токенов: ключи auth:revoked:* и auth:changed:*. Писать их должен только сервис входа; сервисам проекта (пакет
+# Platform.Authentication.Redis) нужно только читать. Без ACL любой из них мог бы стереть отметки (DEL, FLUSHALL) или
+# выставить фальшивые, и отзыв токенов перестал бы работать.
+#
+# Пароли замените (openssl rand -base64 32) и храните в хранилище секретов, не в файле. Запуск:
+#   redis-server /etc/redis/redis.conf
+# Пользователи заданы прямо в конфиге (директивы user): отдельный файл --aclfile комментариев не допускает и от конфига
+# не зависит — использовать что-то одно.
+# Адрес для сервисов: ConnectionStrings__Redis=host:6379,user=<имя>,password=<пароль>
+#
+# +client|setinfo, +client|setname, +client|id, +hello, +info, +echo — то, что клиент StackExchange.Redis выполняет при
+# подключении; без них подключение с таким пользователем не проходит или шумит в логе.
+
+# Пользователь по умолчанию — выключен: без имени и пароля Redis ничего не выполняет.
+user default off
+
+# Сервис входа: читает и пишет отметки (SETEX — так пакет пишет отметку со сроком жизни), больше ничего.
+user auth-service on >CHANGE_ME_AUTH_SERVICE ~auth:revoked:* ~auth:changed:* -@all +mget +get +set +setex +psetex +ping +echo +info +hello +client|setinfo +client|setname +client|id
+
+# Сервисы проекта (и любой, кто только проверяет токены): только читают отметки.
+user project-readonly on >CHANGE_ME_PROJECT_READONLY ~auth:revoked:* ~auth:changed:* -@all +mget +get +ping +echo +info +hello +client|setinfo +client|setname +client|id

@@ -16,7 +16,9 @@
 | Ingress | https на обоих доменах, у Keycloak наружу открыты только `/realms/<код проекта>` и `/resources` | мастер-админка и realm master снаружи не нужны |
 | Секреты | оператор Infisical (`InfisicalSecret`) или Secret, созданный заранее | [secrets.md](secrets.md) |
 
-Postgres (базы сервиса и Keycloak) и Redis внешние: адреса задаются в values. Для стенда они ставятся внутри чарта
+Postgres (базы сервиса и Keycloak) и Redis внешние: адреса задаются в values (Redis с пользователем и паролем — `redisFromSecret: true` и ключ `AUTH_REDIS` в Secret,
+[environments.md](environments.md#redis-пользователи)). Режимы при сбое: `service.revocationOnStoreFailure` (`Open`/`Closed`) и `keycloak.captchaOnOutage` (`pass`/`reject`) —
+[environments.md](environments.md#сбои-redis-и-капчи-открыто-или-закрыто). Для стенда они ставятся внутри чарта
 (`stand.enabled`), данные живут, пока жив под.
 
 ### Keycloak в несколько реплик

@@ -66,10 +66,16 @@ keycloakDatabase:
   name: keycloak
   user: keycloak
 
-# Redis проекта — отметки мгновенного отзыва токенов: host:port[,password=…].
+# Redis проекта — отметки мгновенного отзыва токенов: host:port.
 redis: ""
+# С пользователем и паролем (ACL, deploy/redis/redis.conf.example) строка подключения — секрет: true — взять её целиком из
+# Secret (ключ AUTH_REDIS: host:port,user=auth-service,password=…), redis выше тогда не используется.
+redisFromSecret: false
 
 service:
+  # Что делать, когда Redis с отметками отзыва недоступен: Open (токен пропускается, вход живёт, отзыв на это время не
+  # работает) или Closed (токен не принимается, 503). docs/environments.md, «Сбои Redis и капчи».
+  revocationOnStoreFailure: Open
   replicas: 2
   environment: Production
   # Клиенты проекта — одинаковые во всех проектах (scripts/project/create-project.sh).
@@ -104,6 +110,8 @@ keycloak:
   updateStrategy: RollingUpdate
   # start: http внутри кластера, https снаружи делает Ingress.
   command: [start]
+  # SmartCaptcha недоступна (5xx, таймаут): pass — капча считается пройденной (лимиты действуют), reject — не пройденной.
+  captchaOnOutage: pass
   admin: admin
   # X-Forwarded-* принимаются только от Ingress-контроллера: сети подов кластера.
   trustedProxies: [10.0.0.0/8]

@@ -51,6 +51,8 @@ services:
       # за час с одного IP или на один номер код не уходит.
       KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_SERVER_KEY: ${AUTH_SMARTCAPTCHA_SERVER_KEY:-}
       KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_SITE_KEY: ${AUTH_SMARTCAPTCHA_SITE_KEY:-}
+      # SmartCaptcha недоступна (5xx, таймаут): pass — капча считается пройденной (лимиты действуют), reject — не пройденной.
+      KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_ON_OUTAGE: ${AUTH_CAPTCHA_ON_OUTAGE:-pass}
       # Телефония: адрес провайдера звонков и SMS (с ключом). Пусто — телефонии нет: коды по номеру не отправляются
       # (код входа в лог не пишется), вход по коду на почту работает.
       KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__PHONE_PROVIDER_URL: ${AUTH_PHONE_PROVIDER_URL:-}
@@ -83,8 +85,14 @@ services:
     volumes:
       - auth_db:/var/lib/postgresql/data
 
+  # Redis без пользователей — для одной машины в своей сети. С пользователями (сервис входа пишет, сервисы проекта только читают):
+  # раскомментируйте command и volumes, скопируйте deploy/redis/redis.conf.example в redis/redis.conf, замените пароли и укажите
+  # AUTH_REDIS=auth-redis:6379,user=auth-service,password=… (docs/environments.md, «Redis: пользователи»).
   auth-redis:
     image: redis:7-alpine
+    # command: ["redis-server", "/etc/redis/redis.conf"]
+    # volumes:
+    #   - ./redis/redis.conf:/etc/redis/redis.conf:ro
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -123,6 +131,9 @@ services:
       ASPNETCORE_ENVIRONMENT: ${AUTH_ENVIRONMENT:-Production}
       ConnectionStrings__AuthDb: ${AUTH_DB_CONNECTION:-Host=auth-db;Port=5432;Database=auth_service;Username=auth_service;Password=${AUTH_DB_PASSWORD}}
       ConnectionStrings__Redis: ${AUTH_REDIS:-auth-redis:6379}
+      # Что делать, когда Redis с отметками отзыва недоступен: Open (токен пропускается, вход живёт, отзыв на это время не
+      # работает) или Closed (токен не принимается, 503). По умолчанию Open — docs/environments.md, «Сбои Redis и капчи».
+      TokenRevocation__OnStoreFailure: ${AUTH_REVOCATION_ON_STORE_FAILURE:-Open}
       # Проект (realm): клиенты auth-api и auth-bff — одинаковые во всех проектах (scripts/project/create-project.sh);
       # заданы явно — не зависят от AUTH_ENVIRONMENT (в Docker/Development — демо-проект песочницы).
       Authentication__Audience: auth-api

@@ -16,6 +16,7 @@
 | Сертификат ключей DataProtection (PFX в base64) и его пароль | `AUTH_DATA_PROTECTION_CERT`, `AUTH_DATA_PROTECTION_CERT_PASSWORD` | сервис входа (`DataProtection__Certificate`) | техник платформы | [скрипт, с перекрытием](#сертификат-dataprotection) |
 | Пароль базы сервиса входа | `POSTGRES_PASSWORD` / `AUTH_DB_PASSWORD` | Postgres, мигратор, сервис входа | техник платформы | [скрипт](#пароли-баз) |
 | Пароль базы Keycloak | `KEYCLOAK_DB_PASSWORD` / `AUTH_KEYCLOAK_DB_PASSWORD` | Postgres Keycloak, Keycloak | техник платформы | [скрипт](#пароли-баз) |
+| Строка подключения к Redis с пользователем и паролем (если Redis с ACL, [environments.md](environments.md#redis-пользователи)) | `AUTH_REDIS` | сервис входа (`ConnectionStrings__Redis`); у сервисов проекта — своя, с пользователем только для чтения | техник платформы | вручную: новый пароль в Redis (`ACL SETUSER`) и в хранилище, перезапуск |
 | Пароль админа Keycloak (мастер-админка) | `KEYCLOAK_ADMIN_PASSWORD` / `AUTH_KEYCLOAK_ADMIN_PASSWORD` | Keycloak — только при первом запуске; скрипты техника | техник платформы | [вручную](#пароль-админа-keycloak) |
 | Пароль почты (SMTP) | `SMTP_PASSWORD` | Keycloak (настройки почты проекта, хранит в своей базе) | админ проекта | [вручную](#почта-smtp) |
 | Ключи Яндекс SmartCaptcha (серверный; клиентский — не секрет) | `SMARTCAPTCHA_SERVER_KEY` / `AUTH_SMARTCAPTCHA_SERVER_KEY` | Keycloak (плагин кодов) | техник платформы | [вручную](#ключи-внешних-систем) |

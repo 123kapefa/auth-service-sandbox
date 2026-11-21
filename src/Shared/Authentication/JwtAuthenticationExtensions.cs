@@ -16,6 +16,11 @@ public static class JwtAuthenticationExtensions
 
     private const string ACCESS_CHANGED_ITEM = "PlatformAuth.AccessChanged";
 
+    /// <summary>Код ответа 503: хранилище отзывов недоступно, а режим при сбое — «закрыто».</summary>
+    public const string REVOCATION_UNAVAILABLE = "revocation_unavailable";
+
+    private const string REVOCATION_UNAVAILABLE_ITEM = "PlatformAuth.RevocationUnavailable";
+
     /// <summary>
     /// Проверка access-токенов сервера входа (Keycloak): подпись по ключам из discovery (RS256),
     /// iss, aud, срок действия. Настройки — секция Authentication, проверяются при старте.
@@ -91,6 +96,10 @@ public static class JwtAuthenticationExtensions
                 context.HttpContext.Items[ACCESS_CHANGED_ITEM] = true;
                 context.Fail("Access has changed: refresh the token.");
                 break;
+            case TokenStatus.Unavailable:
+                context.HttpContext.Items[REVOCATION_UNAVAILABLE_ITEM] = true;
+                context.Fail("The token revocation store is unavailable.");
+                break;
             case TokenStatus.Valid:
             default:
                 break;
@@ -101,6 +110,12 @@ public static class JwtAuthenticationExtensions
     // auth.access_changed в теле. Клиент обновляет токен без перелогина и повторяет запрос.
     private static async Task ExplainAccessChangedAsync(JwtBearerChallengeContext context)
     {
+        if (context.HttpContext.Items.ContainsKey(REVOCATION_UNAVAILABLE_ITEM))
+        {
+            await WriteRevocationUnavailableAsync(context);
+            return;
+        }
+
         if (!context.HttpContext.Items.ContainsKey(ACCESS_CHANGED_ITEM))
         {
             return;
@@ -125,6 +140,35 @@ public static class JwtAuthenticationExtensions
                         },
                     },
                     type = "AUTHENTICATION",
+                },
+                isError = true,
+            },
+            context.HttpContext.RequestAborted);
+    }
+
+    // Режим «закрыто» и хранилище отзывов недоступно: 503, а не 401 — человек не разлогинен, сервис временно не может проверить
+    // токен; клиент повторяет запрос позже (Retry-After), а не гонит человека на вход.
+    private static async Task WriteRevocationUnavailableAsync(JwtBearerChallengeContext context)
+    {
+        context.HandleResponse();
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        context.Response.Headers[HeaderNames.RetryAfter] = "5";
+        await context.Response.WriteAsJsonAsync(
+            new
+            {
+                result = (object?)null,
+                error = new
+                {
+                    messages = new[]
+                    {
+                        new
+                        {
+                            code = "auth." + REVOCATION_UNAVAILABLE,
+                            message = "Не удаётся проверить токен: хранилище отзывов недоступно. Повторите запрос позже.",
+                            invalidField = (string?)null,
+                        },
+                    },
+                    type = "FAILURE",
                 },
                 isError = true,
             },

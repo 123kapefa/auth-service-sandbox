@@ -4,14 +4,15 @@ using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PlatformAuth.Revocation;
+using StackExchange.Redis;
 
 namespace PlatformAuth.Redis;
 
 /// <summary>
 /// Отозван ли токен и не изменился ли доступ: отметки из хранилища (Redis) через короткий кэш в памяти — HybridCache
 /// только L1, без второго уровня: решение о доступе не должно лежать в распределённом кэше (стандарт платформы —
-/// Redis напрямую + burst L1). Redis недоступен — токен пропускается (он и так живёт не дольше 15 минут),
-/// с предупреждением в лог.
+/// Redis напрямую + burst L1). Redis недоступен — по TokenRevocation:OnStoreFailure: Open (по умолчанию) токен
+/// пропускается (он и так живёт не дольше 15 минут), с предупреждением в лог; Closed — не принимается (TokenStatus.Unavailable).
 /// </summary>
 internal sealed partial class TokenRevocationChecker(
     ITokenRevocationStore store,
@@ -66,7 +67,22 @@ internal sealed partial class TokenRevocationChecker(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            LogStoreUnavailable(logger, exception);
+            if (options.Value.OnStoreFailure == StoreFailureMode.Closed)
+            {
+                LogStoreUnavailableRejected(logger, exception);
+                return TokenStatus.Unavailable;
+            }
+
+            // Ответ сервера Redis (NOPERM, WRONGPASS) — не сбой сети, а ошибка настройки ACL/пароля: отзыв не работает у всех.
+            if (exception is RedisServerException)
+            {
+                LogStoreRejectedCommand(logger, exception);
+            }
+            else
+            {
+                LogStoreUnavailable(logger, exception);
+            }
+
             return TokenStatus.Valid;
         }
     }
@@ -76,4 +92,10 @@ internal sealed partial class TokenRevocationChecker(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Token revocation store is unavailable; the token is accepted")]
     private static partial void LogStoreUnavailable(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Redis refused the revocation command (check ACL/password); the token is accepted, revocation is NOT working")]
+    private static partial void LogStoreRejectedCommand(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Token revocation store is unavailable; the token is rejected (OnStoreFailure=Closed)")]
+    private static partial void LogStoreUnavailableRejected(ILogger logger, Exception exception);
 }

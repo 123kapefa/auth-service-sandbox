@@ -17,7 +17,11 @@ public static class TokenRevocationExtensions
         string connectionString = configuration.GetConnectionString(TokenRevocationOptions.CONNECTION_STRING_NAME)
             ?? throw new InvalidOperationException($"ConnectionStrings:{TokenRevocationOptions.CONNECTION_STRING_NAME} is required.");
 
-        services.Configure<TokenRevocationOptions>(configuration.GetSection(TokenRevocationOptions.SECTION_NAME));
+        // ValidateOnStart: опечатка в настройке (например, OnStoreFailure=Clsed) останавливает старт, а не всплывает на первом запросе.
+        services.AddOptions<TokenRevocationOptions>()
+            .Bind(configuration.GetSection(TokenRevocationOptions.SECTION_NAME))
+            .Validate(o => Enum.IsDefined(o.OnStoreFailure), "TokenRevocation:OnStoreFailure must be Open or Closed.")
+            .ValidateOnStart();
         // abortConnect=false: сервис стартует и без Redis, переподключение — само; проверка отзыва в это время пропускает токены.
         services.AddSingleton<IConnectionMultiplexer>(_ =>
             ConnectionMultiplexer.Connect(ConfigurationOptions.Parse($"{connectionString},abortConnect=false")));
