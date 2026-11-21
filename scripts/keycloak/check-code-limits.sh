@@ -17,7 +17,7 @@ KEYS="cooldowns target-per-hour target-per-day ip-per-hour range-per-hour range-
 
 # Все запросы — «с IP» из $IP: Keycloak стенда берёт адрес из X-Forwarded-For (KC_PROXY_HEADERS).
 IP=""
-curl() { if [ -n "$IP" ]; then command curl -H "X-Forwarded-For: $IP" "$@"; else command curl "$@"; fi; }
+curl() { if [ -n "$IP" ]; then command curl -H "$CSRF_HEADER" -H "X-Forwarded-For: $IP" "$@"; else command curl -H "$CSRF_HEADER" "$@"; fi; }
 new_ip() { echo "10.$((RANDOM % 250)).$((RANDOM % 250)).$((RANDOM % 250 + 1))"; }
 new_phone() { echo "${1:-7997}$(printf '%07d' $(( (RANDOM * 32768 + RANDOM) % 10000000 )))" | cut -c1-11; }
 

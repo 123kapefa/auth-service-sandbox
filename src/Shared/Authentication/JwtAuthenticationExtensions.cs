@@ -1,10 +1,13 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
+using PlatformAuth.Csrf;
 using PlatformAuth.Revocation;
 
 namespace PlatformAuth;
@@ -33,6 +36,9 @@ public static class JwtAuthenticationExtensions
             .Bind(configuration.GetSection(JwtAuthenticationOptions.SECTION_NAME))
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<JwtAuthenticationOptions>, JwtAuthenticationOptionsValidator>();
+
+        // Меняющие запросы с cookie токена требуют заголовок X-Requested-With (защита от CSRF); подключается сама, без вызова в сервисе.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IStartupFilter, CsrfHeaderStartupFilter>());
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
         services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)

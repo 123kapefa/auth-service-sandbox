@@ -12,6 +12,8 @@ public static class AuthenticationConfiguration
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // Cookie с access-токеном читается под тем же именем, под каким сервис её ставит (по https — с приставкой __Host-).
+        configuration["Authentication:AccessTokenCookie"] = AuthCookies.AccessToken(configuration.GetValue("Cookies:Secure", true));
         services.AddPlatformJwtAuthentication(configuration);
         services.AddPlatformTokenRevocation(configuration);
         services.AddPlatformAuthorization();

@@ -12,9 +12,11 @@ type Reply = { status: number; data?: unknown; headers?: Record<string, string> 
 // Подставной «сервер»: ответы по очереди для каждого пути; вызовы записываются.
 function fakeServer(routes: Record<string, Reply[]>) {
   const calls: string[] = [];
+  const sentHeaders: Array<Record<string, unknown>> = [];
   const adapter: AxiosAdapter = async (config: InternalAxiosRequestConfig) => {
     const url = config.url ?? "";
     calls.push(url);
+    sentHeaders.push(AxiosHeaders.from(config.headers).toJSON());
     const reply = routes[url]?.shift() ?? { status: 404, data: {} };
     const response: AxiosResponse = {
       data: reply.data,
@@ -29,7 +31,7 @@ function fakeServer(routes: Record<string, Reply[]>) {
     }
     return response;
   };
-  return { adapter, calls };
+  return { adapter, calls, sentHeaders };
 }
 
 const ok = (result: unknown): Reply => ({
@@ -156,5 +158,22 @@ describe("apiClient", () => {
     await Promise.all([client.get("/a"), client.get("/b")]);
 
     expect(calls.filter((url) => url === "/auth/refresh")).toHaveLength(1);
+  });
+
+  // Защита от CSRF (12.8): меняющий запрос с cookie токена сервис принимает только с этим заголовком.
+  it("каждый запрос несёт X-Requested-With", async () => {
+    const { adapter, sentHeaders } = fakeServer({ "/auth/logout": [ok(null)], "/me/": [ok({})] });
+    const client = createApiClient(
+      { onAccessChanged: vi.fn(), redirectToLogin: vi.fn() } as never,
+      adapter,
+    );
+
+    await client.post("/auth/logout");
+    await client.get("/me/");
+
+    expect(sentHeaders.map((headers) => headers["X-Requested-With"])).toEqual([
+      "XMLHttpRequest",
+      "XMLHttpRequest",
+    ]);
   });
 });

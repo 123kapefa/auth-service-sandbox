@@ -101,7 +101,7 @@ GitHub, право `read:packages`), фида компании или локал
 
 Секрет ключа — файлом: `ServiceToken__ClientSecretFile=/run/secrets/orders-key` (секрет Docker/Kubernetes), или
 переменной `ServiceToken__ClientSecret`. Из файла сервис берёт секрет при каждом новом токене — перевыпуск ключа без
-перезапуска (шаг 8). Токен берётся только из заголовка `Authorization`; cookie сервиса входа читает только он сам.
+перезапуска (шаг 8). Токен берётся только из заголовка `Authorization`; cookie сервиса входа читает только он сам. Если сервису всё же нужна cookie (он на одном хосте с сервисом входа), в `Authentication:AccessTokenCookie` — `__Host-accessToken` (имя без приставки не принимать: оно подменяется с поддомена), а его интерфейс шлёт на меняющих запросах заголовок `X-Requested-With`: пакет сам отвечает 403 `auth.csrf_header_required` на запрос с cookie без него. Не включайте в сервисах проекта CORS с `AllowAnyHeader` и `AllowCredentials`: на нём держится защита. На хосте сервиса входа по https refresh-cookie (`__Host-refreshToken`) уходит на все пути хоста — недоверенных сервисов на нём быть не должно, а прокси не пишет заголовок `Cookie` в журналы.
 
 **`Program.cs`**:
 

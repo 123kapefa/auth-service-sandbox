@@ -23,7 +23,7 @@ public sealed class LogoutEndpoint : IEndpoint
         CancellationToken cancellationToken)
     {
         UnitResult<Error> logout = await handler.Handle(
-            AuthCookieWriter.ReadRefreshToken(httpContext.Request),
+            cookies.ReadRefreshToken(httpContext.Request),
             user.SessionId,
             cancellationToken);
         cookies.Clear(httpContext.Response);

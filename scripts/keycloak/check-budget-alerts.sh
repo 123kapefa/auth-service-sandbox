@@ -23,7 +23,7 @@ SUBJECT_80="Коды: израсходовано 80 % дневного бюдж�
 SUBJECT_100="Коды: дневной бюджет исчерпан"
 
 IP="10.$((RANDOM % 250)).$((RANDOM % 250)).$((RANDOM % 250 + 1))"
-curl() { command curl -H "X-Forwarded-For: $IP" "$@"; }
+curl() { command curl -H "$CSRF_HEADER" -H "X-Forwarded-For: $IP" "$@"; }
 new_phone() { echo "7997$(printf '%07d' $(( (RANDOM * 32768 + RANDOM) % 10000000 )))"; }
 
 # setting <ключ=значение>… — настройки кодов realm (platform.codes.*); пустое значение — снять

@@ -6,6 +6,7 @@ using AuthService.IntegrationTests.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PlatformAuth;
+using PlatformAuth.Csrf;
 using Xunit;
 
 namespace AuthService.IntegrationTests;
@@ -192,6 +193,7 @@ public sealed class SmartRefreshTests : IClassFixture<AuthServiceWebFactory>
         using HttpClient client = _factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/auth/refresh", UriKind.Relative));
         request.Headers.Add("Cookie", $"{AuthCookies.ACCESS_TOKEN}={accessToken}; {AuthCookies.REFRESH_TOKEN}=refresh-1");
+        request.Headers.Add(CsrfHeaderMiddleware.HEADER_NAME, "XMLHttpRequest");
         HttpResponseMessage response = await client.SendAsync(request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using JsonDocument body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());

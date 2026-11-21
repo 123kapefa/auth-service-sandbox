@@ -19,7 +19,7 @@ KEYS="phone-channels countries daily-budget target-per-hour target-per-day ip-pe
 # Вход по коду на один номер дважды: между отправками — пауза стенда (60 с), её скрипт дожидается.
 # Все запросы к Keycloak — «с нового IP»: прошлые проверки не упрутся в капчу (KC_PROXY_HEADERS стенда).
 IP="10.$((RANDOM % 250)).$((RANDOM % 250)).$((RANDOM % 250 + 1))"
-curl() { command curl -H "X-Forwarded-For: $IP" "$@"; }
+curl() { command curl -H "$CSRF_HEADER" -H "X-Forwarded-For: $IP" "$@"; }
 
 MASTER=$(master_token)
 # api <jar> <метод> <путь> [тело] — печатает «<код> <код ошибки или result>»

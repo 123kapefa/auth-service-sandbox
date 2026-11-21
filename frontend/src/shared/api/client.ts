@@ -43,7 +43,12 @@ const isAccessChanged = (error: AxiosError) =>
  * Ошибка в Envelope превращается в EnvelopeError с кодом.
  */
 export function createApiClient(handlers: AuthHandlers, adapter?: AxiosAdapter): AxiosInstance {
-  const client = axios.create({ headers: { Accept: "application/json" }, adapter });
+  // X-Requested-With — защита от CSRF: меняющий запрос с cookie токена без него сервис отклоняет (403); чужая страница
+  // этот заголовок поставить не может (нужен CORS-предзапрос).
+  const client = axios.create({
+    headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
+    adapter,
+  });
   let refreshing: Promise<AccessChanges | null> | null = null;
 
   // Уходим на вход: запрос не завершается — экран не успевает показать ошибку до перехода.

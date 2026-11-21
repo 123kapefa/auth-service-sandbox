@@ -28,6 +28,16 @@ check "выдан новый refresh-токен" "$([ -n "$NEW_REFRESH" ] && [ "
 check "старый refresh-токен отклонён → 401" \
   "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Cookie: refreshToken=$OLD_REFRESH" "$API/auth/refresh")" 401
 
+echo "2а. Защита от CSRF: меняющий запрос с cookie без X-Requested-With"
+# `command curl`: обычный curl скриптов (lib.sh) заголовок ставит сам.
+check "POST /auth/refresh без заголовка → 403" \
+  "$(command curl -s -o "$WORK/csrf.json" -w '%{http_code}' -b "$JAR" -X POST "$API/auth/refresh")" 403
+check "  код ошибки — auth.csrf_header_required" \
+  "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["error"]["messages"][0]["code"])' "$WORK/csrf.json")" auth.csrf_header_required
+check "POST /auth/logout без заголовка → 403, сессия цела" \
+  "$(command curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -X POST "$API/auth/logout") $(status "$JAR" GET /me/)" "403 200"
+check "GET без заголовка не затронут" "$(command curl -s -o /dev/null -w '%{http_code}' -b "$JAR" "$API/me/")" 200
+
 echo "3. return_to"
 check "чужой return_to → возврат в кабинет (/account/)" "$(login "$JAR" https://evil.example/phish 0987654321)" /account/
 

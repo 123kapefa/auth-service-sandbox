@@ -70,7 +70,9 @@ scope `openid-min`.
 1. `GET /auth/login?return_to=` — сервис кладёт state, PKCE-verifier и `return_to` в зашифрованную одноразовую cookie
    `auth_login` (10 минут) и отправляет на Keycloak (Code + PKCE S256).
 2. `GET /auth/callback` — обмен кода на токены, cookie `accessToken` (Path `/`, живёт как токен) и `refreshToken`
-   (Path `/auth/`), переход на проверенный `return_to`.
+   (Path `/auth/`), переход на проверенный `return_to`. По https (`Cookies:Secure=true`) имена с приставкой `__Host-`
+   (`__Host-accessToken`, `__Host-refreshToken`, обе Path `/`): браузер не примет их с `Domain` и без `Secure`, подменить
+   с соседнего поддомена нельзя ([ADR 0015](adr/0015-csrf-header-host-cookies.md)).
 3. `POST /auth/refresh` — ротация: новый refresh, старый сразу недействителен. `POST /auth/logout` — сессия в
    Keycloak завершается, cookie удаляются всегда.
 
@@ -78,6 +80,9 @@ Cookie httpOnly, `SameSite=Lax`, `Secure` по окружению, **без `Dom
 доменом `refreshToken` (Path `/auth/`) и `accessToken` уходили бы на любой поддомен проекта, и любое приложение получило
 бы сессию человека; поэтому `Cookies:Domain` убран, а заданный вручную — ошибка старта. SSO приложений — через сессию
 Keycloak: каждое приложение входит само (PKCE) и носит токен в заголовке. `refresh` и `logout` только POST.
+Защита от CSRF — не только `SameSite=Lax`: меняющий запрос (не GET/HEAD/OPTIONS/TRACE) с cookie токена и без `Authorization`
+должен нести заголовок `X-Requested-With`, иначе 403 `auth.csrf_header_required`; проверка — middleware пакета
+`Platform.Authentication`, оно подключается само, админка и кабинет ставят заголовок в клиенте API.
 Сервисы проекта читают токен из заголовка; чтение cookie `accessToken` включается явной
 настройкой (у сервиса входа). Тот же сценарий для страницы стороннего приложения — модуль `/sdk/platform-login.js`.
 
