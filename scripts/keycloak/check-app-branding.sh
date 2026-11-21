@@ -87,8 +87,11 @@ check "клиент только для входа — не приложение
 check "цвет не #rrggbb — нет" "$(api "$ADMIN" PUT "/auth/admin/apps/$APP/branding" '{"color":"#fff"}')" "400 invalid.format"
 
 echo "3. Своё у приложения: название, логотип, цвет"
+# Тело запроса — в переменной до check: внутри "$(…)" внутри кавычек bash 3.2 (macOS) режет JSON по запятой на отдельные запросы
+# (docs/tech/pitfalls.md); в CI (bash 5) этого нет, поэтому раньше проверка была красной только на macOS.
+SAVE_APP="{\"name\":\"Менеджер 1С\",\"logo\":\"$PNG\",\"color\":\"#AA3300\"}"
 check "сохранено (цвет — строчными), проект — рядом" \
-  "$(api "$ADMIN" PUT "/auth/admin/apps/$APP/branding" "{\"name\":\"Менеджер 1С\",\"logo\":\"$PNG\",\"color\":\"#AA3300\"}" \
+  "$(api "$ADMIN" PUT "/auth/admin/apps/$APP/branding" "$SAVE_APP" \
     | python3 -c 'import sys,json; c,r=sys.stdin.read().split(" ",1); r=json.loads(r); print(c, r["name"], r["color"], r["logo"][:10], r["project"]["name"])')" \
   "200 Менеджер 1С #aa3300 data:image Магазин"
 check "у клиента — атрибуты, у проекта — без изменений" \

@@ -96,6 +96,6 @@ skipped_days_ago 31
 : > "$J"
 check "вход паролем — без предложения" "$(login "$J" /me/ "$PHONE")" /me/
 check "«Не сейчас» не нажимали — время прежнее (31 день назад)" \
-  "$(skipped_at | cut -c1-10)" "$(date -u -d '31 days ago' +%Y-%m-%d)"
+  "$(skipped_at | cut -c1-10)" "$(python3 -c 'import datetime as d; print((d.datetime.now(d.timezone.utc) - d.timedelta(days=31)).strftime("%Y-%m-%d"))')"
 
 summary

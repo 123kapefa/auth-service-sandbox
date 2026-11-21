@@ -24,7 +24,8 @@ new_phone() { echo "${1:-7997}$(printf '%07d' $(( (RANDOM * 32768 + RANDOM) % 10
 # limits <ключ=значение>… — настройки защиты на время раздела; остальные ключи сняты (стенд: compose.yaml)
 limits() {
   local args=("$@")
-  python3 - "$KEYS" "${args[@]}" > "$WORK/attrs.json" <<'PY'
+  # Пустой массив при set -u: на bash 3.2 (macOS) "${args[@]}" падает, поэтому ${args[@]+…}.
+  python3 - "$KEYS" ${args[@]+"${args[@]}"} > "$WORK/attrs.json" <<'PY'
 import json, sys
 attrs = {"platform.codes." + key: "" for key in sys.argv[1].split()}
 for pair in sys.argv[2:]:

@@ -62,8 +62,11 @@ check "в «кто я» у админа — право branding.manage" \
   "$(curl -s -b "$ADMIN" "$API/auth/admin/me" | python3 -c 'import json,sys; print("branding.manage" in json.load(sys.stdin)["result"]["permissions"])')" True
 
 echo "3. Сохранить: название, логотип, цвет, тема"
+# Тело запроса — в переменной до check: внутри "$(…)" внутри кавычек bash 3.2 (macOS) режет JSON по запятой на отдельные запросы
+# (docs/tech/pitfalls.md); в CI (bash 5) этого нет, поэтому раньше проверка была красной только на macOS.
+SAVE_PROJECT="{\"name\":\"Магазин «Ромашка»\",\"logo\":\"$PNG\",\"color\":\"#1F6FEB\",\"theme\":\"dark\"}"
 check "сохранено (цвет — строчными)" \
-  "$(api "$ADMIN" PUT /auth/admin/branding "{\"name\":\"Магазин «Ромашка»\",\"logo\":\"$PNG\",\"color\":\"#1F6FEB\",\"theme\":\"dark\"}" | python3 -c 'import sys; c,r=sys.stdin.read().split(" ",1); import json; r=json.loads(r); print(c, r["name"], r["color"], r["theme"], r["logo"][:22])')" \
+  "$(api "$ADMIN" PUT /auth/admin/branding "$SAVE_PROJECT" | python3 -c 'import sys; c,r=sys.stdin.read().split(" ",1); import json; r=json.loads(r); print(c, r["name"], r["color"], r["theme"], r["logo"][:22])')" \
   "200 Магазин «Ромашка» #1f6feb dark data:image/png;base64,"
 check "плагин отдаёт новое оформление" "$(plugin 'r["name"], r["color"], r["theme"], r["logo"] is not None')" "Магазин «Ромашка» #1f6feb dark True"
 check "название — displayName realm (письма и заголовок страниц Keycloak)" \
@@ -77,11 +80,13 @@ import json,sys; i=json.load(sys.stdin)["result"]["items"][0]; c=json.loads(i["c
 print(i["action"], c["logo"]["new"], "base64" in json.dumps(c))')" "ProjectBrandingChanged True False"
 
 echo "3а. Акцент для тёмной темы — свой или тот же"
+SAVE_PAIR="{\"name\":\"Магазин «Ромашка»\",\"logo\":\"$PNG\",\"color\":\"#1f6feb\",\"colorDark\":\"#7AA7FF\",\"theme\":\"dark\"}"
 check "сохранён (строчными), плагин отдаёт оба" \
-  "$(api "$ADMIN" PUT /auth/admin/branding "{\"name\":\"Магазин «Ромашка»\",\"logo\":\"$PNG\",\"color\":\"#1f6feb\",\"colorDark\":\"#7AA7FF\",\"theme\":\"dark\"}" | cut -d' ' -f1) $(plugin 'r["color"], r["colorDark"]')" \
+  "$(api "$ADMIN" PUT /auth/admin/branding "$SAVE_PAIR" | cut -d' ' -f1) $(plugin 'r["color"], r["colorDark"]')" \
   "200 #1f6feb #7aa7ff"
+SAVE_SINGLE="{\"name\":\"Магазин «Ромашка»\",\"logo\":\"$PNG\",\"color\":\"#1f6feb\",\"theme\":\"dark\"}"
 check "без своего тёмного — в ответе плагина его нет (тот же, что основной)" \
-  "$(api "$ADMIN" PUT /auth/admin/branding "{\"name\":\"Магазин «Ромашка»\",\"logo\":\"$PNG\",\"color\":\"#1f6feb\",\"theme\":\"dark\"}" | cut -d' ' -f1) $(plugin '"colorDark" in r')" \
+  "$(api "$ADMIN" PUT /auth/admin/branding "$SAVE_SINGLE" | cut -d' ' -f1) $(plugin '"colorDark" in r')" \
   "200 False"
 
 echo "4. Неверное — не сохраняется"
@@ -89,7 +94,7 @@ check "цвет не #rrggbb" "$(api "$ADMIN" PUT /auth/admin/branding '{"name":
 check "тёмный без основного" "$(api "$ADMIN" PUT /auth/admin/branding '{"name":"X","colorDark":"#7aa7ff","theme":"dark"}')" "400 branding.color_dark_without_color"
 check "тёмный не #rrggbb" "$(api "$ADMIN" PUT /auth/admin/branding '{"name":"X","color":"#1f6feb","colorDark":"blue","theme":"dark"}')" "400 invalid.format"
 check "логотип — не картинка" "$(api "$ADMIN" PUT /auth/admin/branding '{"name":"X","logo":"data:text/html;base64,PGI+","theme":"dark"}')" "400 invalid.format"
-printf '{"name":"X","logo":"data:image/png;base64,%s","theme":"dark"}' "$(head -c 102401 /dev/zero | base64 -w0)" > "$WORK/big.json"
+printf '{"name":"X","logo":"data:image/png;base64,%s","theme":"dark"}' "$(head -c 102401 /dev/zero | base64 | tr -d '\n')" > "$WORK/big.json"
 check "логотип больше 100 КБ" "$(api "$ADMIN" PUT /auth/admin/branding "@$WORK/big.json")" "400 branding.logo_too_large"
 check "неизвестная тема" "$(api "$ADMIN" PUT /auth/admin/branding '{"name":"X","theme":"neon"}')" "400 value.is.invalid"
 check "оформление не изменилось" "$(plugin 'r["name"]')" "Магазин «Ромашка»"
