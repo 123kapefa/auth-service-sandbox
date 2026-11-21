@@ -33,6 +33,21 @@ public sealed class DemoPageTests(AuthServiceWebFactory factory) : IClassFixture
         Assert.Contains("/auth/account", html, StringComparison.Ordinal);
     }
 
+    // 12.8: меняющие запросы с cookie токена сервис принимает только с X-Requested-With; страница, которая его не ставит,
+    // получала бы 403 на обновление токена, выход и смену режима (так было, пока страницу не проверяли на заголовок).
+    [Fact]
+    public async Task Dev_EveryFetchSendsCsrfHeader()
+    {
+        using HttpClient browser = factory.CreateBrowserClient();
+
+        string html = await browser.GetStringAsync(new Uri("/dev/", UriKind.Relative));
+
+        int fetches = System.Text.RegularExpressions.Regex.Count(html, @"\bfetch\(");
+        int headers = System.Text.RegularExpressions.Regex.Count(html, "\"X-Requested-With\": \"XMLHttpRequest\"");
+        Assert.True(fetches >= 2, "на странице ожидались запросы fetch");
+        Assert.Equal(fetches, headers);
+    }
+
     // Демо-страница нужна только разработчику (стенд, разработка). В бою она закрыта целиком, а модуль входа для чужих
     // страниц (/sdk/) остаётся: им пользуются приложения проекта.
     [Theory]

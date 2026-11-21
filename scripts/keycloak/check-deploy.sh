@@ -130,6 +130,13 @@ for front in "Caddy|$KC_PUBLIC" "nginx|https://localhost:18445"; do
     bad "${front%%|*}: закрытие master"; sed 's/^/    /' "$WORK/paths.log"
   fi
 done
+# Ограничение частоты в примере nginx: сверх лимита с одного адреса — 429, а ключи (certs) в лимит не входят.
+burst() { for _ in $(seq 150); do command curl -s -o /dev/null -w '%{http_code}\n' "$1"; done | sort | uniq -c | awk '{ printf "%s:%s ", $2, $1 }'; }
+NGINX="https://localhost:18445/realms/$REALM"
+check "nginx: частые запросы к странице входа получают 429" \
+  "$(CURL_CA_BUNDLE="$DIR/proxy-ca-all.crt" burst "$NGINX/protocol/openid-connect/auth?client_id=x&response_type=code" | grep -c '429:')" 1
+check "nginx: ключи (certs) в лимит не входят" \
+  "$(CURL_CA_BUNDLE="$DIR/proxy-ca-all.crt" burst "$NGINX/protocol/openid-connect/certs" | grep -c '429:')" 0
 echo "AUTH_REGISTRATION_TOKEN=$(REALM=$REALM "$ROOT/scripts/keycloak/registration-token.sh")" >> "$DIR/auth.env"
 check "сервис входа из образа поднялся (мигратор отработал)" "$(dc up -d --wait auth-service > /dev/null 2>&1 && ready)" 200
 # Мигратор настроек проектов (до сервиса) — токен мастер-админки сам, по внутреннему адресу Keycloak в боевом режиме.

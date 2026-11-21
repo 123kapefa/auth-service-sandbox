@@ -113,7 +113,8 @@
   }
 
   async function send(method, path) {
-    const response = await fetch(path, { method, credentials: "same-origin", headers: { Accept: "application/json" } });
+    // X-Requested-With — защита от CSRF (12.8): меняющий запрос с cookie токена без него сервис отклоняет (403).
+    const response = await fetch(path, { method, credentials: "same-origin", headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" } });
     let body = null;
     try { body = await response.json(); } catch { /* 401/403 приходят без тела */ }
     return { code: response.status, body, response };
@@ -179,7 +180,7 @@
     const response = await fetch("/auth/mode", {
       method: "POST",
       credentials: "same-origin",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      headers: { Accept: "application/json", "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
       body: JSON.stringify({ activeMode: mode }),
     });
     log(`POST /auth/mode ${mode}`, response.status);

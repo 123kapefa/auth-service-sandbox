@@ -41,6 +41,11 @@ check "GET без заголовка не затронут" "$(command curl -s -
 echo "3. return_to"
 check "чужой return_to → возврат в кабинет (/account/)" "$(login "$JAR" https://evil.example/phish 0987654321)" /account/
 
+echo "3а. return_to: табуляция и перевод строки (12.2)"
+# Браузер выкидывает TAB и CR/LF из адреса: «/<TAB>/evil.example» он прочитал бы как «//evil.example» (чужой сайт).
+check "return_to с %09 → возврат в кабинет" "$(login "$JAR" '/%09/evil.example/phish' 0987654321)" /account/
+check "return_to с %0d%0a → возврат в кабинет" "$(login "$JAR" '/%0d%0a/evil.example/phish' 0987654321)" /account/
+
 echo "4. Выход"
 LAST_REFRESH=$(cookie "$JAR" refreshToken)
 check "POST /auth/logout → 200" "$(status "$JAR" POST /auth/logout)" 200
