@@ -37,6 +37,7 @@ public sealed partial class ServiceKeysHandler(
     ITokenRevocationStore revocations,
     IDataProtectionProvider dataProtection,
     AdminAudit audit,
+    OwnRights ownRights,
     CurrentUser caller,
     TimeProvider timeProvider,
     ILogger<ServiceKeysHandler> logger)
@@ -82,10 +83,18 @@ public sealed partial class ServiceKeysHandler(
             return ServiceKeyErrors.Exists(code);
         }
 
-        UnitResult<Error> known = await CheckAppPermissionsAsync(Normalize(request.Permissions), cancellationToken);
+        IReadOnlyList<string> requested = Normalize(request.Permissions);
+        UnitResult<Error> known = await CheckAppPermissionsAsync(requested, cancellationToken);
         if (known.IsFailure)
         {
             return known.Error;
+        }
+
+        // Ключ не может дать больше, чем есть у выпускающего, — до регистрации клиента в Keycloak.
+        UnitResult<Error> withinOwn = await WithinOwnRightsAsync(requested, cancellationToken);
+        if (withinOwn.IsFailure)
+        {
+            return withinOwn.Error;
         }
 
         Result<RegisteredService, Error> registered = await registry.RegisterAsync(ServiceKey.ClientIdOf(code), name, cancellationToken);
@@ -95,7 +104,7 @@ public sealed partial class ServiceKeysHandler(
         }
 
         string clientId = ServiceKey.ClientIdOf(code);
-        IReadOnlyList<string> permissions = Normalize(request.Permissions);
+        IReadOnlyList<string> permissions = requested;
         if (permissions.Count > 0)
         {
             UnitResult<Error> granted = await ApplyAsync(registered.Value.ServiceAccountId, permissions, [], cancellationToken);
@@ -141,6 +150,24 @@ public sealed partial class ServiceKeysHandler(
         if (key is null)
         {
             return ServiceKeyErrors.NotFound(code);
+        }
+
+        // Перевыпуск отдаёт новый секрет, то есть все права ключа: ключ выше собственных прав перевыпустить нельзя. У админа
+        // проекта (roles.manage) ограничения нет и права ключа не читаются: перевыпуск — средство починки, и сбой чтения прав
+        // (учётку ключа удалили в консоли Keycloak) ему мешать не должен.
+        if (!caller.HasPermission(AuthServicePermissions.Roles.MANAGE))
+        {
+            Result<IReadOnlyList<string>, Error> keyPermissions = await PermissionsOfAsync(key, cancellationToken);
+            if (keyPermissions.IsFailure)
+            {
+                return keyPermissions.Error;
+            }
+
+            UnitResult<Error> withinOwn = await WithinOwnRightsAsync(keyPermissions.Value, cancellationToken);
+            if (withinOwn.IsFailure)
+            {
+                return withinOwn.Error;
+            }
         }
 
         Result<string, Error> registrationToken = Unprotect(key);
@@ -212,6 +239,13 @@ public sealed partial class ServiceKeysHandler(
             return known.Error;
         }
 
+        // Выдать и снять можно только в пределах своих прав: иначе слабый держатель services.manage обнулил бы чужой сильный ключ.
+        UnitResult<Error> withinOwn = await WithinOwnRightsAsync([.. grant, .. revoke], cancellationToken);
+        if (withinOwn.IsFailure)
+        {
+            return withinOwn.Error;
+        }
+
         if (grant.Length > 0 || revoke.Length > 0)
         {
             UnitResult<Error> changed = await ApplyAsync(key.ServiceAccountId, grant, revoke, cancellationToken);
@@ -232,6 +266,8 @@ public sealed partial class ServiceKeysHandler(
         return ToResponse(key, wanted);
     }
 
+    // Отзыв ключа — аварийное действие (утёк сильный ключ): доступен любому держателю services.manage и без проверки «в пределах
+    // своих прав». Права он не даёт (секрета не показывает), а потеря ключа — выпустить заново; запрет мешал бы гасить утечку.
     public async Task<UnitResult<Error>> RevokeAsync(string code, CancellationToken cancellationToken)
     {
         ServiceKey? key = await store.FindAsync(code, cancellationToken);
@@ -371,6 +407,37 @@ public sealed partial class ServiceKeysHandler(
         return UnitResult.Success<Error>();
     }
 
+    // Права ключа в пределах собственных прав выпускающего (OwnRights). service.* сводятся к правам людей в сервисе входа: чтение
+    // пользователя и проверка доступа — users.view, объявление каталога — roles.manage; «приложение:право» — право в приложении.
+    private async Task<UnitResult<Error>> WithinOwnRightsAsync(IReadOnlyCollection<string> keyPermissions, CancellationToken cancellationToken)
+    {
+        List<string> above = [];
+
+        string[] service = [.. keyPermissions.Where(permission => !ServiceKeyPermissions.IsAppPermission(permission))];
+        Result<string[], Error> missingHere = await ownRights.MissingAsync(
+            caller.Id, caller.Permissions, AppClientId, new HashSet<string>(service.Select(ServiceKeyPermissions.HumanRightOf), StringComparer.Ordinal), cancellationToken);
+        if (missingHere.IsFailure)
+        {
+            return missingHere.Error;
+        }
+
+        above.AddRange(service.Where(permission => missingHere.Value.Contains(ServiceKeyPermissions.HumanRightOf(permission), StringComparer.Ordinal)));
+
+        foreach (IGrouping<string, string> app in keyPermissions.Where(ServiceKeyPermissions.IsAppPermission).GroupBy(AppOf, StringComparer.Ordinal))
+        {
+            Result<string[], Error> missing = await ownRights.MissingAsync(
+                caller.Id, caller.Permissions, app.Key, new HashSet<string>(app.Select(NameOf), StringComparer.Ordinal), cancellationToken);
+            if (missing.IsFailure)
+            {
+                return missing.Error;
+            }
+
+            above.AddRange(missing.Value.Select(name => ServiceKeyPermissions.Qualify(app.Key, name)));
+        }
+
+        return above.Count == 0 ? UnitResult.Success<Error>() : ServiceKeyErrors.AboveOwnRights(above);
+    }
+
     // Права в приложениях — только существующие права (kind=permission) подключённых приложений.
     private async Task<UnitResult<Error>> CheckAppPermissionsAsync(IReadOnlyCollection<string> permissions, CancellationToken cancellationToken)
     {
@@ -469,6 +536,17 @@ public static class ServiceKeyPermissions
 
     public static bool IsAppPermission(string permission) => TryParse(permission, out _, out _);
 
+    /// <summary>
+    /// Какое право человека в сервисе входа стоит за правом ключа: чтение пользователя и проверка доступа — users.view,
+    /// объявление каталога — roles.manage. Нужно, чтобы ключ не давал выпускающему больше, чем у него есть.
+    /// </summary>
+    public static string HumanRightOf(string servicePermission) => servicePermission switch
+    {
+        AuthServicePermissions.ServiceAccess.USERS_READ or AuthServicePermissions.ServiceAccess.ACCESS_CHECK => AuthServicePermissions.Users.VIEW,
+        AuthServicePermissions.ServiceAccess.CATALOG_DECLARE => AuthServicePermissions.Roles.MANAGE,
+        _ => servicePermission,
+    };
+
     /// <summary>Право, которое можно выдать ключу: service.* или право в приложении.</summary>
     public static bool IsValid(string? permission) =>
         permission is not null && (AuthServicePermissions.ServiceAccess.All.Contains(permission, StringComparer.Ordinal) || IsAppPermission(permission));
@@ -476,6 +554,12 @@ public static class ServiceKeyPermissions
 
 public static class ServiceKeyErrors
 {
+    /// <summary>Ключ с такими правами выпустить, изменить или перевыпустить нельзя: их нет у самого меняющего.</summary>
+    public static Error AboveOwnRights(IEnumerable<string> permissions) =>
+        Error.Authorization(
+            "services.key_above_own_rights",
+            "Нельзя выдать, снять или перевыпустить ключ с правами, которых нет у вас: " + string.Join(", ", permissions.Order(StringComparer.Ordinal)) + ".");
+
     public static Error Exists(string code) =>
         Error.Conflict("services.exists", $"Сервис «{code}» уже есть.");
 
