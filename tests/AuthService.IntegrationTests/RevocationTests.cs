@@ -193,6 +193,25 @@ public sealed class RevocationTests : IClassFixture<AuthServiceWebFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    // Метрики (13.1): итог проверки токена и сбои хранилища отметок видны в Prometheus.
+    [Fact]
+    public async Task Metrics_TokenChecks_CountedByStatus_StoreErrorsByMode()
+    {
+        using var metrics = new MetricsRecorder(PlatformAuthMetrics.METER_NAME);
+        using WebApplicationFactory<Program> closed = ClosedMode();
+        string token = _factory.CreateToken(TestUser.Customer);
+
+        (await MeAsync(closed, token)).Dispose();
+        _factory.Revocations.Broken = true;
+        (await MeAsync(closed, token)).Dispose();
+        (await MeAsync(_factory, token)).Dispose();
+
+        Assert.True(metrics.Sum("token_checks", ("status", "valid")) >= 1);
+        Assert.True(metrics.Sum("token_checks", ("status", "unavailable")) >= 1);
+        Assert.True(metrics.Sum("revocation_store_errors", ("mode", "closed"), ("kind", "connection")) >= 1);
+        Assert.True(metrics.Sum("revocation_store_errors", ("mode", "open")) >= 1);
+    }
+
     private WebApplicationFactory<Program> ClosedMode() =>
         _factory.WithWebHostBuilder(builder => builder.UseSetting("TokenRevocation:OnStoreFailure", "Closed"));
 

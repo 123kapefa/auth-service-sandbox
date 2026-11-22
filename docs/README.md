@@ -22,6 +22,7 @@
 | выпустить версию и поставить её (Compose, Kubernetes) | [release.md](release.md) |
 | окружения и что где хранится | [environments.md](environments.md) |
 | секреты | [secrets.md](secrets.md) |
+| метрики и дашборд | [monitoring.md](monitoring.md) |
 | миграции базы и настроек проектов | [migrations.md](migrations.md) |
 | Kubernetes (Helm-чарт) | [kubernetes.md](kubernetes.md) |
 

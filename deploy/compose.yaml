@@ -47,6 +47,10 @@ services:
       KC_PROXY_TRUSTED_ADDRESSES: ${AUTH_KEYCLOAK_PROXY_TRUSTED:-172.16.0.0/12,127.0.0.1}
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
+      # События входа Keycloak как метрики (keycloak_user_events_total{event,realm,client_id}): успешные и неудачные входы.
+      KC_EVENT_METRICS_USER_ENABLED: "true"
+      KC_EVENT_METRICS_USER_TAGS: realm,clientId
+      KC_EVENT_METRICS_USER_EVENTS: login,logout,code_to_token,refresh_token,client_login,reset_password,update_password
       # Капча перед отправкой кода (Яндекс SmartCaptcha). Без ключа после 2 отправок
       # за час с одного IP или на один номер код не уходит.
       KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__CAPTCHA_SERVER_KEY: ${AUTH_SMARTCAPTCHA_SERVER_KEY:-}

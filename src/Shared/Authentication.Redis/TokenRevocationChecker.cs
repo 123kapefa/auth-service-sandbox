@@ -23,6 +23,19 @@ internal sealed partial class TokenRevocationChecker(
 {
     public async Task<TokenStatus> CheckAsync(ClaimsPrincipal principal, CancellationToken cancellationToken)
     {
+        TokenStatus status = await CheckCoreAsync(principal, cancellationToken);
+        PlatformAuthMetrics.TokenChecked(status switch
+        {
+            TokenStatus.Revoked => "revoked",
+            TokenStatus.AccessChanged => "access_changed",
+            TokenStatus.Unavailable => "unavailable",
+            _ => "valid",
+        });
+        return status;
+    }
+
+    private async Task<TokenStatus> CheckCoreAsync(ClaimsPrincipal principal, CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(principal);
 
         string? subject = principal.FindFirstValue(AuthClaims.SUBJECT);
@@ -67,6 +80,9 @@ internal sealed partial class TokenRevocationChecker(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
+            PlatformAuthMetrics.StoreError(
+                options.Value.OnStoreFailure == StoreFailureMode.Closed ? "closed" : "open",
+                exception is RedisServerException ? "server" : "connection");
             if (options.Value.OnStoreFailure == StoreFailureMode.Closed)
             {
                 LogStoreUnavailableRejected(logger, exception);

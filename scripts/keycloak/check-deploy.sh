@@ -146,6 +146,12 @@ check "мигратор настроек проектов: проект из ш�
 check "образ сервиса — версия из Directory.Build.props" \
   "$(docker inspect --format '{{.Config.Image}}' "$(dc ps -q auth-service)")" "platform-auth-service:$VERSION"
 check "сервис — не root" "$(dc exec -T auth-service id -u 2>/dev/null)" 1654
+# Метрики (9100 сервис, 9000 Keycloak) — только во внутренней сети: на хост не публикуются и через прокси не доходят.
+# Опубликованный порт в «docker compose ps» выглядит как «0.0.0.0:9100->9100/tcp»; неопубликованный — просто «9100/tcp».
+PUBLISHED=$(dc ps --format '{{.Service}} {{.Ports}}' 2>/dev/null | grep -c -E -e '->(9100|9000)/')
+check "порты метрик не опубликованы на хосте" "$PUBLISHED" 0
+check "Prometheus по внутреннему адресу видит метрики сервиса" \
+  "$(dc exec -T auth-service bash -c "exec 3<>/dev/tcp/127.0.0.1/9100; printf 'GET /metrics HTTP/1.1\\r\\nHost: x\\r\\nConnection: close\\r\\n\\r\\n' >&3; cat <&3" 2>/dev/null | grep -c '^process_start_time_seconds')" 1
 
 echo "1. Вход и админка (через прокси, https)"
 JAR="$WORK/page-jar"; : > "$JAR"

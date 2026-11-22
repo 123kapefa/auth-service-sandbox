@@ -22,6 +22,10 @@ spec:
       annotations:
         # Новый realm JSON стенда — новые поды (импорт — только в пустую базу, docs/migrations.md).
         checksum/realm: {{ .Values.keycloak.realmImport | sha256sum | trunc 16 }}
+        # Метрики Prometheus — порт управления 9000 (события входа, плагин кодов); в Service и Ingress он не входит.
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9000"
+        prometheus.io/path: /metrics
         {{- with .Values.keycloak.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -79,6 +83,13 @@ spec:
               value: "true"
             - name: KC_METRICS_ENABLED
               value: "true"
+            # События входа Keycloak как метрики (keycloak_user_events_total): успешные и неудачные входы.
+            - name: KC_EVENT_METRICS_USER_ENABLED
+              value: "true"
+            - name: KC_EVENT_METRICS_USER_TAGS
+              value: realm,clientId
+            - name: KC_EVENT_METRICS_USER_EVENTS
+              value: login,logout,code_to_token,refresh_token,client_login,reset_password,update_password
             # Кластер: общий кэш Infinispan, узлы находят друг друга через базу Keycloak (таблица JGROUPS_PING).
             # Сессии входа и действий видят все реплики — sticky-сессии на Ingress не нужны.
             - name: KC_CACHE

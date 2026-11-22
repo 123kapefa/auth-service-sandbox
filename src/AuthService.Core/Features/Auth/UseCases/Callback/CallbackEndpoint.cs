@@ -31,6 +31,32 @@ public sealed class CallbackEndpoint : IEndpoint
 
     public void MapEndpoint(IEndpointRouteBuilder app) => app.MapGet(CallbackUrl.PATH, Handle);
 
+    // Исход входа для метрик: коротко и без подробностей ошибки.
+    private static string LoginResult(Result<LoginCompleted, Error> completed, bool stateMissing)
+    {
+        if (completed.IsSuccess)
+        {
+            return "success";
+        }
+
+        if (stateMissing || AuthErrors.IsLostLogin(completed.Error))
+        {
+            return "state_lost";
+        }
+
+        if (completed.Error.Messages.Any(message => string.Equals(message.Code, "auth.login.denied", StringComparison.Ordinal)))
+        {
+            return "denied";
+        }
+
+        return completed.Error.Type switch
+        {
+            ErrorType.VALIDATION => "invalid",
+            ErrorType.AUTHENTICATION => "exchange_rejected",
+            _ => "exchange_error",
+        };
+    }
+
     private static async Task<IResult> Handle(
         [FromQuery] string? code,
         [FromQuery] string? state,
@@ -55,6 +81,7 @@ public sealed class CallbackEndpoint : IEndpoint
             actionStatus,
             CallbackUrl.For(httpContext.Request),
             cancellationToken);
+        AuthMetrics.LoginFinished(LoginResult(completed, saved is null));
         if (completed.IsFailure && AuthErrors.IsLostLogin(completed.Error))
         {
             return Results.Redirect(ReturnUrlValidator.ToLocation(returnUrls.Resolve(null)));

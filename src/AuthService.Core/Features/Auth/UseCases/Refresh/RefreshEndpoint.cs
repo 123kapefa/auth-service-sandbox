@@ -20,6 +20,22 @@ public sealed class RefreshEndpoint : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app) => app.MapPost("/auth/refresh", Handle);
 
+    // Исход обновления для метрик: нет cookie, Keycloak не принял refresh (сессия закончилась) или сбой.
+    private static string RefreshResult(Result<TokenSet, Error> tokens)
+    {
+        if (tokens.IsSuccess)
+        {
+            return "ok";
+        }
+
+        if (tokens.Error.Messages.Any(message => string.Equals(message.Code, "auth.session.missing", StringComparison.Ordinal)))
+        {
+            return "no_session";
+        }
+
+        return tokens.Error.Type == ErrorType.AUTHENTICATION ? "rejected" : "error";
+    }
+
     private static async Task<EndpointResult<RefreshResponse>> Handle(
         HttpContext httpContext,
         [FromServices] RefreshHandler handler,
@@ -27,6 +43,7 @@ public sealed class RefreshEndpoint : IEndpoint
         CancellationToken cancellationToken)
     {
         Result<TokenSet, Error> tokens = await handler.Handle(cookies.ReadRefreshToken(httpContext.Request), cancellationToken);
+        AuthMetrics.Refreshed(RefreshResult(tokens));
         if (tokens.IsFailure)
         {
             if (tokens.Error.Type == ErrorType.AUTHENTICATION)

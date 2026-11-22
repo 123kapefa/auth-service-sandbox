@@ -22,6 +22,7 @@
 | [0013](0013-release-ghcr-helm.md) | Релиз тегом: образы в GHCR, пакеты в GitHub Packages, в Kubernetes — Helm | Предложено |
 | [0014](0014-master-realm-closed-at-proxy.md) | Realm master и мастер-админка закрыты на прокси; Keycloak — вторая линия | Предложено |
 | [0015](0015-csrf-header-host-cookies.md) | Защита от CSRF заголовком и cookie с приставкой `__Host-` | Предложено |
+| [0016](0016-metrics-prometheus-bridge.md) | Метрики: счётчики .NET, порт метрик отдельно, мост в Prometheus | Предложено |
 
 Новое решение — следующий номер, файл `NNNN-коротко.md` по образцу: статус и дата, контекст, решение, последствия,
 что отвергли.

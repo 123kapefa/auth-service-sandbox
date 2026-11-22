@@ -1,0 +1,9 @@
+apiVersion: 1
+providers:
+  - name: auth-service
+    folder: Сервис входа
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

@@ -52,6 +52,8 @@ services:
     init: true
     ports:
       - "8080:8080"
+      # Метрики Prometheus (Metrics:Port, 9100): только с этой машины; наружу не публикуются.
+      - "127.0.0.1:${AUTH_METRICS_PORT:-9100}:9100"
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ConnectionStrings__AuthDb: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
@@ -171,6 +173,10 @@ services:
       KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__PHONE_STUB: ${PHONE_LOG_STUB:-true}
       # Метрики Prometheus (/metrics на порту управления 9000): отправки кодов, расход, отказы.
       KC_METRICS_ENABLED: "true"
+      # События входа Keycloak как метрики (keycloak_user_events_total{event,realm,client_id}): успешные и неудачные входы.
+      KC_EVENT_METRICS_USER_ENABLED: "true"
+      KC_EVENT_METRICS_USER_TAGS: realm,clientId
+      KC_EVENT_METRICS_USER_EVENTS: login,logout,code_to_token,refresh_token,client_login,reset_password,update_password
     volumes:
       - ./infra/keycloak/realm:/opt/keycloak/data/import:ro
       # Тема входа — в образе (jar из login-theme/). Правки страниц без Keycloak — npm run dev в login-theme/.
@@ -205,6 +211,39 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  # Наблюдаемость стенда (профиль monitoring): docker compose --profile monitoring up -d prometheus grafana.
+  # Prometheus — http://localhost:9090, Grafana — http://localhost:3030 (admin / admin), дашборд «Сервис входа».
+  # Те же конфиги и дашборд лежат в deploy/monitoring для боя.
+  prometheus:
+    profiles: [monitoring]
+    image: prom/prometheus:v3.5.0
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=2d"]
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./deploy/monitoring/prometheus.stand.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+    depends_on:
+      - auth-service
+      - keycloak
+
+  grafana:
+    profiles: [monitoring]
+    image: grafana/grafana:12.1.0
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3030}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./deploy/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
 
 volumes:
   postgres_data:

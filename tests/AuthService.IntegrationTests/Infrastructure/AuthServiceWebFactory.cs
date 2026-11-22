@@ -169,6 +169,8 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
         builder.UseSetting("ConnectionStrings:AuthDb", UNREACHABLE_DATABASE);
         // Проверка отзыва без кэша: тест проверяет запрос сразу после отметки.
         builder.UseSetting("TokenRevocation:LocalCache", "00:00:00");
+        // Порт метрик (Prometheus) в тестах не нужен: десятки фабрик заняли бы один и тот же порт.
+        builder.UseSetting("Metrics:Port", "0");
         builder.ConfigureTestServices(services =>
         {
             services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
