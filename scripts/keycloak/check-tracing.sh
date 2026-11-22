@@ -90,12 +90,16 @@ dc --profile monitoring up -d --force-recreate --no-deps jaeger otel-collector >
 dc --profile monitoring up -d --force-recreate --no-deps --wait keycloak auth-service > /dev/null 2>&1
 for _ in $(seq 60); do [ "$(command curl -s -o /dev/null -w '%{http_code}' "$JAEGER/api/services")" = 200 ] && break; sleep 2; done
 for _ in $(seq 30); do [ "$(command curl -s -o /dev/null -w '%{http_code}' "$API/health/ready")" = 200 ] && break; sleep 2; done
-T2=$(python3 -c 'import uuid; print(uuid.uuid4().hex)')
-traced_request "$T2"
-check "ответ несёт идентификатор трассы" "$(header "$WORK/h" X-Trace-Id)" "$T2"
+# Сразу после пересоздания Keycloak его первая отправка spans в коллектор может уйти раньше, чем соединение готово, и пропасть: поэтому до пяти
+# попыток с новым идентификатором, каждая ждёт трассу до 30 секунд.
 SERVICES=""
-for _ in $(seq 40); do
-  SERVICES=$(command curl -s "$JAEGER/api/traces/$T2" | python3 -c '
+T2=""
+for attempt in 1 2 3 4 5; do
+  T2=$(python3 -c 'import uuid; print(uuid.uuid4().hex)')
+  traced_request "$T2"
+  [ "$attempt" = 1 ] && check "ответ несёт идентификатор трассы" "$(header "$WORK/h" X-Trace-Id)" "$T2"
+  for _ in $(seq 15); do
+    SERVICES=$(command curl -s "$JAEGER/api/traces/$T2" | python3 -c '
 import json,sys
 try:
     data = json.load(sys.stdin).get("data") or []
@@ -103,8 +107,10 @@ except Exception:
     data = []
 names = sorted({p["serviceName"] for t in data for p in t["processes"].values()})
 print(",".join(names))')
+    [ "$SERVICES" = "auth-service,keycloak" ] && break
+    sleep 2
+  done
   [ "$SERVICES" = "auth-service,keycloak" ] && break
-  sleep 2
 done
 check "трасса $T2 в Jaeger: spans сервиса входа и Keycloak" "$SERVICES" "auth-service,keycloak"
 check "в трассе — запрос сервиса и запрос к Keycloak (родитель — span сервиса)" \
@@ -136,6 +142,8 @@ sleep 8
 : > "$WORK/spans.json"
 for name in auth-service keycloak; do command curl -s "$JAEGER/api/traces?service=$name&limit=1500&lookback=1h" >> "$WORK/spans.json"; done
 check "в Jaeger есть трассы сервиса и Keycloak за прогон" "$([ "$(wc -c < "$WORK/spans.json")" -gt 5000 ] && echo да || echo нет)" да
+# Без этого проверки «нет поля» ниже прошли бы впустую, если бы spans Keycloak вообще не дошли до Jaeger.
+check "в Jaeger есть spans Keycloak (проверки ниже не пустые)" "$([ "$(grep -c -F '"kc.realmName"' "$WORK/spans.json")" -gt 0 ] && echo да || echo нет)" да
 for secret in "$SECRET_CODE" "$SECRET_STATE" "0987654321" "$NEW2" "$CODE2" "wrong-password-for-span-check" "not-a-real-refresh-token" "$PASSWORD"; do
   check "spans: нет «${secret:0:14}…»" "$(grep -c -F -e "$secret" "$WORK/spans.json")" 0
 done
