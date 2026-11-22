@@ -18,10 +18,14 @@ spec:
       labels:
         {{- include "auth.labels" . | nindent 8 }}
         app.kubernetes.io/name: service
-      {{- with .Values.service.podAnnotations }}
       annotations:
+        # Метрики Prometheus — порт 9100 пода (Metrics:Port); в Service и Ingress он не входит, наружу не публикуется.
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+        prometheus.io/path: /metrics
+        {{- with .Values.service.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
     spec:
       # dotnet не должен быть PID 1 (иначе упавший при старте процесс зависает): PID 1 — pause, как init: true в compose.
       shareProcessNamespace: true
@@ -66,6 +70,8 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+            - name: metrics
+              containerPort: 9100
           env:
             - name: ASPNETCORE_ENVIRONMENT
               value: {{ .Values.service.environment | quote }}

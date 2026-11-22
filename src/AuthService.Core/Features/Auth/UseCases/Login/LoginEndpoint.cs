@@ -38,6 +38,7 @@ public sealed class LoginEndpoint : IEndpoint
             return new EndpointResult<LoginStart>(start);
         }
 
+        AuthMetrics.LoginStarted();
         loginState.Save(httpContext.Response, start.Value.State);
         return Results.Redirect(start.Value.RedirectTo.ToString());
     }

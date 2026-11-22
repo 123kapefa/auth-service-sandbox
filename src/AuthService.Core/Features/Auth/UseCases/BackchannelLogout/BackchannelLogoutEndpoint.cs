@@ -22,7 +22,18 @@ public sealed class BackchannelLogoutEndpoint : IEndpoint
         [FromServices] BackchannelLogoutHandler handler,
         CancellationToken cancellationToken)
     {
-        UnitResult<Error> result = await handler.Handle(logoutToken, cancellationToken);
+        UnitResult<Error> result;
+        try
+        {
+            result = await handler.Handle(logoutToken, cancellationToken);
+        }
+        catch (Exception)
+        {
+            AuthMetrics.BackchannelLoggedOut(success: false); // например, Redis недоступен: отметку отзыва не записали
+            throw;
+        }
+
+        AuthMetrics.BackchannelLoggedOut(result.IsSuccess);
         return result;
     }
 }

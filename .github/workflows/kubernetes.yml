@@ -60,6 +60,10 @@ jobs:
           paths=$(helm template auth deploy/helm/platform-auth "${prod[@]}" | grep -E '^[[:space:]]+- path: ' | sed -E 's/^[[:space:]]+- path: //' | sort)
           echo "$paths"
           test "$paths" = "$(printf '%s\n' / /realms/shop /resources | sort)" || { echo "::error::Ingress публикует лишние пути"; exit 1; }
+          # Порты метрик (9100 сервис, 9000 Keycloak) в Service и Ingress не входят: метрики наружу не публикуются.
+          services=$(helm template auth deploy/helm/platform-auth "${prod[@]}" | awk '/^kind: Service$/ {s=1} /^---/ {s=0} s && /port: / {print}')
+          echo "$services"
+          if echo "$services" | grep -E 'port: (9100|9000)$'; then echo "::error::Service публикует порт метрик"; exit 1; fi
           # realm master и неверный код проекта шаблон не принимает (иначе Ingress опубликовал бы master).
           for bad in master Master 'a/../master' 'a: b'; do
             if helm template auth deploy/helm/platform-auth "${prod[@]}" --set "realm=$bad" > /dev/null 2>&1; then

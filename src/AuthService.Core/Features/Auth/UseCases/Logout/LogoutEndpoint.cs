@@ -22,10 +22,18 @@ public sealed class LogoutEndpoint : IEndpoint
         [FromServices] CurrentUser user,
         CancellationToken cancellationToken)
     {
-        UnitResult<Error> logout = await handler.Handle(
-            cookies.ReadRefreshToken(httpContext.Request),
-            user.SessionId,
-            cancellationToken);
+        UnitResult<Error> logout;
+        try
+        {
+            logout = await handler.Handle(cookies.ReadRefreshToken(httpContext.Request), user.SessionId, cancellationToken);
+        }
+        catch (Exception)
+        {
+            AuthMetrics.LoggedOut(success: false); // например, Redis недоступен: отметку отзыва не записали
+            throw;
+        }
+
+        AuthMetrics.LoggedOut(logout.IsSuccess);
         cookies.Clear(httpContext.Response);
         return logout;
     }

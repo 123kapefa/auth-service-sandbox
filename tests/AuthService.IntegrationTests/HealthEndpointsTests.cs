@@ -11,7 +11,7 @@ public sealed class HealthEndpointsTests(WebApplicationFactory<Program> factory)
     private const string UNREACHABLE_DATABASE = "Host=127.0.0.1;Port=1;Database=auth_service;Username=test;Password=test;Timeout=1";
 
     private readonly WebApplicationFactory<Program> _factory = factory.WithWebHostBuilder(builder =>
-        builder.UseSetting("ConnectionStrings:AuthDb", UNREACHABLE_DATABASE));
+        builder.UseSetting("ConnectionStrings:AuthDb", UNREACHABLE_DATABASE).UseSetting("Metrics:Port", "0"));
 
     [Fact]
     public async Task Live_Returns200_EvenWhenDatabaseIsDown()

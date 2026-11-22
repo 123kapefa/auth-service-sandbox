@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using AuthService.Core;
 using AuthService.Core.Abstractions;
 using AuthService.Domain.AuditLog;
 using AuthService.Domain.Sessions;
@@ -417,6 +418,94 @@ public sealed class LoginFlowTests : IClassFixture<AuthServiceWebFactory>
 
         await AssertErrorAsync(response, HttpStatusCode.InternalServerError, "auth.provider.unavailable");
         Assert.True(SetCookie(response, AuthCookies.REFRESH_TOKEN).Expires < DateTimeOffset.UtcNow);
+    }
+
+    // Метрики входа (13.1): счётчики общие на процесс, поэтому проверяется «не меньше одного» по набору меток.
+    [Fact]
+    public async Task Metrics_LoginStartedAndSucceeded_Counted()
+    {
+        using var metrics = new MetricsRecorder(AuthMetrics.METER_NAME);
+        (HttpClient browser, string loginCookie) = await StartLoginAsync("/me/");
+
+        await Callback(browser, loginCookie, $"code=the-code&state={_keycloak.LastAuthorization!.State}");
+
+        Assert.True(metrics.Sum("logins_started") >= 1);
+        Assert.True(metrics.Sum("logins", ("result", "success")) >= 1);
+    }
+
+    [Theory]
+    [InlineData("code=c&state=forged", "state_lost")]
+    [InlineData("error=access_denied&error_description=user+cancelled", "denied")]
+    public async Task Metrics_FailedLogin_CountedByReason(string query, string result)
+    {
+        using var metrics = new MetricsRecorder(AuthMetrics.METER_NAME);
+        (HttpClient browser, string loginCookie) = await StartLoginAsync("/");
+
+        await Callback(browser, loginCookie, query);
+
+        Assert.True(metrics.Sum("logins", ("result", result)) >= 1);
+        Assert.Equal(0, metrics.Sum("logins", ("result", "success")));
+    }
+
+    [Fact]
+    public async Task Metrics_MissingCode_CountedAsInvalid_ExchangeRejected_CountedSeparately()
+    {
+        using var metrics = new MetricsRecorder(AuthMetrics.METER_NAME);
+        (HttpClient browser, string loginCookie) = await StartLoginAsync("/");
+        await Callback(browser, loginCookie, $"state={_keycloak.LastAuthorization!.State}");
+
+        _keycloak.TokenResult = Result.Failure<TokenSet, Error>(IdentityProviderErrors.GrantRejected());
+        (HttpClient second, string secondCookie) = await StartLoginAsync("/");
+        await Callback(second, secondCookie, $"code=bad&state={_keycloak.LastAuthorization.State}");
+        _keycloak.TokenResult = FakeIdentityProvider.Tokens("access-1", "refresh-1");
+
+        Assert.True(metrics.Sum("logins", ("result", "invalid")) >= 1);
+        Assert.True(metrics.Sum("logins", ("result", "exchange_rejected")) >= 1);
+    }
+
+    [Fact]
+    public async Task Metrics_Refresh_CountedByResult()
+    {
+        using var metrics = new MetricsRecorder(AuthMetrics.METER_NAME);
+        using HttpClient browser = _factory.CreateBrowserClient();
+
+        _keycloak.TokenResult = FakeIdentityProvider.Tokens("access-2", "refresh-2");
+        await PostWithRefreshCookie(browser, "/auth/refresh", "refresh-1");
+        _keycloak.TokenResult = Result.Failure<TokenSet, Error>(IdentityProviderErrors.GrantRejected());
+        await PostWithRefreshCookie(browser, "/auth/refresh", "stale");
+        await browser.PostAsync(new Uri("/auth/refresh", UriKind.Relative), content: null);
+        _keycloak.TokenResult = FakeIdentityProvider.Tokens("access-1", "refresh-1");
+
+        Assert.True(metrics.Sum("refreshes", ("result", "ok")) >= 1);
+        Assert.True(metrics.Sum("refreshes", ("result", "rejected")) >= 1);
+        Assert.True(metrics.Sum("refreshes", ("result", "no_session")) >= 1);
+    }
+
+    [Fact]
+    public async Task Metrics_Logout_CountedOkAndError()
+    {
+        using var metrics = new MetricsRecorder(AuthMetrics.METER_NAME);
+        using HttpClient browser = _factory.CreateBrowserClient();
+
+        await PostWithRefreshCookie(browser, "/auth/logout", "refresh-1");
+        _keycloak.LogoutResult = UnitResult.Failure(IdentityProviderErrors.Unavailable());
+        await PostWithRefreshCookie(browser, "/auth/logout", "refresh-1");
+        _keycloak.LogoutResult = UnitResult.Success<Error>();
+
+        Assert.True(metrics.Sum("logouts", ("result", "ok")) >= 1);
+        Assert.True(metrics.Sum("logouts", ("result", "error")) >= 1);
+    }
+
+    [Fact]
+    public async Task Metrics_Labels_NeverCarryTokensOrCodes()
+    {
+        using var metrics = new MetricsRecorder(AuthMetrics.METER_NAME);
+        (HttpClient browser, string loginCookie) = await StartLoginAsync("/me/");
+        await Callback(browser, loginCookie, $"code=secret-code-123&state={_keycloak.LastAuthorization!.State}");
+        await PostWithRefreshCookie(browser, "/auth/refresh", "refresh-secret-456");
+
+        string?[] labels = [.. metrics.TagValues("logins"), .. metrics.TagValues("refreshes")];
+        Assert.DoesNotContain(labels, label => label is not null && (label.Contains("secret", StringComparison.Ordinal) || label.Contains("access", StringComparison.Ordinal)));
     }
 
     private async Task<(HttpClient Browser, string LoginCookie)> StartLoginAsync(string returnTo)

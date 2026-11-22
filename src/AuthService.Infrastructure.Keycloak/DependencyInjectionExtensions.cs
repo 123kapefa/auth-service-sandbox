@@ -21,6 +21,9 @@ public static class DependencyInjectionExtensions
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<KeycloakOptions>, KeycloakOptionsValidator>();
         services.AddSingleton(TimeProvider.System);
+        // Все HttpClient сервиса ходят только в Keycloak (типизированные клиенты, служебная учётка, discovery и ключи): считаем их все.
+        services.AddTransient<KeycloakMetricsHandler>();
+        services.ConfigureHttpClientDefaults(builder => builder.AddHttpMessageHandler<KeycloakMetricsHandler>());
 
         services.AddHttpClient<IIdentityProvider, KeycloakIdentityProvider>();
         services.AddSingleton<KeycloakServiceAccount>();

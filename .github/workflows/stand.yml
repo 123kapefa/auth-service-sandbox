@@ -11,7 +11,7 @@ on:
     tags: ["v*"]
   workflow_dispatch:
   pull_request:
-    paths: [.github/workflows/stand.yml, scripts/keycloak/**, scripts/project/**, scripts/ci/**, deploy/proxy/**]
+    paths: [.github/workflows/stand.yml, scripts/keycloak/**, scripts/project/**, scripts/ci/**, deploy/proxy/**, deploy/monitoring/**]
 
 permissions:
   contents: read
@@ -95,6 +95,10 @@ jobs:
       - name: check-code-login
         if: ${{ !cancelled() && steps.token.outcome == 'success' }}
         run: scripts/keycloak/check-code-login.sh 2>&1 | tee -a stand-logs/check-code-login.log
+      # Поднимает prometheus и grafana (профиль monitoring), создаёт события и ждёт сбор: идёт после проверок входа.
+      - name: check-metrics
+        if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: scripts/keycloak/check-metrics.sh 2>&1 | tee -a stand-logs/check-metrics.log
       - name: check-shop
         if: ${{ !cancelled() && steps.token.outcome == 'success' }}
         run: scripts/keycloak/check-shop.sh 2>&1 | tee -a stand-logs/check-shop.log

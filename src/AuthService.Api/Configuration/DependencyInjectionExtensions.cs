@@ -15,6 +15,7 @@ public static class DependencyInjectionExtensions
         services.AddCore(configuration);
         services.AddInfrastructurePostgres(configuration);
         services.AddAuthServiceHealthChecks();
+        services.AddAuthServiceMetrics(configuration);
 
         return services;
     }
