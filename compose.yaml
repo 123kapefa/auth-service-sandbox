@@ -56,6 +56,8 @@ services:
       - "127.0.0.1:${AUTH_METRICS_PORT:-9100}:9100"
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      # Трассировка: пусто — spans никуда не уходят (идентификатор трассы в логах и ответах есть); адрес OTLP-коллектора — уходят.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${AUTH_OTEL_ENDPOINT:-}
       ConnectionStrings__AuthDb: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       Keycloak__ClientSecret: ${SANDBOX_BFF_CLIENT_SECRET}
       # Прежний секрет — только на время смены (scripts/secrets/rotate-bff-secret.sh, docs/secrets.md).
@@ -173,6 +175,18 @@ services:
       KC_SPI_AUTHENTICATOR__PLATFORM_CODE_LOGIN__PHONE_STUB: ${PHONE_LOG_STUB:-true}
       # Метрики Prometheus (/metrics на порту управления 9000): отправки кодов, расход, отказы.
       KC_METRICS_ENABLED: "true"
+      # Сквозная трассировка (OpenTelemetry): Keycloak продолжает трассу сервиса входа (заголовок traceparent) и пишет её идентификатор
+      # в каждую строку журнала — по нему находятся записи обеих сторон. Spans уходят в коллектор по OTLP, если задан AUTH_OTEL_ENDPOINT
+      # и AUTH_TRACING_SAMPLER (например, parentbased_always_on); без них spans не записываются, а идентификатор в журнале остаётся.
+      KC_TRACING_ENABLED: "true"
+      KC_TRACING_ENDPOINT: ${AUTH_OTEL_ENDPOINT:-http://localhost:4317}
+      KC_TRACING_SAMPLER_TYPE: ${AUTH_TRACING_SAMPLER:-always_off}
+      KC_TRACING_SERVICE_NAME: keycloak
+      KC_TRACING_JDBC_ENABLED: "false"
+      KC_TRACING_INFINISPAN_ENABLED: "false"
+      KC_LOG_CONSOLE_INCLUDE_TRACE: "true"
+      # Журнал — строки JSON (для сборщика логов); идентификатор трассы — в поле mdc.
+      KC_LOG_CONSOLE_OUTPUT: json
       # События входа Keycloak как метрики (keycloak_user_events_total{event,realm,client_id}): успешные и неудачные входы.
       KC_EVENT_METRICS_USER_ENABLED: "true"
       KC_EVENT_METRICS_USER_TAGS: realm,clientId
@@ -227,6 +241,24 @@ services:
     depends_on:
       - auth-service
       - keycloak
+
+  # Трассы (профиль monitoring): сервис входа и Keycloak шлют spans по OTLP в коллектор (AUTH_OTEL_ENDPOINT=http://otel-collector:4317 и
+  # AUTH_TRACING_SAMPLER=parentbased_always_on при запуске сервисов); коллектор вырезает сведения о людях и передаёт Jaeger,
+  # интерфейс — http://localhost:16686.
+  otel-collector:
+    profiles: [monitoring]
+    image: otel/opentelemetry-collector-contrib:0.141.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./deploy/monitoring/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    depends_on:
+      - jaeger
+
+  jaeger:
+    profiles: [monitoring]
+    image: jaegertracing/jaeger:2.11.0
+    ports:
+      - "127.0.0.1:${JAEGER_PORT:-16686}:16686"
 
   grafana:
     profiles: [monitoring]

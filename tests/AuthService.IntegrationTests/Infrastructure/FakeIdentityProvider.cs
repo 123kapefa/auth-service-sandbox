@@ -70,8 +70,16 @@ public sealed class FakeIdentityProvider : IIdentityProvider
         return Task.FromResult(TokenResult);
     }
 
+    /// <summary>Не null — обновление токена бросает это исключение (необработанный сбой в запросе).</summary>
+    public Exception? RefreshFault { get; set; }
+
     public Task<Result<TokenSet, Error>> RefreshAsync(string refreshToken, CancellationToken cancellationToken)
     {
+        if (RefreshFault is not null)
+        {
+            throw RefreshFault;
+        }
+
         Refreshes.Add(refreshToken);
         return Task.FromResult(TokenResult);
     }

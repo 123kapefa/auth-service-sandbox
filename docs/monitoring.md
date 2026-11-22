@@ -1,4 +1,4 @@
-# Метрики и дашборд
+# Метрики, логи и трассировка
 
 Сервис входа и Keycloak отдают метрики для Prometheus; в `deploy/monitoring` лежат готовые настройки Prometheus и дашборд
 Grafana «Сервис входа». Оповещения — [alerts.yml](../deploy/monitoring/alerts.yml) (правила появляются вместе с проверкой
@@ -45,6 +45,60 @@ Grafana «Сервис входа». Оповещения — [alerts.yml](../de
 `platform_code_sent_total`, `platform_code_verified_total` (доля введённых — второе на первое), `platform_code_cost_kopecks_total`,
 `platform_code_refused_total{reason}`, `platform_code_budget_alerts_total{percent}`, `platform_code_captcha_unavailable_total`;
 метки `realm`, `channel`.
+
+## Логи и сквозная трассировка
+
+Запрос проходит браузер → сервис входа → Keycloak. У него один **идентификатор трассы** (32 hex-символа, формат W3C): сервис создаёт его
+(или продолжает, если пришёл заголовок `traceparent`) и передаёт Keycloak тем же заголовком. По нему находятся записи обеих сторон.
+
+| Где виден идентификатор | Как |
+|---|---|
+| заголовок любого ответа сервиса | `X-Trace-Id` (в том числе у 401, 403 и 503) |
+| тело ответа с ошибкой | `"traceId": "…"` рядом с `isError` — его называет человек в обращении в поддержку |
+| журнал сервиса | строка JSON в stdout, в `Scopes` — `TraceId` и `SpanId`, код проекта `Project`, `RequestId` |
+| журнал Keycloak | строка JSON, в `mdc.traceId` |
+
+**Журнал сервиса** — одна строка JSON на запрос (`AuthService.Request`: метод, шаблон маршрута, статус, время) и записи самого сервиса.
+В строке нет ни строки запроса, ни идентификаторов в пути (маршрут — шаблон: `/auth/admin/users/{userId}`), ни токенов, кодов, паролей и
+номеров телефонов; здоровье, метрики, статические файлы и 404 от сканеров не пишутся, а отказ в доступе (401, 403, 429), сбой (5xx) и
+необработанное исключение — пишутся. Отказ защиты от CSRF (запрос с cookie токена без `X-Requested-With`) пишет сама защита (Warning).
+Пример поиска:
+
+```bash
+docker compose logs auth-service keycloak | grep 4bf92f3577b34da6a3ce929d0e0e4736
+```
+
+В Kubernetes и в сборщике логов (Loki, Elastic) — поиск по полю `Scopes[].TraceId` (сервис) и `mdc.traceId` (Keycloak).
+
+> Журналы ASP.NET Core на уровне Information пишут адрес запроса целиком, со строкой запроса: в ней одноразовый `code` входа и `state`.
+> Поэтому в `appsettings` для категорий `Microsoft.AspNetCore.Hosting.Diagnostics` и `Microsoft.AspNetCore.Http.Result` стоит `Warning`
+> в каждой конфигурации; при отладке не поднимайте эти категории до Information.
+
+**Spans** (запрос сервиса, запрос сервиса к Keycloak, обработка в Keycloak) уходят в коллектор по OTLP, когда задан адрес:
+
+| Что | Compose (`deploy/compose.yaml`, стенд) | Helm |
+|---|---|---|
+| адрес коллектора OpenTelemetry (`http://otel-collector:4317`) | `AUTH_OTEL_ENDPOINT` | `tracing.otlpEndpoint` |
+| какие трассы пишет Keycloak (`parentbased_always_on` — те, что начал сервис) | `AUTH_TRACING_SAMPLER` (по умолчанию `always_off`) | `tracing.sampler` |
+
+Без адреса spans никуда не уходят, а идентификатор трассы в логах и ответах есть всегда. Что учесть в бою:
+
+- **Доля трасс.** Сервис пишет в коллектор все запросы (`parentbased_always_on`), чтобы уменьшить: `OTEL_TRACES_SAMPLER=parentbased_traceidratio`
+  и `OTEL_TRACES_SAMPLER_ARG=0.1`. Решение о записи принимает сервис; Keycloak (`tracing.sampler`) следует за ним. Флаг «записывать»
+  в `traceparent` от внешнего клиента доверяется: ограничьте объём на коллекторе.
+- **Что попадает в spans и зачем коллектор.** Spans сервиса входа без значений параметров запроса и без данных людей. А Keycloak пишет в свои
+  spans события входа с логином (телефон или почта), IP, идентификаторами человека и сессии, адресом со строкой запроса и user-agent; отключить это
+  настройками нельзя. Поэтому и сервис, и Keycloak шлют трассы **в коллектор OpenTelemetry**, который вырезает эти поля и передаёт дальше в
+  Jaeger или Tempo: [otel-collector.yaml](../deploy/monitoring/otel-collector.yaml). Слать Keycloak напрямую в хранилище нельзя. Что
+  осталось после коллектора, проверяет `check-tracing.sh` (раздел 5: коды, state, пароли, телефоны, токены, IP, логины в трассах Jaeger).
+  Текст SQL и вызовы кэша Keycloak отключены (`KC_TRACING_JDBC_ENABLED`, `KC_TRACING_INFINISPAN_ENABLED`). Коллектор и хранилище трасс всё
+  равно закрывайте от внешнего доступа.
+- **OTLP без TLS.** `http://collector:4317` годится только внутри доверенной сети (Compose, кластер); для коллектора вне её — `https://` и заголовки
+  авторизации из хранилища секретов (`OTEL_EXPORTER_OTLP_HEADERS`).
+- **Журнал Keycloak** содержит события с пользователем и IP (`type="LOGIN_ERROR"`, `username`, `ipAddress`) — как и раньше; идентификатор трассы связал их
+  с записью сервиса. Доступ и срок хранения журналов — как у персональных данных. В стенде песочницы коллектор и Jaeger поднимаются в профиле
+`monitoring` (`http://localhost:16686`); `scripts/keycloak/check-tracing.sh` сам пересоздаёт сервис и Keycloak с отправкой трасс,
+находит запрос в Jaeger, проверяет, что в трассах нет секретов и данных людей, и возвращает всё обратно.
 
 ## Запуск на стенде песочницы
 

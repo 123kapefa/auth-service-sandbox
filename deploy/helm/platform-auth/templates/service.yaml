@@ -84,6 +84,10 @@ spec:
             - name: ConnectionStrings__Redis
               value: {{ include "auth.redis" . | quote }}
             {{- end }}
+            {{- with .Values.tracing.otlpEndpoint }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ . | quote }}
+            {{- end }}
             - name: TokenRevocation__OnStoreFailure
               value: {{ .Values.service.revocationOnStoreFailure | quote }}
             - name: Authentication__Audience

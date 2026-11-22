@@ -1,0 +1,57 @@
+# Коллектор OpenTelemetry между сервисом входа, Keycloak и хранилищем трасс (Jaeger, Tempo). Принимает OTLP и ВЫРЕЗАЕТ из spans
+# сведения о людях, прежде чем передать дальше: Keycloak пишет в spans события входа с логином (телефон или почта), IP, идентификаторами
+# человека и сессии, адреса со строкой запроса, user-agent. Отключить это настройками Keycloak нельзя, поэтому Keycloak и сервис входа
+# отправляют трассы в коллектор, а не напрямую в хранилище. Проверяется: scripts/keycloak/check-tracing.sh (раздел 5).
+# Адрес хранилища — exporters.otlp/storage.endpoint (по умолчанию Jaeger стенда).
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  transform/scrub:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          # Строка запроса: в ней коды входа, state, логины, session_code. Остаётся путь.
+          - delete_key(attributes, "url.query")
+          - replace_pattern(attributes["url.full"], "\\?.*$", "")
+          - replace_pattern(attributes["http.url"], "\\?.*$", "")
+          - replace_pattern(attributes["http.target"], "\\?.*$", "")
+          # Кто и откуда.
+          - delete_key(attributes, "client.address")
+          - delete_key(attributes, "user_agent.original")
+          - delete_key(attributes, "kc.sessionId")
+          - delete_key(attributes, "kc.authenticationSessionId")
+          - delete_key(attributes, "kc.authenticationTabId")
+          - delete_key(attributes, "kc.token.id")
+          - delete_key(attributes, "kc.token.sid")
+      - context: spanevent
+        statements:
+          # События Keycloak: логин человека, IP, идентификаторы человека, сессии и токенов, адрес возврата.
+          - delete_key(attributes, "kc.details.username")
+          - delete_key(attributes, "ipAddress")
+          - delete_key(attributes, "kc.userId")
+          - delete_key(attributes, "kc.sessionId")
+          - delete_key(attributes, "kc.details.redirect_uri")
+          - delete_key(attributes, "kc.details.code_id")
+          - delete_key(attributes, "kc.details.token_id")
+          - delete_key(attributes, "kc.details.refresh_token_id")
+  batch: {}
+
+exporters:
+  otlp/storage:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true # внутри сети Compose или кластера; для хранилища вне доверенной сети — tls и заголовки авторизации
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [transform/scrub, batch]
+      exporters: [otlp/storage]

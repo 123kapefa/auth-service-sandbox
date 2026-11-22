@@ -72,6 +72,13 @@ redis: ""
 # Secret (ключ AUTH_REDIS: host:port,user=auth-service,password=…), redis выше тогда не используется.
 redisFromSecret: false
 
+# Трассировка (OpenTelemetry): адрес OTLP-коллектора (http://otel-collector:4317). Пусто — spans никуда не уходят, а идентификатор
+# трассы в логах сервиса и Keycloak, в заголовке X-Trace-Id и в теле ответа с ошибкой есть всегда.
+tracing:
+  otlpEndpoint: ""
+  # Какие трассы Keycloak записывает: always_off — никакие; parentbased_always_on — те, что начал сервис входа (при заданном адресе).
+  sampler: always_off
+
 service:
   # Что делать, когда Redis с отметками отзыва недоступен: Open (токен пропускается, вход живёт, отзыв на это время не
   # работает) или Closed (токен не принимается, 503). docs/environments.md, «Сбои Redis и капчи».

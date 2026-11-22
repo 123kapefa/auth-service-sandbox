@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json.Serialization;
 
 namespace SharedKernel;
@@ -10,6 +11,7 @@ public sealed record Envelope
         Result = result;
         Error = error;
         TimeGenerated = DateTime.UtcNow;
+        TraceId = error is null ? null : Activity.Current?.TraceId.ToString();
     }
 
     public object? Result { get; }
@@ -19,6 +21,10 @@ public sealed record Envelope
     public bool IsError => Error is not null;
 
     public DateTime TimeGenerated { get; }
+
+    /// <summary>Идентификатор трассы запроса — только у ответов с ошибкой: по нему находятся записи сервиса и Keycloak.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TraceId { get; }
 
     public static Envelope Ok(object? result = null) => new(result, null);
 
@@ -33,6 +39,7 @@ public sealed record Envelope<T>
         Result = result;
         Error = error;
         TimeGenerated = DateTime.UtcNow;
+        TraceId = error is null ? null : Activity.Current?.TraceId.ToString();
     }
 
     public T? Result { get; }
@@ -42,6 +49,10 @@ public sealed record Envelope<T>
     public bool IsError => Error is not null;
 
     public DateTime TimeGenerated { get; }
+
+    /// <summary>Идентификатор трассы запроса — только у ответов с ошибкой: по нему находятся записи сервиса и Keycloak.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TraceId { get; }
 
     public static Envelope<T> Ok(T? result = default) => new(result, null);
 

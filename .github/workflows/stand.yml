@@ -105,6 +105,10 @@ jobs:
       - name: check-migration
         if: ${{ !cancelled() && steps.token.outcome == 'success' }}
         run: scripts/keycloak/check-migration.sh 2>&1 | tee -a stand-logs/check-migration.log
+      # Пересоздаёт сервис и Keycloak с отправкой трасс в Jaeger и возвращает обратно: поэтому последним.
+      - name: check-tracing
+        if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: scripts/keycloak/check-tracing.sh 2>&1 | tee -a stand-logs/check-tracing.log
 
       - name: Логи контейнеров
         if: failure()

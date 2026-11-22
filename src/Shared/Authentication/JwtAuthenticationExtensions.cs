@@ -9,6 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using PlatformAuth.Csrf;
 using PlatformAuth.Revocation;
+using PlatformAuth.Telemetry;
 
 namespace PlatformAuth;
 
@@ -148,6 +149,7 @@ public static class JwtAuthenticationExtensions
                     type = "AUTHENTICATION",
                 },
                 isError = true,
+                traceId = TraceContext.CurrentId(context.HttpContext),
             },
             context.HttpContext.RequestAborted);
     }
@@ -177,6 +179,7 @@ public static class JwtAuthenticationExtensions
                     type = "FAILURE",
                 },
                 isError = true,
+                traceId = TraceContext.CurrentId(context.HttpContext),
             },
             context.HttpContext.RequestAborted);
     }

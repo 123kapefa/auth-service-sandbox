@@ -47,6 +47,18 @@ services:
       KC_PROXY_TRUSTED_ADDRESSES: ${AUTH_KEYCLOAK_PROXY_TRUSTED:-172.16.0.0/12,127.0.0.1}
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
+      # Сквозная трассировка (OpenTelemetry): Keycloak продолжает трассу сервиса входа (заголовок traceparent) и пишет её идентификатор
+      # в каждую строку журнала — по нему находятся записи обеих сторон. Spans уходят в коллектор по OTLP, если задан AUTH_OTEL_ENDPOINT
+      # и AUTH_TRACING_SAMPLER (например, parentbased_always_on); без них spans не записываются, а идентификатор в журнале остаётся.
+      KC_TRACING_ENABLED: "true"
+      KC_TRACING_ENDPOINT: ${AUTH_OTEL_ENDPOINT:-http://localhost:4317}
+      KC_TRACING_SAMPLER_TYPE: ${AUTH_TRACING_SAMPLER:-always_off}
+      KC_TRACING_SERVICE_NAME: keycloak
+      KC_TRACING_JDBC_ENABLED: "false"
+      KC_TRACING_INFINISPAN_ENABLED: "false"
+      KC_LOG_CONSOLE_INCLUDE_TRACE: "true"
+      # Журнал — строки JSON (для сборщика логов); идентификатор трассы — в поле mdc.
+      KC_LOG_CONSOLE_OUTPUT: json
       # События входа Keycloak как метрики (keycloak_user_events_total{event,realm,client_id}): успешные и неудачные входы.
       KC_EVENT_METRICS_USER_ENABLED: "true"
       KC_EVENT_METRICS_USER_TAGS: realm,clientId
@@ -160,6 +172,9 @@ services:
       DataProtection__PreviousCertificate: ${AUTH_DATA_PROTECTION_PREVIOUS_CERT:-}
       DataProtection__PreviousCertificatePassword: ${AUTH_DATA_PROTECTION_PREVIOUS_CERT_PASSWORD:-}
       Cookies__Secure: ${AUTH_COOKIES_SECURE:-true}
+      # Трассировка (OpenTelemetry): пусто — spans никуда не уходят (идентификатор трассы в логах и ответах есть); адрес OTLP-коллектора
+      # (http://collector:4317) — уходят. У Keycloak то же: AUTH_OTEL_ENDPOINT и AUTH_TRACING_SAMPLER (parentbased_always_on).
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${AUTH_OTEL_ENDPOINT:-}
       # Домена у cookie нет (задача 12.1). Переменная пробрасывается только затем, чтобы старое значение остановило сервис
       # с понятным сообщением в логе, а не было молча забыто (Compose сам отказать на непустое значение не умеет).
       Cookies__Domain: ${AUTH_COOKIES_DOMAIN:-}

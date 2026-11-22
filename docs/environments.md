@@ -52,6 +52,8 @@
 | `DataProtection:PreviousCertificate*` | прежний сертификат — только на время смены ([secrets.md](secrets.md#сертификат-dataprotection)) | — | так же | так же |
 | `DemoPage:Enabled` | демо-страница разработчика `/dev/` | `true` | `true` | нет: `/dev/` — 404, включить нельзя (старт остановится) |
 | `Metrics:Port` | порт метрик Prometheus (`/metrics`, наружу не публикуется); `0` — выключено ([monitoring.md](monitoring.md)) | `0` | `9100` (на хосте — `127.0.0.1`) | `9100` (по умолчанию) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | адрес OTLP-коллектора для трасс; пусто — spans никуда не уходят ([monitoring.md](monitoring.md#логи-и-сквозная-трассировка)) | — | `AUTH_OTEL_ENDPOINT` (пусто) | `AUTH_OTEL_ENDPOINT` / `tracing.otlpEndpoint` |
+| `Logging:Console` | формат журнала: JSON (в Docker и Production), текст (Development) | текст | JSON | JSON |
 | `Cookies:Secure` | cookie входа (только для хоста сервиса входа, `Domain` нет); `true` — имена `__Host-accessToken`/`__Host-refreshToken` | `false` | `false` | `true` |
 | `ReturnUrls:AllowedOrigins` | куда вернуть после входа | `localhost:5080/3000/5173` | `localhost:8080/3000/5173` | приложения платформы |
 | `Logging:LogLevel` | ASP.NET Core | Debug | Debug для `AuthService`, фреймворк — Warning | Warning |

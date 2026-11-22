@@ -83,6 +83,24 @@ spec:
               value: "true"
             - name: KC_METRICS_ENABLED
               value: "true"
+            # Трассировка: Keycloak продолжает трассу сервиса входа и пишет её идентификатор в каждую строку журнала (JSON).
+            - name: KC_TRACING_ENABLED
+              value: "true"
+            - name: KC_TRACING_ENDPOINT
+              value: {{ .Values.tracing.otlpEndpoint | default "http://localhost:4317" | quote }}
+            - name: KC_TRACING_SAMPLER_TYPE
+              value: {{ .Values.tracing.sampler | quote }}
+            - name: KC_TRACING_SERVICE_NAME
+              value: keycloak
+            # В spans — только запросы Keycloak; текст SQL и внутренние вызовы кэша не нужны.
+            - name: KC_TRACING_JDBC_ENABLED
+              value: "false"
+            - name: KC_TRACING_INFINISPAN_ENABLED
+              value: "false"
+            - name: KC_LOG_CONSOLE_INCLUDE_TRACE
+              value: "true"
+            - name: KC_LOG_CONSOLE_OUTPUT
+              value: json
             # События входа Keycloak как метрики (keycloak_user_events_total): успешные и неудачные входы.
             - name: KC_EVENT_METRICS_USER_ENABLED
               value: "true"

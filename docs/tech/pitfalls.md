@@ -171,6 +171,29 @@
   молча не происходит, а проверки после него красные только на macOS (так были красными `check-branding` и `check-app-branding`,
   пока в CI на bash 5 они проходили, — #231).
 
+### Логи и трассировка (13.2)
+
+- **ASP.NET Core на уровне Information пишет адрес запроса со строкой запроса** (`Hosting.Diagnostics`: «Request starting … /auth/callback?code=…&state=…»)
+  и адрес перехода (`Http.Result.RedirectResult`: «redirecting to …/auth?state=…»). Правила `Warning` для этих двух категорий — в каждом
+  `appsettings*.json`; тест `Logs_NeverContainSecrets_OfLoginRefreshAndLogout` идёт в окружении Development, где общий уровень — Information.
+- **.NET заменяет строку запроса в журнале HttpClient на `?*`** — а идентификатор в пути остаётся (`/admin/realms/x/users/{id}`); категория
+  `System.Net.Http.HttpClient` в сервисе — Warning (ответы Keycloak считают метрики).
+- **Свой журнал запроса** (`AuthService.Request`) пишет шаблон маршрута, а не путь: `/auth/admin/users/{userId}`. Область `RequestPath` ASP.NET Core
+  добавляет сам (путь без строки запроса).
+- **Идентификатор трассы в Keycloak** пишется, пока включена трассировка (`KC_TRACING_ENABLED`), даже при `always_off` (идентификатор
+  берётся из `traceparent`); без `KC_LOG_CONSOLE_INCLUDE_TRACE` его в журнале нет. Допустимые значения `KC_EVENT_METRICS_USER_EVENTS`
+  и `KC_EVENT_METRICS_USER_TAGS` Keycloak проверяет при старте (ошибки — части событий вроде `login_error` — отдельно не задаются).
+- **Защита от CSRF и идентификатор трассы работают раньше журнала запросов** (стартовые фильтры): отказ 403 в журнал запросов не попадает —
+  его пишет `CsrfHeaderMiddleware` (Warning).
+- **Spans Keycloak несут сведения о людях** (`kc.details.username` — логин, `ipAddress`, `kc.userId`, id сессий, `client.address`, `url.query`): без
+  коллектора с очисткой (`deploy/monitoring/otel-collector.yaml`) слать их в Jaeger или Tempo нельзя. Правки очистки — в этом файле; поле,
+  которое Keycloak добавит в следующей версии, ловит раздел 5 `check-tracing.sh` только если оно похоже на значения проверки: после обновления
+  Keycloak просмотрите spans в Jaeger глазами.
+- **Необработанное исключение**: журнал запроса пишет статус 500 и Warning сам (иначе в `finally` был бы ещё 200); исключение пишет ASP.NET Core.
+- **Идентификатор в теле ответа — `traceId` рядом с `isError`**, а не в `error`: добавляется только к ответам с ошибкой (`Envelope`) и к
+  ответам, которые пишут защита (CSRF 403, 401, 503) вручную.
+- **`check-code-limits.sh` читает журнал Keycloak** (`[CODE BUDGET] … исчерпан`): журнал Keycloak — строки JSON; кириллица в них без экранирования.
+
 ### Метрики (13.1)
 
 - **Счётчик в Prometheus — только через `PrometheusMeterBridge`**: встроенный адаптер prometheus-net отдаёт счётчики .NET как
