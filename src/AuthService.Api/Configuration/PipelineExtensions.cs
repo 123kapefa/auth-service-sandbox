@@ -7,6 +7,9 @@ public static class PipelineExtensions
 {
     public static WebApplication UseAuthServicePipeline(this WebApplication app)
     {
+        // Код проекта в каждой записи журнала запроса (идентификатор трассы подставляет ASP.NET Core).
+        app.UseAuthServiceLogScope();
+
         // Первым: всё, что дальше читает IP клиента или схему запроса, должно видеть настоящие значения.
         app.UseAuthServiceForwardedHeaders();
 

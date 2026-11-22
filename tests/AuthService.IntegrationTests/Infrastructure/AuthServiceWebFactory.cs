@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using AuthService.Core.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -71,6 +72,9 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
 
     /// <summary>Уведомления человеку в памяти вместо плагина Keycloak.</summary>
     public FakeAccountNotices Notices { get; } = new();
+
+    /// <summary>Журнал сервиса за время работы фабрики (для проверки идентификатора трассы и отсутствия секретов).</summary>
+    public CapturingLoggerProvider Logs { get; } = new();
 
     /// <summary>Клиент как браузер без автоматических переходов и cookie: тест видит каждый 302 и Set-Cookie.</summary>
     public HttpClient CreateBrowserClient() =>
@@ -171,6 +175,7 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
         builder.UseSetting("TokenRevocation:LocalCache", "00:00:00");
         // Порт метрик (Prometheus) в тестах не нужен: десятки фабрик заняли бы один и тот же порт.
         builder.UseSetting("Metrics:Port", "0");
+        builder.ConfigureLogging(logging => logging.AddProvider(Logs));
         builder.ConfigureTestServices(services =>
         {
             services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>

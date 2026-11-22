@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using PlatformAuth;
 using PlatformAuth.Csrf;
@@ -54,7 +55,8 @@ public sealed class CsrfHeaderMiddlewareTests
                 reachedNext = true;
                 return Task.CompletedTask;
             },
-            Options.Create(new JwtAuthenticationOptions { AccessTokenCookie = accessTokenCookie }));
+            Options.Create(new JwtAuthenticationOptions { AccessTokenCookie = accessTokenCookie }),
+            NullLogger<CsrfHeaderMiddleware>.Instance);
         var context = new DefaultHttpContext();
         context.Response.Body = new MemoryStream();
         context.Request.Method = method;
