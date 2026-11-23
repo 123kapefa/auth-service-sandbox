@@ -1,0 +1,40 @@
+# Alertmanager стенда песочницы (корневой compose.yaml, профиль monitoring): письма уходят в Mailpit — http://localhost:8025.
+# Боевой пример с маршрутами и подавлением — alertmanager.yml.
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: mailpit:1025
+  smtp_from: auth-alerts@sandbox.test
+  smtp_require_tls: false
+
+route:
+  receiver: mailpit
+  group_by: [alertname, realm]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 1h
+  routes:
+    # Watchdog на стенде никуда не уходит (в бою — во внешний сторож, alertmanager.yml).
+    - matchers: [alertname="Watchdog"]
+      receiver: watchdog
+    # Бюджет кодов: без письма «RESOLVED» (оповещение горит 10 минут, а состояние держится до полуночи).
+    - matchers: [alertname=~"AuthCodeBudget.*"]
+      receiver: mailpit-once
+
+receivers:
+  - name: mailpit-once
+    email_configs:
+      - to: oncall@sandbox.test
+        send_resolved: false
+  - name: watchdog
+  - name: mailpit
+    email_configs:
+      - to: oncall@sandbox.test
+        send_resolved: true
+
+inhibit_rules:
+  - source_matchers: [alertname="AuthServiceDown"]
+    target_matchers: [alertname=~"AuthKeycloakErrors|AuthRefreshFailures|AuthRefreshKeycloakErrors|AuthLoginFailureShareHigh|AuthMetricsMissing"]
+  - source_matchers: [alertname="AuthKeycloakDown"]
+    target_matchers: [alertname=~"AuthKeycloakErrors|AuthRefreshFailures|AuthRefreshKeycloakErrors|AuthLoginFailureShareHigh|AuthCodeVerifiedShareLow"]
+  - source_matchers: [alertname="AuthRedisUnavailable"]
+    target_matchers: [alertname=~"AuthRevocationStoreErrors"]

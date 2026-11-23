@@ -1,8 +1,7 @@
 # Метрики, логи и трассировка
 
 Сервис входа и Keycloak отдают метрики для Prometheus; в `deploy/monitoring` лежат готовые настройки Prometheus и дашборд
-Grafana «Сервис входа». Оповещения — [alerts.yml](../deploy/monitoring/alerts.yml) (правила появляются вместе с проверкой
-каждого искусственным сбоем).
+Grafana «Сервис входа», а в [alerts.yml](../deploy/monitoring/alerts.yml) и [alertmanager.yml](../deploy/monitoring/alertmanager.yml) — правила оповещений и маршруты.
 
 ## Откуда берутся метрики
 
@@ -100,13 +99,68 @@ docker compose logs auth-service keycloak | grep 4bf92f3577b34da6a3ce929d0e0e473
 `monitoring` (`http://localhost:16686`); `scripts/keycloak/check-tracing.sh` сам пересоздаёт сервис и Keycloak с отправкой трасс,
 находит запрос в Jaeger, проверяет, что в трассах нет секретов и данных людей, и возвращает всё обратно.
 
+## Оповещения
+
+Правила — [alerts.yml](../deploy/monitoring/alerts.yml), получатели и маршруты — [alertmanager.yml](../deploy/monitoring/alertmanager.yml) (пример: письма,
+дежурному — отдельным маршрутом; рядом — заготовка для webhook в чат). Prometheus подключает правила (`rule_files`) и знает Alertmanager
+(`alerting`) — [prometheus.yml](../deploy/monitoring/prometheus.yml). Важность: **critical** — вход не работает или не работает защита (будить), **warning** —
+разобраться в рабочее время, в том числе подозрение на перебор. Пороги — для проекта с десятками-сотнями входов в час; подберите под свою нагрузку.
+
+| Оповещение | Важность | Когда | Что делать |
+|---|---|---|---|
+| `AuthServiceDown` | critical | Prometheus не собирает метрики сервиса > 1 мин | сервис упал или недоступен по сети: перезапуск, журнал |
+| `AuthKeycloakDown` | critical | не собираются метрики Keycloak > 1 мин | Keycloak упал: новые входы не проходят |
+| `AuthKeycloakErrors` | critical | > 20 % запросов сервиса к Keycloak за 5 мин — 5xx или обрыв (≥ 10 запросов) | журнал Keycloak; `auth_keycloak_requests_total` по целям |
+| `AuthDatabaseUnavailable` | critical | проверка готовности базы не проходит > 1 мин | Postgres сервиса: журнал, диск, соединения |
+| `AuthRedisUnavailable` | critical | проверка готовности Redis не проходит > 1 мин | отзыв токенов не работает (режим «открыто») или 503 (режим «закрыто») |
+| `AuthRevocationStoreErrors` | warning | ошибки от Redis при проверке токенов (`kind=server` — ACL или пароль, Redis «жив») | права пользователя Redis ([environments.md](environments.md#redis-пользователи)) |
+| `AuthTokenChecksUnavailable` | critical | запросы отклонены: проверить отзыв токена нельзя (режим «закрыто») | вернуть Redis |
+| `AuthLoginFailuresSpike` | warning | > 30 неудачных попыток входа за 5 мин в проекте | подбор паролей или кодов: прокси, блокировки |
+| `AuthLoginFailureShareHigh` | warning | > 50 % попыток входа за 15 мин неудачны (≥ 20 попыток) | перебор — или сломан способ входа (письма, провайдер, тема) |
+| `AuthRefreshFailures` | warning | > 30 % обновлений токенов за 15 мин не прошли (≥ 20) | сессии заканчиваются, или Keycloak недоступен |
+| `AuthRefreshKeycloakErrors` | critical | ≥ 5 обновлений за 5 мин закончились ошибкой Keycloak | Keycloak: люди теряют сессию через 15 мин |
+| `AuthCodeVerifiedShareLow` | warning | введено < 40 % отправленных кодов за час (≥ 20 отправлено) | коды не доходят (провайдер) или накрутка отправок |
+| `AuthCodeBudgetNearlyExhausted` | warning | израсходовано 80 % дневного бюджета на коды | необычный расход — накрутка |
+| `AuthCodeBudgetExhausted` | critical | бюджет исчерпан: SMS и звонки отключены до полуночи | увеличить бюджет или разобраться с расходом |
+| `AuthCaptchaUnavailable` | warning | SmartCaptcha не отвечает | поведение — `captcha-on-outage` |
+| `AuthMetricsMissing` | warning | пропала метрика готовности базы или Redis (> 5 мин) | цель убрана из `prometheus.yml`, порт метрик закрыт, сервис не стартовал |
+| `AuthDependencyChecksStale` | critical | проверки готовности базы и Redis не выполнялись > 2 мин | проверка зависла: `auth_dependency_up` показывает старое значение; перезапуск сервиса |
+| `Watchdog` | — | горит всегда | см. «Если мониторинг сам не работает» |
+
+Оповещения о бюджете горят 10 минут после порога, а состояние (80 %, SMS выключены) держится до полуночи, поэтому письма «RESOLVED» по ним не отправляются (маршруты `*-once`).
+Счётчики плагина кодов (`platform_code_*`) создаются нулями при старте Keycloak для всех проектов (и при первом событии нового проекта): иначе ряд появлялся бы
+сразу со значением 1, а Prometheus не видит приращения у ряда без предыдущей точки — первое оповещение о бюджете (оно приходит раз в сутки) терялось бы.
+
+**Если мониторинг сам не работает.** Правила молчат, когда лежат Prometheus или Alertmanager или нет канала до получателя. Поэтому есть оповещение `Watchdog`: оно горит
+всегда, а маршрут `watchdog` в [alertmanager.yml](../deploy/monitoring/alertmanager.yml) передаёт его каждые 5 минут внешнему «сторожу» (dead man's switch:
+Healthchecks.io, Better Stack, Grafana OnCall и т. п.), который поднимает тревогу, когда сигнал пропал. Адрес сторожа с токеном — из хранилища секретов
+(`url_file`). Без внешнего сторожа остальные оповещения не защищены от падения самого мониторинга. На стенде `Watchdog` никуда не уходит.
+
+**Безопасность Alertmanager.** У его API (`:9093`) нет проверки доступа: любой, кто до него дотянется, может создать тишину (silence) или подбросить оповещение. На стенде порт
+привязан к `127.0.0.1`; в бою не публикуйте его наружу и держите во внутренней сети (за прокси с проверкой, если нужен интерфейс).
+
+Alertmanager подавляет оповещения-следствия: пока горит `AuthServiceDown` или `AuthKeycloakDown`, письма об ошибках обновления и доле неудачных входов не уходят
+(человек уже разбужен; `AuthKeycloakDown` при упавшем сервисе всё равно придёт отдельным письмом); при `AuthRedisUnavailable` не пишется `AuthRevocationStoreErrors`. Повтор письма — раз в 4 часа (critical — раз в час), пока горит.
+
+**Как проверено** (`scripts/keycloak/check-alerts.sh`): (1) `promtool check rules` и **модульные тесты** `alerts_test.yml` на искусственных рядах — у каждого правила
+есть ряд, при котором оно срабатывает, и (где есть порог) ряд, при котором молчит; (2) рабочие Prometheus и Alertmanager стенда загрузили правила;
+(3) **живые сбои на стенде**: перебор паролей, коды без ввода, остановка Redis, базы, Keycloak и сервиса, исчерпание бюджета кодов — для каждого
+оповещения проверено, что оно загорелось, письмо дошло в Mailpit (`http://localhost:8025`) и оно погасло, когда сбой убрали; подавление следствий тоже.
+Для живой проверки временный Prometheus опрашивает раз в 2 секунды, а «`for`» правил сокращён до 4 секунд. Режим «закрыто» (`AuthTokenChecksUnavailable`: Redis остановлен, сервис
+отвечает 503) и недоступная SmartCaptcha (`AuthCaptchaUnavailable`: адрес капчи не существует) тоже проверены живыми сбоями; «зависшая» база (пауза контейнера) —
+оповещением `AuthDatabaseUnavailable`. Только модульным тестом проверено `AuthDependencyChecksStale`: метка времени проверок застывает лишь при дефекте самой публикации
+(зависшая база даёт не «застыло», а «недоступна»).
+
+В Kubernetes: правила из `alerts.yml` загружаются в Prometheus Operator ресурсом `PrometheusRule` (то же содержимое `groups`), маршруты — в `AlertmanagerConfig`
+или секрет Alertmanager.
+
 ## Запуск на стенде песочницы
 
 ```bash
 docker compose --profile monitoring up -d prometheus grafana
 ```
 
-Остановить: `docker compose --profile monitoring down` (обычный `down` их не трогает: они в профиле). Prometheus — http://localhost:9090, Grafana — http://localhost:3030 (admin / admin; на общей машине задайте свой пароль:
+Alertmanager — http://localhost:9093 (письма — в Mailpit, http://localhost:8025). Остановить: `docker compose --profile monitoring down` (обычный `down` их не трогает: они в профиле). Prometheus — http://localhost:9090, Grafana — http://localhost:3030 (admin / admin; на общей машине задайте свой пароль:
 `GRAFANA_ADMIN_PASSWORD`), папка «Сервис входа», дашборд «Сервис входа». Оба порта привязаны к `127.0.0.1`. Проверка метрик и дашборда — `scripts/keycloak/check-metrics.sh` (сама создаёт события и ждёт сбор).
 
 ## В бою

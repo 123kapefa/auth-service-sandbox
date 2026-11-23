@@ -1,5 +1,6 @@
 using AuthService.Core;
 using PlatformAuth;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Prometheus;
 
 namespace AuthService.Api.Configuration;
@@ -42,6 +43,15 @@ public static class MetricsConfiguration
                 options.InstrumentFilterPredicate = instrument => _meters.Contains(instrument.Meter.Name);
             });
             services.AddMetricServer(options => options.Port = (ushort)port);
+            // Готовность базы и Redis — метрика auth_dependency_up (оповещения 13.3): проверки идут по таймеру, а не по запросу пробы.
+            services.Configure<HealthCheckPublisherOptions>(options =>
+            {
+                options.Delay = TimeSpan.FromSeconds(3);
+                options.Period = TimeSpan.FromSeconds(10);
+                options.Timeout = TimeSpan.FromSeconds(25); // зависшая проверка не должна «заморозить» метрику дольше, чем на цикл
+                options.Predicate = registration => registration.Tags.Contains("ready");
+            });
+            services.AddSingleton<IHealthCheckPublisher, DependencyHealthMetrics>();
             services.AddSingleton<PrometheusMeterBridge>(provider => new PrometheusMeterBridge(
                 _ownMeters,
                 provider.GetRequiredService<ILogger<PrometheusMeterBridge>>(),

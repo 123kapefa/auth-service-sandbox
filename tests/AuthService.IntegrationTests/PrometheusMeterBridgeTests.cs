@@ -12,10 +12,6 @@ namespace AuthService.IntegrationTests;
 /// <summary>13.1: счётчики .NET уходят в Prometheus настоящими counter с суффиксом _total и метками из тегов.</summary>
 public sealed class PrometheusMeterBridgeTests
 {
-    // Встроенный адаптер prometheus-net по умолчанию публикует все Meter процесса и дублировал бы наши счётчики; в сервисе он
-    // ограничен списком встроенных источников (MetricsConfiguration), здесь выключен совсем.
-    static PrometheusMeterBridgeTests() => Metrics.ConfigureMeterAdapter(options => options.InstrumentFilterPredicate = _ => false);
-
     [Fact]
     public async Task Counter_ExportedAsPrometheusCounter_WithLabels()
     {

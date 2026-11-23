@@ -13,6 +13,7 @@ import org.keycloak.models.AuthenticationExecutionModel.Requirement;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
 import org.keycloak.models.RealmModel;
+import org.keycloak.models.utils.KeycloakModelUtils;
 import org.keycloak.provider.ProviderConfigProperty;
 
 /**
@@ -151,7 +152,15 @@ public final class CodeLoginAuthenticatorFactory implements AuthenticatorFactory
 
     @Override
     public void postInit(KeycloakSessionFactory factory) {
-        // зависимостей от других провайдеров пока нет
+        // Метрики кодов существующих проектов — нулями при старте (CodeMetrics.register): иначе первое событие ряда теряется в Prometheus.
+        try {
+            KeycloakModelUtils.runJobInTransaction(factory, session -> session.realms().getRealmsStream()
+                .map(RealmModel::getName)
+                .filter(name -> !Config.getAdminRealm().equals(name))
+                .forEach(metrics::register));
+        } catch (RuntimeException e) {
+            LOG.warnf(e, "Нулевые ряды метрик кодов при старте не созданы: появятся с первым событием проекта");
+        }
     }
 
     @Override

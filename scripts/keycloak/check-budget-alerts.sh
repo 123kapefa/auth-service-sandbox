@@ -53,13 +53,26 @@ import json, re, sys
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 def parse(value):
-    value = re.sub(r"(\.\d{6})\d*", r"\1", value.replace("Z", "+00:00"))
+    # Доли секунды — ровно 6 цифр: Mailpit пишет время без хвостовых нулей («.79»), а fromisoformat в python 3.9 такое не читает
+    # (из-за этого проверка изредка не видела письмо — «ValueError: Invalid isoformat string»).
+    value = re.sub(r"\.(\d+)", lambda m: "." + m.group(1)[:6].ljust(6, "0"), value.replace("Z", "+00:00"))
     return datetime.fromisoformat(value)
 since = datetime.now(ZoneInfo("Europe/Moscow")).replace(hour=0, minute=0, second=0, microsecond=0)
 if sys.argv[3]:
     since = max(since, parse(sys.argv[3]))
 print(sum(1 for m in json.load(sys.stdin)["messages"]
           if m["Subject"] == sys.argv[1] and sys.argv[2] in [t["Address"] for t in m["To"]] and parse(m["Created"]) >= since))' "$2" "$1" "$SINCE"
+}
+# mails_wait <адрес> <тема> <сколько ждём> — как mails, но ждёт до 20 секунд, пока писем станет столько, сколько ждём: Keycloak отправляет письма
+# админам по очереди, а Mailpit показывает их с задержкой; проверка сразу после отправки иногда видела только первого (см. docs/tech/pitfalls.md).
+mails_wait() {
+  local i n
+  for i in $(seq 20); do
+    n=$(mails "$1" "$2")
+    [ "$n" = "$3" ] && break
+    sleep 1
+  done
+  echo "$n"
 }
 # text <адрес> <тема> — текст последнего такого письма
 text() {
@@ -91,7 +104,7 @@ echo "1. Расход дошёл до 80 % — письмо админам"
 PHONE=$(new_phone); JAR="$WORK/jar1"; : > "$JAR"
 check "звонок (1 ₽) уходит" "$(code_start "$JAR" "$PHONE")" "Вам звонят на +$PHONE."
 sleep 2
-for to in $ADMINS; do check "$to — одно письмо о 80 % за сутки" "$(mails "$to" "$SUBJECT_80")" 1; done
+for to in $ADMINS; do check "$to — одно письмо о 80 % за сутки" "$(mails_wait "$to" "$SUBJECT_80" 1)" 1; done
 check "в письме — проект и что будет при 100 %" \
   "$(text admin@sandbox.test "$SUBJECT_80" | grep -c -e 'дневного бюджета' -e 'SMS с кодами перестанут уходить до полуночи')" 2
 
@@ -100,7 +113,7 @@ sleep 1.1
 check "«Прислать SMS» — отказ" "$(send_sms "$JAR")" \
   "Сейчас не можем отправить SMS. Войдите по почте или с ключом доступа."
 sleep 2
-for to in $ADMINS; do check "$to — одно письмо об исчерпанном бюджете за сутки" "$(mails "$to" "$SUBJECT_100")" 1; done
+for to in $ADMINS; do check "$to — одно письмо об исчерпанном бюджете за сутки" "$(mails_wait "$to" "$SUBJECT_100" 1)" 1; done
 check "в письме — SMS выключены до полуночи" \
   "$(text admin@sandbox.test "$SUBJECT_100" | grep -c 'SMS с кодами выключены до полуночи')" 1
 
@@ -112,7 +125,7 @@ sleep 1.1
 send_sms "$JAR" > /dev/null
 sleep 2
 for to in $ADMINS; do
-  check "$to — по-прежнему по одному письму" "$(mails "$to" "$SUBJECT_80") $(mails "$to" "$SUBJECT_100")" "1 1"
+  check "$to — по-прежнему по одному письму" "$(mails_wait "$to" "$SUBJECT_80" 1) $(mails_wait "$to" "$SUBJECT_100" 1)" "1 1"
 done
 
 echo "4. Не админам — ничего"

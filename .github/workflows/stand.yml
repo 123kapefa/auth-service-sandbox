@@ -109,6 +109,10 @@ jobs:
       - name: check-tracing
         if: ${{ !cancelled() && steps.token.outcome == 'success' }}
         run: scripts/keycloak/check-tracing.sh 2>&1 | tee -a stand-logs/check-tracing.log
+      # Останавливает и возвращает Redis, Postgres, Keycloak и сервис (живые сбои для оповещений): после всех остальных проверок.
+      - name: check-alerts
+        if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: scripts/keycloak/check-alerts.sh 2>&1 | tee -a stand-logs/check-alerts.log
 
       - name: Логи контейнеров
         if: failure()

@@ -1,0 +1,393 @@
+# Модульные тесты правил alerts.yml на искусственных рядах (promtool test rules): для каждого правила — ряд, при котором оно срабатывает,
+# и (там, где есть порог) ряд, при котором молчит. Запуск: scripts/keycloak/check-alerts.sh (или promtool test rules alerts_test.yml).
+# exp_annotations повторяют тексты из alerts.yml: после правки текста promtool покажет «got» — скопируйте его сюда.
+rule_files:
+  - alerts.yml
+evaluation_interval: 1m
+tests:
+  # ── доступность ────────────────────────────────────────────────────────────────────────────────
+  - name: сервис входа не отвечает
+    interval: 1m
+    input_series:
+      - series: 'up{job="auth-service", instance="auth-service:9100"}'
+        values: '1 1 0 0 0 0'
+    alert_rule_test:
+      - { eval_time: 1m, alertname: AuthServiceDown, exp_alerts: [] }
+      - eval_time: 5m
+        alertname: AuthServiceDown
+        exp_alerts:
+          - exp_labels: { severity: critical, job: auth-service, instance: "auth-service:9100" }
+            exp_annotations:
+              description: "Prometheus не может собрать метрики сервиса входа (auth-service:9100) больше минуты: сервис упал, перезапускается или недоступен по сети. Вход и админка не работают."
+              summary: "Сервис входа не отвечает"
+
+  - name: Keycloak не отвечает
+    interval: 1m
+    input_series:
+      - series: 'up{job="keycloak", instance="auth-keycloak:9000"}'
+        values: '1 1 0 0 0 0'
+    alert_rule_test:
+      - { eval_time: 1m, alertname: AuthKeycloakDown, exp_alerts: [] }
+      - eval_time: 5m
+        alertname: AuthKeycloakDown
+        exp_alerts:
+          - exp_labels: { severity: critical, job: keycloak, instance: "auth-keycloak:9000" }
+            exp_annotations:
+              description: "Prometheus не может собрать метрики Keycloak (auth-keycloak:9000) больше минуты. Новые входы не проходят; уже вошедшие работают, пока не истечёт токен (до 15 минут)."
+              summary: "Keycloak не отвечает"
+
+  - name: ошибки Keycloak для сервиса — доля больше 20 %
+    interval: 1m
+    input_series:
+      - series: 'auth_keycloak_requests_total{target="token", outcome="2xx"}'
+        values: '0+2x12'
+      - series: 'auth_keycloak_requests_total{target="token", outcome="5xx"}'
+        values: '0+1x12'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: AuthKeycloakErrors
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              description: "33.33% запросов сервиса к Keycloak за 5 минут закончились ошибкой сервера (5xx) или обрывом соединения. Смотрите журнал Keycloak и метрики auth_keycloak_requests_total по целям (target)."
+              summary: "Keycloak отвечает ошибками сервису входа"
+
+  - name: ошибки Keycloak все, но запросов меньше десяти за пять минут — молчит
+    interval: 1m
+    input_series:
+      - series: 'auth_keycloak_requests_total{target="token", outcome="error"}'
+        values: '0+1x12'
+    alert_rule_test:
+      - { eval_time: 10m, alertname: AuthKeycloakErrors, exp_alerts: [] }
+
+  - name: ошибки Keycloak — молчит, пока ошибок мало или запросов меньше десяти
+    interval: 1m
+    input_series:
+      - series: 'auth_keycloak_requests_total{target="token", outcome="2xx"}'
+        values: '0+4x12'
+      - series: 'auth_keycloak_requests_total{target="token", outcome="5xx"}'
+        values: '0+0x12'
+      - series: 'auth_keycloak_requests_total{target="admin", outcome="error"}'
+        values: '0 1 1 1 1 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - { eval_time: 10m, alertname: AuthKeycloakErrors, exp_alerts: [] }
+
+  - name: база недоступна
+    interval: 1m
+    input_series:
+      - series: 'auth_dependency_up{dependency="database"}'
+        values: '1 1 0 0 0 0'
+    alert_rule_test:
+      - { eval_time: 2m, alertname: AuthDatabaseUnavailable, exp_alerts: [] }
+      - eval_time: 5m
+        alertname: AuthDatabaseUnavailable
+        exp_alerts:
+          - exp_labels: { severity: critical, dependency: database }
+            exp_annotations:
+              description: "Проверка готовности базы (Postgres) не проходит больше минуты. Сервис не готов (/health/ready — 503); журнал входов, ключи сервисов и устройства недоступны."
+              summary: "База сервиса входа недоступна"
+
+  - name: Redis недоступен
+    interval: 1m
+    input_series:
+      - series: 'auth_dependency_up{dependency="redis"}'
+        values: '1 1 0 0 0 0'
+    alert_rule_test:
+      - { eval_time: 2m, alertname: AuthRedisUnavailable, exp_alerts: [] }
+      - eval_time: 5m
+        alertname: AuthRedisUnavailable
+        exp_alerts:
+          - exp_labels: { severity: critical, dependency: redis }
+            exp_annotations:
+              description: "Проверка готовности Redis не проходит больше минуты. Мгновенный отзыв токенов не работает: в режиме «открыто» токены пропускаются (до 15 минут после отзыва), в режиме «закрыто» сервис отвечает 503."
+              summary: "Redis с отметками отзыва недоступен"
+
+  - name: ошибки хранилища отметок отзыва (ACL, пароль)
+    interval: 1m
+    input_series:
+      - series: 'platformauth_revocation_store_errors_total{mode="open", kind="server"}'
+        values: '0 0 1 2 3 4 5 6 7 8'
+      - series: 'platformauth_revocation_store_errors_total{mode="open", kind="connection"}'
+        values: '0x9'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: AuthRevocationStoreErrors
+        exp_alerts:
+          - exp_labels: { severity: warning, mode: open, kind: server }
+            exp_annotations:
+              description: "kind=connection — Redis недоступен или тайм-аут; kind=server — Redis отказал в команде (ACL, пароль, права пользователя): отзыв токенов не работает, хотя Redis «жив». Смотрите журнал сервиса: «Redis refused the revocation command»."
+              summary: "Проверка отзыва токенов получает ошибки от Redis (server, режим open)"
+
+  - name: проверить отзыв токена нельзя (режим закрыто)
+    interval: 1m
+    input_series:
+      - series: 'platformauth_token_checks_total{status="unavailable"}'
+        values: '0 0 3 6 9 12'
+      - series: 'platformauth_token_checks_total{status="valid"}'
+        values: '0+10x5'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: AuthTokenChecksUnavailable
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              description: "TokenRevocation:OnStoreFailure=Closed, Redis недоступен: люди получают 503 с кодом auth.revocation_unavailable."
+              summary: "Сервис отклоняет запросы: проверить отзыв токена нельзя (режим «закрыто»)"
+
+  # ── вход ───────────────────────────────────────────────────────────────────────────────────────
+  - name: всплеск неудачных входов
+    interval: 1m
+    input_series:
+      - series: 'keycloak_user_events_total{event="login", error="invalid_user_credentials", realm="shop", client_id="shop-bff"}'
+        values: '0+10x10'
+      - series: 'keycloak_user_events_total{event="login", error="", realm="other", client_id="other-bff"}'
+        values: '0+10x10'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: AuthLoginFailuresSpike
+        exp_alerts:
+          - exp_labels: { severity: warning, realm: shop }
+            exp_annotations:
+              description: "50 неудачных попыток входа за 5 минут (неверный пароль, неверный код, временная блокировка): похоже на подбор паролей или кодов. Журнал Keycloak: события LOGIN_ERROR по realm; блокировку по IP делает прокси (docs/environments.md, «Прокси»)."
+              summary: "Всплеск неудачных входов в проекте shop"
+
+  - name: неудачных входов мало — молчит
+    interval: 1m
+    input_series:
+      - series: 'keycloak_user_events_total{event="login", error="invalid_user_credentials", realm="shop", client_id="shop-bff"}'
+        values: '0+2x10'
+    alert_rule_test:
+      - { eval_time: 8m, alertname: AuthLoginFailuresSpike, exp_alerts: [] }
+
+  - name: больше половины попыток входа неудачны
+    interval: 1m
+    input_series:
+      - series: 'keycloak_user_events_total{event="login", error="invalid_user_credentials", realm="shop", client_id="shop-bff"}'
+        values: '0+4x30'
+      - series: 'keycloak_user_events_total{event="login", error="", realm="shop", client_id="shop-bff"}'
+        values: '0+1x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: AuthLoginFailureShareHigh
+        exp_alerts:
+          - exp_labels: { severity: warning, realm: shop }
+            exp_annotations:
+              description: "80% попыток входа за 15 минут закончились ошибкой. Если растут и отказы, и объём — перебор; если объём обычный — сломан способ входа (письма и коды не доходят, провайдер, тема)."
+              summary: "Больше половины попыток входа в проекте shop неудачны"
+
+  - name: доля неудачных входов высокая, но попыток мало — молчит
+    interval: 1m
+    input_series:
+      - series: 'keycloak_user_events_total{event="login", error="invalid_user_credentials", realm="shop", client_id="shop-bff"}'
+        values: '0+0.5x30'
+      - series: 'keycloak_user_events_total{event="login", error="", realm="shop", client_id="shop-bff"}'
+        values: '0x30'
+    alert_rule_test:
+      - { eval_time: 25m, alertname: AuthLoginFailureShareHigh, exp_alerts: [] }
+
+  - name: много отказов при обновлении токенов
+    interval: 1m
+    input_series:
+      - series: 'auth_refreshes_total{result="ok"}'
+        values: '0+1x30'
+      - series: 'auth_refreshes_total{result="rejected"}'
+        values: '0+1x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: AuthRefreshFailures
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              description: "50% обновлений токенов за 15 минут не прошли (rejected — сессия закончилась или refresh украден и повторён; error — Keycloak недоступен). Людей выбрасывает на вход."
+              summary: "Много отказов при обновлении токенов"
+
+  - name: отказов обновления много, но обновлений меньше двадцати — молчит
+    interval: 1m
+    input_series:
+      - series: 'auth_refreshes_total{result="rejected"}'
+        values: '0+0.5x30'
+    alert_rule_test:
+      - { eval_time: 25m, alertname: AuthRefreshFailures, exp_alerts: [] }
+
+  - name: обновления в норме — молчит
+    interval: 1m
+    input_series:
+      - series: 'auth_refreshes_total{result="ok"}'
+        values: '0+3x30'
+      - series: 'auth_refreshes_total{result="rejected"}'
+        values: '0+0.1x30'
+    alert_rule_test:
+      - { eval_time: 25m, alertname: AuthRefreshFailures, exp_alerts: [] }
+
+  - name: обновление токенов упирается в ошибки Keycloak
+    interval: 1m
+    input_series:
+      - series: 'auth_refreshes_total{result="error"}'
+        values: '0+2x10'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: AuthRefreshKeycloakErrors
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              description: "10 обновлений токенов за 5 минут закончились ошибкой Keycloak (недоступен или 5xx): люди теряют сессию через 15 минут."
+              summary: "Обновление токенов не доходит до Keycloak"
+
+  # ── коды ───────────────────────────────────────────────────────────────────────────────────────
+  - name: доля введённых кодов ниже порога
+    interval: 1m
+    input_series:
+      - series: 'platform_code_sent_total{realm="shop", channel="SMS"}'
+        values: '0+1x100'
+      - series: 'platform_code_verified_total{realm="shop", channel="SMS"}'
+        values: '0x100'
+    alert_rule_test:
+      - eval_time: 85m
+        alertname: AuthCodeVerifiedShareLow
+        exp_alerts:
+          - exp_labels: { severity: warning, realm: shop }
+            exp_annotations:
+              description: "За час введено 0% отправленных кодов (норма — больше 60–70 %). Коды не доходят (звонки и SMS у провайдера), или идёт накрутка на отправку. Смотрите platform_code_refused_total по причинам и расход в дашборде."
+              summary: "Людей, введших присланный код, мало в проекте shop"
+
+  - name: ни один код не введён — ряда «введено» нет совсем
+    interval: 1m
+    input_series:
+      - series: 'platform_code_sent_total{realm="shop", channel="CALL"}'
+        values: '0+1x100'
+    alert_rule_test:
+      - eval_time: 85m
+        alertname: AuthCodeVerifiedShareLow
+        exp_alerts:
+          - exp_labels: { severity: warning, realm: shop }
+            exp_annotations:
+              description: "За час введено 0% отправленных кодов (норма — больше 60–70 %). Коды не доходят (звонки и SMS у провайдера), или идёт накрутка на отправку. Смотрите platform_code_refused_total по причинам и расход в дашборде."
+              summary: "Людей, введших присланный код, мало в проекте shop"
+
+  - name: коды вводят — молчит
+    interval: 1m
+    input_series:
+      - series: 'platform_code_sent_total{realm="shop", channel="SMS"}'
+        values: '0+1x100'
+      - series: 'platform_code_verified_total{realm="shop", channel="SMS"}'
+        values: '0+0.8x100'
+    alert_rule_test:
+      - { eval_time: 85m, alertname: AuthCodeVerifiedShareLow, exp_alerts: [] }
+
+  - name: кодов отправлено мало — молчит
+    interval: 1m
+    input_series:
+      - series: 'platform_code_sent_total{realm="shop", channel="SMS"}'
+        values: '0+0.1x100'
+      - series: 'platform_code_verified_total{realm="shop", channel="SMS"}'
+        values: '0x100'
+    alert_rule_test:
+      - { eval_time: 85m, alertname: AuthCodeVerifiedShareLow, exp_alerts: [] }
+
+  - name: израсходовано 80 процентов бюджета
+    interval: 1m
+    input_series:
+      - series: 'platform_code_budget_alerts_total{realm="shop", percent="80"}'
+        values: '0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: AuthCodeBudgetNearlyExhausted
+        exp_alerts:
+          - exp_labels: { severity: warning, realm: shop }
+            exp_annotations:
+              description: "При 100 % SMS и звонки отключатся до полуночи (вход по паролю и коду на почту работает). Если расход необычен — накрутка. Письмо «RESOLVED» не придёт: оповещение горит 10 минут после порога, а состояние держится до полуночи."
+              summary: "Израсходовано 80 % дневного бюджета на коды в проекте shop"
+
+  - name: бюджет исчерпан
+    interval: 1m
+    input_series:
+      - series: 'platform_code_budget_alerts_total{realm="shop", percent="100"}'
+        values: '0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - { eval_time: 2m, alertname: AuthCodeBudgetExhausted, exp_alerts: [] }
+      - { eval_time: 14m, alertname: AuthCodeBudgetExhausted, exp_alerts: [] }
+      - eval_time: 4m
+        alertname: AuthCodeBudgetExhausted
+        exp_alerts:
+          - exp_labels: { severity: critical, realm: shop }
+            exp_annotations:
+              description: "SMS и звонки с кодами отключены до полуночи по времени проекта: вход по коду на телефон не работает. Письмо «RESOLVED» не придёт: оповещение горит 10 минут после порога, а бюджет остаётся исчерпанным до полуночи."
+              summary: "Дневной бюджет на коды исчерпан в проекте shop"
+
+  - name: капча недоступна
+    interval: 1m
+    input_series:
+      - series: 'platform_code_captcha_unavailable_total{realm="shop"}'
+        values: '0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: AuthCaptchaUnavailable
+        exp_alerts:
+          - exp_labels: { severity: warning, realm: shop }
+            exp_annotations:
+              description: "Сервис капчи не отвечает: капча считается пройденной (captcha-on-outage=pass, лимиты действуют) или не пройденной (reject)."
+              summary: "SmartCaptcha недоступна в проекте shop"
+
+  # ── сам мониторинг ─────────────────────────────────────────────────────────────────────────────
+  - name: Watchdog горит всегда
+    interval: 1m
+    input_series:
+      - series: 'up{job="auth-service"}'
+        values: '1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: Watchdog
+        exp_alerts:
+          - exp_labels: { severity: none }
+            exp_annotations:
+              description: "Горит всегда. Получатель watchdog в alertmanager.yml передаёт его внешнему сервису, который поднимает тревогу, когда сигнал пропал."
+              summary: "Мониторинг работает (постоянное оповещение)"
+
+  - name: пропали метрики готовности базы
+    interval: 1m
+    input_series:
+      - series: 'auth_dependency_up{dependency="redis"}'
+        values: '1x12'
+    alert_rule_test:
+      - { eval_time: 2m, alertname: AuthMetricsMissing, exp_alerts: [] }
+      - eval_time: 8m
+        alertname: AuthMetricsMissing
+        exp_alerts:
+          - exp_labels: { severity: warning, dependency: database }
+            exp_annotations:
+              description: "Метрика auth_dependency_up пропала: сервис не отдаёт метрики (цель убрана из prometheus.yml, порт метрик закрыт, Metrics:Port=0) или не стартовал. Оповещения о базе и Redis без неё не работают."
+              summary: "Нет метрик готовности базы или Redis сервиса входа"
+
+  - name: метрики готовности есть — молчит
+    interval: 1m
+    input_series:
+      - series: 'auth_dependency_up{dependency="redis"}'
+        values: '1x12'
+      - series: 'auth_dependency_up{dependency="database"}'
+        values: '1x12'
+    alert_rule_test:
+      - { eval_time: 8m, alertname: AuthMetricsMissing, exp_alerts: [] }
+
+  - name: проверки готовности зависли — метка времени не обновляется
+    interval: 1m
+    input_series:
+      - series: 'auth_dependency_checked_timestamp_seconds'
+        values: '0x10'
+    alert_rule_test:
+      - { eval_time: 1m, alertname: AuthDependencyChecksStale, exp_alerts: [] }
+      - eval_time: 8m
+        alertname: AuthDependencyChecksStale
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              description: "Последняя проверка была 8m 0s назад: проверка зависла или остановилась, auth_dependency_up показывает старое значение. Перезапустите сервис, смотрите журнал."
+              summary: "Проверки готовности базы и Redis не выполняются"
+
+  - name: проверки готовности идут — молчит
+    interval: 1m
+    input_series:
+      - series: 'auth_dependency_checked_timestamp_seconds'
+        values: '0 60 120 180 240 300 360 420 480 540'
+    alert_rule_test:
+      - { eval_time: 8m, alertname: AuthDependencyChecksStale, exp_alerts: [] }
+
