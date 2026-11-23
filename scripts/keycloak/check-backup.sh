@@ -42,6 +42,12 @@ import json,sys
 items=json.loads(sys.stdin.read().split(" ",1)[1])
 print(" ".join(sorted(x["code"] for x in items if x["code"].startswith("check-backup"))))'; }
 
+# На свежем стенде сервис только что перезапущен (выдача разрешения на регистрацию): ждём, пока он и Keycloak ответят.
+for _ in $(seq 1 120); do
+  [ "$(command curl -s -o /dev/null -w '%{http_code}' "$API/health/ready")" = 200 ] \
+    && [ "$(command curl -s -o /dev/null -w '%{http_code}' "$KC/realms/sandbox/.well-known/openid-configuration")" = 200 ] && break
+  sleep 1
+done
 require_service
 BACKUPS="$WORK/backups"; mkdir -p "$BACKUPS"
 DISASTER=""; RESTORED=""
