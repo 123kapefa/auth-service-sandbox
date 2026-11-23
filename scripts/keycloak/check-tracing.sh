@@ -145,7 +145,13 @@ check "в Jaeger есть трассы сервиса и Keycloak за прог�
 # Без этого проверки «нет поля» ниже прошли бы впустую, если бы spans Keycloak вообще не дошли до Jaeger.
 check "в Jaeger есть spans Keycloak (проверки ниже не пустые)" "$([ "$(grep -c -F '"kc.realmName"' "$WORK/spans.json")" -gt 0 ] && echo да || echo нет)" да
 for secret in "$SECRET_CODE" "$SECRET_STATE" "0987654321" "$NEW2" "$CODE2" "wrong-password-for-span-check" "not-a-real-refresh-token" "$PASSWORD"; do
-  check "spans: нет «${secret:0:14}…»" "$(grep -c -F -e "$secret" "$WORK/spans.json")" 0
+  # Короткое значение (код из 4–6 цифр) совпало бы с кусочком идентификатора или времени: ищем его только как отдельное слово.
+  if [ "${#secret}" -lt 10 ]; then
+    found=$(grep -c -E "(^|[^0-9A-Za-z])${secret}([^0-9A-Za-z]|$)" "$WORK/spans.json")
+  else
+    found=$(grep -c -F -e "$secret" "$WORK/spans.json")
+  fi
+  check "spans: нет «${secret:0:14}…»" "$found" 0
 done
 check "spans: нет токенов (JWT)" "$(grep -c -E "$JWT_RE" "$WORK/spans.json")" 0
 # Keycloak пишет в spans события с логином, IP и идентификаторами человека; коллектор их вырезает (deploy/monitoring/otel-collector.yaml).
