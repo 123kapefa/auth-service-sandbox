@@ -71,6 +71,12 @@ services:
       DataProtection__CertificatePassword: ${AUTH_DATA_PROTECTION_CERT_PASSWORD:-}
       DataProtection__PreviousCertificate: ${AUTH_DATA_PROTECTION_PREVIOUS_CERT:-}
       DataProtection__PreviousCertificatePassword: ${AUTH_DATA_PROTECTION_PREVIOUS_CERT_PASSWORD:-}
+      # Лимиты частоты запросов (13.4). На стенде все проверки приходят с одного адреса и входят десятки раз за минуту, поэтому лимиты
+      # высокие; рабочие значения — в appsettings.json (RateLimiting), их проверяет scripts/keycloak/check-rate-limits.sh.
+      RateLimiting__Login__PermitLimit: ${AUTH_RATE_LIMIT_LOGIN:-100000}
+      RateLimiting__Refresh__PermitLimit: ${AUTH_RATE_LIMIT_REFRESH:-100000}
+      RateLimiting__Services__PermitLimit: ${AUTH_RATE_LIMIT_SERVICES:-100000}
+      RateLimiting__ServicesAnonymous__PermitLimit: ${AUTH_RATE_LIMIT_SERVICES_ANONYMOUS:-100000}
     depends_on:
       postgres:
         condition: service_healthy

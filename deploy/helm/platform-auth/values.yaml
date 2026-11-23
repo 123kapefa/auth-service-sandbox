@@ -96,6 +96,7 @@ service:
   cookies:
     secure: true
   # X-Forwarded-* принимаются только из этих сетей — сети подов кластера, где Ingress-контроллер.
+  # Лимиты запросов (RateLimiting, docs/environments.md) считают IP из X-Forwarded-For: если Ingress-контроллер вне этих сетей, все клиенты делят один лимит.
   trustedNetworks: [10.0.0.0/8]
   # Тип и nodePort Service — для стенда без Ingress (kind); в бою ClusterIP.
   serviceType: ClusterIP

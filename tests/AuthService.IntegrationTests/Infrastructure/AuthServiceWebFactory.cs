@@ -175,6 +175,8 @@ public sealed class AuthServiceWebFactory : WebApplicationFactory<Program>
         builder.UseSetting("TokenRevocation:LocalCache", "00:00:00");
         // Порт метрик (Prometheus) в тестах не нужен: десятки фабрик заняли бы один и тот же порт.
         builder.UseSetting("Metrics:Port", "0");
+        // Лимиты частоты в обычных тестах выключены (все запросы приходят с одного «адреса»); их проверяет RateLimitingTests.
+        builder.UseSetting("RateLimiting:Enabled", "false");
         builder.ConfigureLogging(logging => logging.AddProvider(Logs));
         builder.ConfigureTestServices(services =>
         {
