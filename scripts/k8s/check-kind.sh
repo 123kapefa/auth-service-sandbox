@@ -78,6 +78,18 @@ secrets:
     AUTH_DATA_PROTECTION_CERT_PASSWORD: development-pfx
 YAML
 
+# Том для копий — заранее, готовым PVC (backup.persistence.existingClaim): класс хранения kind привязывает том только к первому поду
+# (WaitForFirstConsumer), а PVC самого чарта «helm --wait» ждёт привязанным и установка зависла бы. Так же — в облаках с таким классом.
+kubectl --context "$KCTX" create namespace "$NS" --dry-run=client -o yaml | kubectl --context "$KCTX" apply -f - > /dev/null
+kubectl --context "$KCTX" -n "$NS" apply -f - > /dev/null <<YAML
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: kind-backups }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 1Gi } }
+YAML
+
 # --wait: Deployment готовы, затем хуки post-install (миграторы) отработали.
 if helm upgrade --install "$RELEASE" "$ROOT/deploy/helm/platform-auth" --kube-context "$KCTX" -n "$NS" --create-namespace \
     -f "$ROOT/scripts/k8s/kind-values.yaml" -f "$SECRETS" --set "images.tag=$VERSION" \
@@ -155,6 +167,44 @@ k rollout status "deploy/$RELEASE-keycloak" --timeout 300s > /dev/null
 check "Keycloak снова в двух репликах" "$(ready keycloak)" 2
 still_signed_in "обе реплики — новые"
 check "выход" "$(status "$JAR" POST /auth/logout)" 200
+
+echo "4а. Резервные копии: CronJob чарта снимает копии обеих баз"
+check "CronJob создан, расписание из values" "$(k get cronjob "$RELEASE-backup" -o jsonpath='{.spec.schedule} {.spec.concurrencyPolicy}')" "0 3 * * * Forbid"
+# Не ждём трёх часов ночи: запуск того же CronJob вручную.
+k delete job backup-check --ignore-not-found > /dev/null 2>&1
+k create job backup-check --from="cronjob/$RELEASE-backup" > /dev/null 2>&1
+k wait --for=condition=complete job/backup-check --timeout=240s > /dev/null 2>&1
+check "копия снята: Job завершён" "$(k get job backup-check -o jsonpath='{.status.succeeded}')" 1
+k logs job/backup-check > "$WORK/backup-job.log" 2>&1
+check "в журнале: обе базы и «готово»" "$(grep -cE '^(auth-service|keycloak): /backups/|^готово: ' "$WORK/backup-job.log")" 3
+check "в журнале нет пароля базы" "$(grep -c 'development-only' "$WORK/backup-job.log")" 0
+# Содержимое тома смотрим подом с тем же PVC: файлы, суммы, права и что pg_restore читает копию.
+CLAIM=$(k get cronjob "$RELEASE-backup" -o jsonpath='{.spec.jobTemplate.spec.template.spec.volumes[?(@.name=="backups")].persistentVolumeClaim.claimName}')
+k delete pod backup-inspect --ignore-not-found > /dev/null 2>&1
+k apply -f - > /dev/null 2>&1 <<YAML
+apiVersion: v1
+kind: Pod
+metadata: { name: backup-inspect }
+spec:
+  restartPolicy: Never
+  securityContext: { runAsNonRoot: true, runAsUser: 70, runAsGroup: 70, fsGroup: 70 }
+  containers:
+    - name: inspect
+      image: postgres:17-alpine
+      imagePullPolicy: IfNotPresent
+      command: ["sh", "-c", "cd /backups && sha256sum -c *.sha256 | grep -c ': OK'; ls -l *.dump | cut -c1-10 | sort -u; for f in *.dump; do pg_restore --list \"\$f\" | grep -c 'TABLE DATA'; done; ls last-success"]
+      volumeMounts: [{ name: backups, mountPath: /backups, readOnly: true }]
+  volumes:
+    - { name: backups, persistentVolumeClaim: { claimName: $CLAIM } }
+YAML
+k wait --for=jsonpath='{.status.phase}'=Succeeded pod/backup-inspect --timeout=120s > /dev/null 2>&1
+k logs pod/backup-inspect > "$WORK/backup-inspect.log" 2>&1
+check "суммы обеих копий совпадают" "$(sed -n 1p "$WORK/backup-inspect.log")" 2
+check "права копий — только владелец" "$(sed -n 2p "$WORK/backup-inspect.log")" "-rw-------"
+check "pg_restore читает обе копии (таблицы с данными есть)" \
+  "$(sed -n '3,4p' "$WORK/backup-inspect.log" | awk '{ if ($1 > 0) n++ } END { print n }')" 2
+check "last-success записан" "$(sed -n 5p "$WORK/backup-inspect.log")" last-success
+k delete pod backup-inspect job/backup-check --ignore-not-found > /dev/null 2>&1
 
 echo "5. Ingress: наружу — только realm проекта, realm master и мастер-админка закрыты"
 # Настоящий контроллер (ingress-nginx, манифест для kind): рендер чарта и спецификация Kubernetes ничего не говорят о том,

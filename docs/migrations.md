@@ -25,22 +25,75 @@ Helm: база сервиса до раскатки, настройки прое
 
 ### Резервные копии
 
-`deploy/compose.yaml` (базы `auth-db` и `auth-keycloak-db`; со своим Postgres проекта — его средствами):
+База сервиса (журнал, ключи сервисов, устройства) и база Keycloak (проекты, люди, сессии) хранят всё, поэтому копии снимаются по расписанию — обе сразу, парой.
+Один скрипт [`deploy/backup/backup.sh`](../deploy/backup/backup.sh) работает везде: его запускает CronJob чарта, сервис `auth-backup` в Compose и ручной запуск.
+
+**Что получается.** За запуск — пара файлов с общей меткой времени (UTC): `auth-service-<метка>.dump` и `keycloak-<метка>.dump` (формат custom, `pg_restore`)
+и рядом `.sha256`. Копию сначала пишут во временный файл, проверяют (`pg_restore --list`), считают сумму и только потом переименовывают: недописанного файла
+под настоящим именем не бывает. Сбой на второй базе убирает и готовую копию первой: пара целая или никакой. Права — `0600`: в копиях хэши паролей, телефоны
+и адреса почты людей. Копия Keycloak восстанавливается **только вместе с копией сервиса той же метки**: люди и сессии — в Keycloak, журнал и ключи сервисов — в базе сервиса.
+
+**Срок хранения.** `BACKUP_RETENTION_DAYS` (14 по умолчанию): копии старше удаляются, но `BACKUP_KEEP_MIN` (3) самых свежих каждой базы остаются всегда — если копии
+перестали получаться, срок не вычистит последние рабочие. Удаление идёт только после того, как новая пара готова. Файл `last-success` хранит время последней удачной копии.
+
+**Docker Compose** (`deploy/compose.yaml`; копии — в томе `auth_backups`):
 
 ```bash
-docker compose exec -T auth-db pg_dump -U auth_service -Fc auth_service > auth-$(date +%F-%H%M).dump
-docker compose exec -T auth-keycloak-db pg_dump -U keycloak -Fc keycloak > keycloak-$(date +%F-%H%M).dump
+docker compose --profile backup up -d        # расписание — AUTH_BACKUP_SCHEDULE (cron, по умолчанию 0 3 * * *, время контейнера — UTC)
+docker compose exec auth-backup sh /backup.sh   # копия прямо сейчас
+docker compose cp auth-backup:/backups/. ./backups   # достать копии
 ```
 
-Восстановить (сервис и Keycloak остановлены: `docker compose stop auth-service auth-keycloak`):
+Срок и расписание — `AUTH_BACKUP_SCHEDULE`, `AUTH_BACKUP_RETENTION_DAYS`, `AUTH_BACKUP_KEEP_MIN` ([`deploy/.env.example`](../deploy/.env.example)); со своим Postgres проекта — `AUTH_BACKUP_DB_HOST`
+и `AUTH_BACKUP_KEYCLOAK_DB_HOST`. Контейнер здоров, пока последняя удачная копия моложе 26 часов (`docker compose ps`; первые сутки — период разгона): подключите это к своему мониторингу.
+
+**Kubernetes** (чарт, `backup.enabled: true`): CronJob `<релиз>-backup` по `backup.schedule`, копии — на томе (PVC `<релиз>-backups`, 10 Gi; свой — `backup.persistence.existingClaim`);
+том не удаляется при `helm uninstall`. Если класс хранения привязывает том только к первому поду (`WaitForFirstConsumer`: kind, EBS, многие облака), `helm install --wait` не дождётся своего PVC — создайте том заранее и укажите его в `backup.persistence.existingClaim`. Запуск вручную: `kubectl create job --from=cronjob/<релиз>-backup backup-now`. Упавшую копию видно по состоянию Job (`kubectl get jobs`;
+оповещение — по метрике kube-state-metrics `kube_job_status_failed{job_name=~".*-backup-.*"}`).
+
+**Две базы снимаются одна за другой**, а не в один момент: запись между ними окажется только в одной (например, ключ сервиса: строка в базе сервиса и клиент в Keycloak). Снимайте в тихое время, а после восстановления проверьте список ключей сервисов в админке. Версия `pg_dump` (образ `postgres:17-alpine`) не должна быть ниже версии сервера; для внешней базы с обязательным TLS — `AUTH_BACKUP_PGSSLMODE` (Compose) или `backup.sslMode` (чарт). Срок хранения считается сутками от времени изменения файла: копия живёт до `retentionDays` полных суток, самые свежие `keepMin` остаются всегда.
+
+**Копия на другом хосте обязательна.** Том рядом с базами не спасает от потери диска или кластера: синхронизируйте каталог копий с хранилищем вне машины (rclone, `aws s3 sync`,
+снимки тома облака) и шифруйте его — в копиях персональные данные. Скрипт копий этого не делает: у каждого проекта своё хранилище.
+
+**Восстановление в Compose** (`scripts/backup/restore.sh`; песочница — `--stand`, поставка — `--deploy`):
 
 ```bash
-docker compose exec -T auth-db pg_restore -U auth_service -d auth_service --clean --if-exists < auth-….dump
-docker compose exec -T auth-keycloak-db pg_restore -U keycloak -d keycloak --clean --if-exists < keycloak-….dump
+scripts/backup/restore.sh --dir ./backups --deploy            # покажет, какая пара выбрана, и попросит --yes
+scripts/backup/restore.sh --dir ./backups --stamp 20261123T030000Z --deploy --yes
 ```
 
-В песочнице — сервисы `postgres` (`-U "$POSTGRES_USER" "$POSTGRES_DB"` из `.env`) и `keycloak-postgres`. Копия
-Keycloak — вместе с копией сервиса: realm, пользователи и их сессии там, а журнал и ключи сервисов — в базе сервиса.
+Скрипт проверяет суммы (повреждённая или неполная пара отклоняется до остановки сервисов), останавливает Keycloak и сервис, **стирает схемы обеих баз** и разворачивает копию
+(`pg_restore`; на пустую базу после потери тома — тот же путь), запускает Keycloak и сервис и ждёт готовности. Redis не копируется: отзыв токенов между копией и сбоем пропадает
+(токены живут до 15 минут). Всё, что записано в базы после копии, теряется: журнал входов за это время, выданные ключи сервисов, новые люди.
+
+**Восстановление в Kubernetes** (те же шаги руками; сервис и Keycloak — `kubectl scale deploy/<релиз>-service deploy/<релиз>-keycloak --replicas=0`):
+
+```bash
+# копии — в под с psql и pg_restore (образ postgres:17-alpine) и доступом к базам; пароли — из Secret (PGPASSWORD=… в окружении пода)
+kubectl cp ./backups/auth-service-<метка>.dump <под>:/tmp/ && kubectl cp ./backups/keycloak-<метка>.dump <под>:/tmp/
+# в поде, для каждой базы (auth_service и keycloak: свой хост, пользователь и файл): стереть схемы и развернуть копию
+psql -h <хост> -U <пользователь> -d <база> -v ON_ERROR_STOP=1 -c "
+  DO \$\$ DECLARE s text; BEGIN
+    FOR s IN SELECT nspname FROM pg_namespace WHERE nspname NOT LIKE 'pg\\_%' AND nspname <> 'information_schema' LOOP
+      EXECUTE format('DROP SCHEMA %I CASCADE', s);
+    END LOOP;
+    CREATE SCHEMA public;
+  END \$\$;"
+pg_restore --single-transaction --exit-on-error --no-owner --no-privileges -h <хост> -U <пользователь> -d <база> /tmp/<файл>.dump
+# затем вернуть реплики: kubectl scale … --replicas=2
+```
+
+Тот же блок стирает **все** схемы базы (в базе сервиса это `auth` и `public`, в Keycloak — `public`), как `restore.sh`. Если упало на второй базе, сервисы остаются остановленными, а первая база уже заменена:
+повторите шаги для второй базы с той же меткой.
+
+Со своим Postgres проекта (управляемая база облака) восстановление — его средствами (снимок на момент времени), если он есть; наши копии — вторая линия.
+
+**Проверка, что копии годятся.** Копия, из которой ни разу не восстанавливались, — не копия. `scripts/keycloak/check-backup.sh` проходит весь путь на стенде: выдаёт ключ сервиса,
+снимает копию настоящим скриптом, выдаёт второй ключ, «теряет» обе базы вместе с томами, восстанавливает и проверяет, что первый ключ на месте и по его секрету Keycloak выдаёт
+токен, второго нет (вернулось состояние на момент копии), затем прогоняет `check-stand.sh`. Это идёт в ночном прогоне «Стенд» и раз в месяц отдельно
+([`backup-restore.yml`](../.github/workflows/backup-restore.yml), 1-го числа; упало — письмо GitHub). Перед обновлением версии с миграциями ([release.md](release.md)) сделайте копию вручную и
+убедитесь, что она свежая: `last-success`.
 
 ## База сервиса
 

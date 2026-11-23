@@ -11,7 +11,7 @@ on:
     tags: ["v*"]
   workflow_dispatch:
   pull_request:
-    paths: [.github/workflows/stand.yml, scripts/keycloak/**, scripts/project/**, scripts/ci/**, deploy/proxy/**, deploy/monitoring/**]
+    paths: [.github/workflows/stand.yml, scripts/keycloak/**, scripts/project/**, scripts/ci/**, scripts/backup/**, deploy/proxy/**, deploy/monitoring/**, deploy/backup/**]
 
 permissions:
   contents: read
@@ -117,6 +117,10 @@ jobs:
       - name: check-alerts
         if: ${{ !cancelled() && steps.token.outcome == 'success' }}
         run: scripts/keycloak/check-alerts.sh 2>&1 | tee -a stand-logs/check-alerts.log
+      # Копия обеих баз, «авария» (тома удалены) и восстановление, затем check-stand: разрушает базы стенда, поэтому самым последним.
+      - name: check-backup
+        if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: scripts/keycloak/check-backup.sh 2>&1 | tee -a stand-logs/check-backup.log
 
       - name: Логи контейнеров
         if: failure()

@@ -1,0 +1,55 @@
+# Ежемесячная проверка резервных копий (13.5): снять копию обеих баз настоящим скриптом, «потерять» базы вместе с томами, восстановить
+# из копии и прогнать check-stand.sh. Копии, из которых ни разу не восстанавливались, — не копии. Тот же сценарий идёт и в ночном
+# прогоне «Стенд» (последним шагом); здесь он отдельно, на чистом стенде, с оповещением о падении письмом GitHub и
+# с запуском вручную перед выкатом версии. Упало — в артефакте backup-logs вывод скрипта и логи контейнеров.
+name: Проверка копий
+
+on:
+  schedule:
+    - cron: "0 2 1 * *" # 1-го числа, 05:00 по Москве
+  workflow_dispatch:
+  pull_request:
+    paths: [.github/workflows/backup-restore.yml, deploy/backup/**, scripts/backup/**, scripts/keycloak/check-backup.sh]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-restore-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  LANG: C.UTF-8
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  backup-restore:
+    name: Копия и восстановление на стенде
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Поднять стенд
+        run: |
+          mkdir -p backup-logs
+          cp .env.example .env
+          docker compose up -d --build --wait --wait-timeout 600
+          scripts/keycloak/registration-token.sh --write-env
+
+      - name: Копия, потеря баз, восстановление, check-stand
+        run: scripts/keycloak/check-backup.sh 2>&1 | tee -a backup-logs/check-backup.log
+
+      - name: Логи контейнеров
+        if: failure()
+        run: scripts/ci/collect-logs.sh backup-logs
+
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: backup-logs
+          path: backup-logs/
+          retention-days: 14

@@ -96,7 +96,7 @@ cleanup() {
   if [ -n "${KEEP:-}" ]; then
     echo "Установка оставлена: COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME docker compose -f .check-deploy/compose.yaml down -v"
   else
-    dc down -v > /dev/null 2>&1
+    dc --profile backup down -v > /dev/null 2>&1
     rm -rf "$DIR"
   fi
   rm -rf "$WORK"
@@ -107,7 +107,7 @@ trap cleanup EXIT
 ready() { for _ in $(seq 1 60); do [ "$(curl -s -o /dev/null -w '%{http_code}' "$API/health/ready")" = 200 ] && { echo 200; return; }; sleep 1; done; echo нет; }
 
 echo "0. Установка из образов: прокси с https, Keycloak, проект, сервис"
-dc down -v > /dev/null 2>&1
+dc --profile backup down -v > /dev/null 2>&1
 check "Keycloak из образа поднялся в боевом режиме (start)" \
   "$(dc up -d --wait auth-keycloak auth-proxy auth-proxy-nginx > /dev/null 2>&1 && docker inspect --format '{{join .Config.Cmd " "}}' "$(dc ps -q auth-keycloak)")" start
 # Корневой сертификат прокси — curl доверяет ему, как браузер — сертификату компании.
@@ -195,5 +195,33 @@ ROTATED=$(echo "$R" | python3 -c 'import json,sys; print(json.load(sys.stdin)["r
 check "ключ перевыпущен (токен управления расшифрован после перезапуска)" "$([ -n "$ROTATED" ] && [ "$ROTATED" != "$ORDERS" ] && echo да || echo "нет: $R")" да
 check "старый ключ не принимается, новый — да" \
   "$([ -z "$(service_token "$ORDERS")" ] && echo нет || echo да) $([ -n "$(service_token "$ROTATED")" ] && echo да || echo нет)" "нет да"
+
+echo "4. Резервные копии: auth-backup по расписанию, восстановление в поставке"
+# Расписание — каждую минуту: ждём первой копии, а не трёх часов ночи. Проверка здоровья у сервиса отсрочена на сутки (start_period),
+# поэтому без --wait.
+echo 'AUTH_BACKUP_SCHEDULE=* * * * *' >> "$DIR/auth.env"
+check "скрипт копий в чарте совпадает со скриптом Compose" "$(cmp -s "$ROOT/deploy/backup/backup.sh" "$ROOT/deploy/helm/platform-auth/files/backup.sh" && echo да || echo нет)" да
+dc --profile backup up -d auth-backup > /dev/null 2>&1
+backups_count() { dc exec -T auth-backup sh -c 'ls /backups/*.dump 2> /dev/null | wc -l' 2> /dev/null | tr -d '\r '; }
+for _ in $(seq 1 80); do [ "$(backups_count)" -ge 2 ] 2> /dev/null && break; sleep 2; done
+check "по расписанию (cron в контейнере) снята копия обеих баз" "$(backups_count)" 2
+check "рядом суммы и last-success" "$(dc exec -T auth-backup sh -c 'cd /backups && sha256sum -c *.sha256 | grep -c ": OK"; ls last-success' | tr -d '\r' | tr '\n' ' ')" "2 last-success "
+check "права копий — только владелец" "$(dc exec -T auth-backup sh -c 'ls -l /backups/*.dump | cut -c1-10 | sort -u' | tr -d '\r')" "-rw-------"
+check "в журнале сервиса копий нет паролей" "$(dc logs auth-backup 2>&1 | grep -c -e check-auth-db -e check-keycloak-db)" 0
+check "настроено расписание из AUTH_BACKUP_SCHEDULE" "$(dc exec -T auth-backup cat /etc/crontabs/root | awk '{print $1 $2 $3 $4 $5}')" '*****'
+dc --profile backup stop auth-backup > /dev/null 2>&1
+mkdir -p "$DIR/backups"
+dc cp auth-backup:/backups/. "$DIR/backups" > /dev/null 2>&1
+# Состояние после копии: ключ перевыпущен ещё раз — после восстановления должен действовать прежний секрет (на момент копии).
+AFTER=$(curl -s -b "$ADMIN" -X POST "$API/auth/admin/services/orders/rotate" | python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["clientSecret"])' 2>/dev/null)
+check "ключ перевыпущен после копии" "$([ -n "$AFTER" ] && [ "$AFTER" != "$ROTATED" ] && echo да || echo нет)" да
+AUTH_PROJECT_DIR="$ROOT" "$ROOT/scripts/backup/restore.sh" --deploy --dir "$DIR/backups" --yes > "$WORK/restore.log" 2>&1
+check "restore.sh --deploy: базы восстановлены" "$(starts "$(tail -1 "$WORK/restore.log")" "Готово: базы восстановлены из")" "Готово: базы восстановлены из"
+check "сервис снова готов" "$(ready)" 200
+# Keycloak только что перезапущен, прокси мог держать оборванное соединение к нему: токен ждём до 30 секунд.
+RESTORED_TOKEN=""
+for _ in $(seq 1 15); do RESTORED_TOKEN=$(service_token "$ROTATED"); [ -n "$RESTORED_TOKEN" ] && break; sleep 2; done
+check "после восстановления действует секрет на момент копии, а не последний" \
+  "$([ -n "$RESTORED_TOKEN" ] && echo да || echo нет) $([ -z "$(service_token "$AFTER")" ] && echo да || echo нет)" "да да"
 
 summary

@@ -60,7 +60,7 @@ Postgres (базы сервиса и Keycloak) и Redis внешние: адре
 Job остаётся до следующего развёртывания, и в его логе видно, что применено:
 `kubectl logs job/auth-migrator`, `kubectl logs job/auth-realm-migrator`. Если мигратор упал, `helm upgrade` тоже
 падает, а прежняя версия продолжает работать. Перед развёртыванием нужны резервные копии обеих баз
-([migrations.md](migrations.md#резервные-копии)).
+([migrations.md](migrations.md#резервные-копии): CronJob чарта `backup.enabled` снимает их по расписанию).
 
 ### Прокси и https
 

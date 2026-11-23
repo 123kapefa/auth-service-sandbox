@@ -111,7 +111,7 @@ kubectl -n auth create secret docker-registry ghcr --docker-server=ghcr.io \
 
 ### Новая версия
 
-1. Резервные копии обеих баз ([migrations.md](migrations.md#резервные-копии) — `pg_dump` средствами вашего Postgres).
+1. Резервные копии обеих баз ([migrations.md](migrations.md#резервные-копии): по расписанию их снимают `auth-backup` в Compose и CronJob чарта; перед обновлением убедитесь, что `last-success` свежий, или снимите копию вручную).
 2. Чарт с нового тега (`git switch --detach v0.2.0`) и тот же `my-values.yaml`:
 
    ```bash

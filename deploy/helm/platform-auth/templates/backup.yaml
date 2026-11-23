@@ -1,0 +1,121 @@
+{{/*
+Резервные копии обеих баз по расписанию (13.5, docs/migrations.md, «Резервные копии»): CronJob запускает files/backup.sh —
+тот же скрипт, что у сервиса auth-backup в deploy/compose.yaml. Копии (пары <auth-service|keycloak>-<время>.dump + .sha256) — на томе
+(PVC): свой том чарта или готовый (backup.persistence.existingClaim). Том в том же кластере не спасает от его потери — настройте
+вынос копий (docs/migrations.md). Пароли баз — из Secret (те же ключи, что у сервиса и Keycloak).
+*/}}
+{{- if .Values.backup.enabled }}
+{{- $base := include "auth.name" . -}}
+{{- $claim := .Values.backup.persistence.existingClaim | default (printf "%s-backups" $base) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $base }}-backup-script
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+    app.kubernetes.io/name: backup
+data:
+  backup.sh: |
+    {{- .Files.Get "files/backup.sh" | nindent 4 }}
+{{- if not .Values.backup.persistence.existingClaim }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $claim }}
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+    app.kubernetes.io/name: backup
+  annotations:
+    # Копии переживают helm uninstall: том с ними не удаляется вместе с релизом.
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with .Values.backup.persistence.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backup.persistence.size }}
+{{- end }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $base }}-backup
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+    app.kubernetes.io/name: backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  {{- with .Values.backup.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
+  # Копия не должна идти поверх копии; пропущенный запуск (кластер был недоступен) догоняется в течение часа.
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: {{ .Values.backup.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            {{- include "auth.labels" . | nindent 12 }}
+            app.kubernetes.io/name: backup
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            # Пользователь postgres образа postgres:alpine; том доступен ему через fsGroup.
+            runAsUser: 70
+            runAsGroup: 70
+            fsGroup: 70
+          {{- with .Values.images.pullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: backup
+              image: {{ .Values.backup.image }}
+              imagePullPolicy: {{ .Values.backup.imagePullPolicy | default "IfNotPresent" }}
+              command: ["sh", "/scripts/backup.sh"]
+              env:
+                - { name: AUTH_DB_HOST, value: {{ include "auth.dbHost" . | quote }} }
+                - { name: AUTH_DB_PORT, value: {{ .Values.database.port | quote }} }
+                - { name: AUTH_DB_NAME, value: {{ .Values.database.name | quote }} }
+                - { name: AUTH_DB_USER, value: {{ .Values.database.user | quote }} }
+                {{- include "auth.secretEnv" (dict "root" . "name" "AUTH_DB_PASSWORD" "key" "AUTH_DB_PASSWORD") | nindent 16 }}
+                - { name: KEYCLOAK_DB_HOST, value: {{ include "auth.keycloakDbHost" . | quote }} }
+                - { name: KEYCLOAK_DB_PORT, value: {{ .Values.keycloakDatabase.port | quote }} }
+                - { name: KEYCLOAK_DB_NAME, value: {{ .Values.keycloakDatabase.name | quote }} }
+                - { name: KEYCLOAK_DB_USER, value: {{ .Values.keycloakDatabase.user | quote }} }
+                {{- include "auth.secretEnv" (dict "root" . "name" "KEYCLOAK_DB_PASSWORD" "key" "AUTH_KEYCLOAK_DB_PASSWORD") | nindent 16 }}
+                # Внешняя база с обязательным TLS: backup.sslMode (require, verify-full).
+                - { name: PGSSLMODE, value: {{ .Values.backup.sslMode | quote }} }
+                - { name: BACKUP_DIR, value: /backups }
+                - { name: BACKUP_RETENTION_DAYS, value: {{ .Values.backup.retentionDays | quote }} }
+                - { name: BACKUP_KEEP_MIN, value: {{ .Values.backup.keepMin | quote }} }
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: [ALL] }
+              volumeMounts:
+                - { name: script, mountPath: /scripts, readOnly: true }
+                - { name: backups, mountPath: /backups }
+                # pg_dump пишет служебные файлы в /tmp; корень контейнера — только для чтения.
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - name: script
+              configMap:
+                name: {{ $base }}-backup-script
+            - name: backups
+              persistentVolumeClaim:
+                claimName: {{ $claim }}
+            - name: tmp
+              emptyDir: {}
+{{- end }}

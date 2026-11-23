@@ -156,6 +156,33 @@ ingress:
   # Secret с сертификатом https для обоих доменов (cert-manager или созданный заранее).
   tlsSecretName: platform-auth-tls
 
+# Резервные копии обеих баз по расписанию (CronJob, docs/migrations.md, «Резервные копии»). Включите и задайте том для копий.
+# Том в том же кластере не спасает от его потери: выносите копии в хранилище вне кластера.
+backup:
+  enabled: false
+  # Расписание cron; часовой пояс — timeZone (пусто — пояс кластера, обычно UTC).
+  schedule: "0 3 * * *"
+  timeZone: ""
+  # Копии старше срока удаляются, но keepMin самых свежих каждой базы остаются всегда.
+  retentionDays: 14
+  keepMin: 3
+  # Версия pg_dump не должна быть ниже версии сервера Postgres: при необходимости смените образ.
+  image: postgres:17-alpine
+  imagePullPolicy: ""
+  # Подключение к базам: prefer (по умолчанию), require, verify-full. Для внешней базы с обязательным TLS — require.
+  sslMode: prefer
+  activeDeadlineSeconds: 1800
+  persistence:
+    # Готовый том (PVC) — или пусто: чарт создаст свой и оставит его при helm uninstall. С классом хранения, который привязывает том только к
+    # первому поду (WaitForFirstConsumer: kind, EBS, многие облака), «helm install --wait» не дождётся привязки своего PVC: создайте том заранее
+    # и укажите его здесь.
+    existingClaim: ""
+    size: 10Gi
+    storageClassName: ""
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 512Mi }
+
 # Только стенд: Postgres (обе базы) и Redis внутри чарта, данные — до перезапуска пода (emptyDir).
 stand:
   enabled: false
