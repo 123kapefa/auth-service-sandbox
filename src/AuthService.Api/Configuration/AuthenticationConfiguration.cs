@@ -26,5 +26,7 @@ public static class AuthenticationConfiguration
     public static IApplicationBuilder UseAuthServiceAuthentication(this IApplicationBuilder app) =>
         app
             .UseAuthentication()
+            // Лимиты частоты: после проверки токена (ключ сервиса — client_id из него), до авторизации и эндпоинтов.
+            .UseAuthServiceRateLimiting()
             .UseAuthorization();
 }

@@ -23,6 +23,7 @@ Grafana «Сервис входа», а в [alerts.yml](../deploy/monitoring/ale
 | `auth_refreshes_total` | `result` | `ok`, `no_session`, `rejected` (сессия закончилась), `error` |
 | `auth_logouts_total`, `auth_backchannel_logouts_total` | `result` | выход; сообщения Keycloak о завершённой сессии |
 | `auth_keycloak_requests_total` | `target`, `outcome` | запросы сервиса к Keycloak: куда (`token`, `keys`, `logout`, `admin`, `registration`, `other`) и чем кончились (`2xx`…`5xx`, `error`) |
+| `auth_rate_limited_total` | `policy` | запросы, отклонённые лимитом частоты (429): `login`, `refresh`, `services` (по ключу сервиса), `services_anonymous` (без токена сервиса, по IP); [лимиты](environments.md#лимиты-на-запросы-к-сервису) |
 | `auth_keycloak_request_duration_seconds` | `target` | время ответа Keycloak (гистограмма) |
 | `platformauth_token_checks_total` | `status` | проверка токена по отметкам отзыва: `valid`, `revoked`, `access_changed`, `unavailable` |
 | `platformauth_revocation_store_errors_total` | `mode`, `kind` | Redis не ответил (`connection`) или отказал (`server`: ACL, пароль); `mode` — режим при сбое |

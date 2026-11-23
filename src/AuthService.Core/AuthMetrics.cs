@@ -6,7 +6,7 @@ namespace AuthService.Core;
 /// Метрики сервиса входа (встроенные <see cref="Meter"/> .NET; в Prometheus их отдаёт порт метрик сервиса). Имена в Prometheus:
 /// <c>auth_logins_started_total</c>, <c>auth_logins_total{result}</c>, <c>auth_refreshes_total{result}</c>,
 /// <c>auth_logouts_total{result}</c>, <c>auth_backchannel_logouts_total{result}</c>, <c>auth_keycloak_requests_total{target,outcome}</c>,
-/// <c>auth_keycloak_request_duration_seconds{target}</c>. В метках — только короткие перечисления
+/// <c>auth_keycloak_request_duration_seconds{target}</c>, <c>auth_rate_limited_total{policy}</c>. В метках — только короткие перечисления
 /// исхода: ни адресов, ни кодов, ни идентификаторов людей и сессий. Проверка токенов и отзыв — <c>PlatformAuthMetrics</c>
 /// (пакет Platform.Authentication), ответы Keycloak — здесь же (<see cref="KeycloakRequested"/>).
 /// </summary>
@@ -40,6 +40,11 @@ public static class AuthMetrics
         "keycloak_requests",
         description: "Запросы сервиса к Keycloak: target — token, logout, keys, registration, admin, other; outcome — 2xx, 3xx, 4xx, 5xx или error "
             + "(нет соединения, таймаут, отмена).");
+
+    private static readonly Counter<long> _rateLimited = _meter.CreateCounter<long>(
+        "rate_limited",
+        description: "Запросы, отклонённые ограничением частоты (429): policy — login, refresh, services (по ключу сервиса), "
+            + "services_anonymous (без токена сервиса, по IP).");
 
     private static readonly Histogram<double> _keycloakDuration = _meter.CreateHistogram<double>(
         "keycloak_request_duration_seconds", unit: "s", description: "Время ответа Keycloak на запросы сервиса.");
@@ -79,6 +84,11 @@ public static class AuthMetrics
             _backchannelLogouts.Add(0, Result(result));
         }
 
+        foreach (string policy in new[] { "login", "refresh", "services", "services_anonymous" })
+        {
+            _rateLimited.Add(0, new KeyValuePair<string, object?>("policy", policy));
+        }
+
         foreach (string target in new[] { "token", "logout", "keys", "registration", "admin", "other" })
         {
             foreach (string outcome in new[] { "2xx", "3xx", "4xx", "5xx", "error" })
@@ -87,6 +97,8 @@ public static class AuthMetrics
             }
         }
     }
+
+    public static void RateLimited(string policy) => _rateLimited.Add(1, new KeyValuePair<string, object?>("policy", policy));
 
     public static void LoginStarted() => _loginsStarted.Add(1);
 
