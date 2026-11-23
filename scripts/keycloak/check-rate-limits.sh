@@ -42,11 +42,24 @@ access_token() {
   command curl -s -d grant_type=client_credentials -d "client_id=$1" --data-urlencode "client_secret=$2" "$TOKEN_URL" | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])'
 }
 
+# wait_for <секунды> <ожидаемый код> <curl-аргументы> — ждёт, пока адрес ответит нужным кодом (после перезапуска Keycloak и сервис греются дольше, чем
+# думает «healthy» в compose)
+wait_for() {
+  local seconds=$1 expected=$2 i code=""; shift 2
+  for ((i = 0; i < seconds; i++)); do
+    code=$(command curl -s -o /dev/null -w '%{http_code}' "$@")
+    [ "$code" = "$expected" ] && return 0
+    sleep 1
+  done
+  return 1
+}
+
 require_service
 
 ADMIN="$WORK/admin"; : > "$ADMIN"
 cleanup() {
   dc up -d --force-recreate --no-deps --wait auth-service > /dev/null 2>&1
+  wait_for 60 200 "$API/health/live"
   local jar="$WORK/cleanup"; : > "$jar"
   if [ "$(login "$jar" /me/ 1234567890)" = /me/ ]; then
     for c in "$CODE_A" "$CODE_B"; do admin_call "$jar" DELETE "/auth/admin/services/$c" > /dev/null; done
@@ -56,6 +69,9 @@ cleanup() {
 trap cleanup EXIT
 
 echo "1. Два ключа сервисов (при обычных лимитах стенда)"
+# Стенд мог только что перезапускаться (предыдущая проверка пересоздаёт Keycloak и сервис): ждём, пока вход действительно заработает.
+wait_for 180 200 "$KC/realms/sandbox/.well-known/openid-configuration" || bad "Keycloak не отвечает"
+wait_for 120 302 "$API/auth/login?return_to=/me/" || bad "сервис не отдаёт редирект на вход"
 check "админ проекта вошёл" "$(login "$ADMIN" /me/ 1234567890)" /me/
 for c in "$CODE_A" "$CODE_B"; do admin_call "$ADMIN" DELETE "/auth/admin/services/$c" > /dev/null; done
 BODY_A="{\"code\":\"$CODE_A\",\"name\":\"Проверка лимитов A\",\"permissions\":[\"service.users.read\"]}"
@@ -86,8 +102,8 @@ services:
       ForwardedHeaders__TrustedNetworks__0: 0.0.0.0/0
       ForwardedHeaders__TrustedNetworks__1: "::/0"
 YAML
-dc -f "$ROOT/compose.yaml" -f "$WORK/limits.yaml" up -d --force-recreate --no-deps --wait auth-service > /dev/null 2>&1
-check "сервис поднялся с низкими лимитами" "$(command curl -s -o /dev/null -w '%{http_code}' "$API/health/live")" 200
+dc -f "$ROOT/compose.yaml" -f "$WORK/limits.yaml" up -d --force-recreate --no-deps --wait auth-service > "$WORK/up.log" 2>&1 || tail -5 "$WORK/up.log"
+wait_for 60 200 "$API/health/live" && ok "сервис поднялся с низкими лимитами" || bad "сервис не поднялся с низкими лимитами"
 # Токены не зависят от перезапуска сервиса, а окна — от начала прогона: каждый блок ниже работает со своим адресом или ключом.
 
 echo "3. /auth/login — по IP клиента"
