@@ -88,6 +88,9 @@ scrape_configs:
 YAML
 # Правила те же, что в бою, но «for» — 4 секунды: иначе каждый сбой ждали бы минутами.
 sed -E 's/^( *for: )[0-9]+m/\14s/' "$MON/alerts.yml" > "$T/alerts.yml"
+# AuthMetricsMissing в бою ждёт дольше, чем AuthServiceDown (5 минут против 1), и потому подавляется им. С одинаковыми 4 секундами
+# оно могло дойти до Alertmanager первым и уйти письмом до подавления, — сохраняем порядок.
+sed -i.bak -E '/alert: AuthMetricsMissing/,/for:/ s/^( *for: )4s/\120s/' "$T/alerts.yml" && rm -f "$T/alerts.yml.bak"
 sed -e 's/group_wait: 10s/group_wait: 2s/' -e 's/group_interval: 1m/group_interval: 10s/' "$MON/alertmanager.stand.yml" > "$T/alertmanager.yml"
 cleanup() {
   docker rm -f check-alerts-prom check-alerts-am > /dev/null 2>&1
