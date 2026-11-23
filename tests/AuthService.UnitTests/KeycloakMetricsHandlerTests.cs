@@ -7,7 +7,18 @@ using Xunit;
 
 namespace AuthService.UnitTests;
 
+/// <summary>
+/// Метры статические: слушатель видит запросы к Keycloak из любых тестов процесса (например, тесты с настоящим DI).
+/// Поэтому класс идёт в коллекции без параллельного запуска — ни один другой тест не работает одновременно с ним.
+/// </summary>
+[CollectionDefinition(NAME, DisableParallelization = true)]
+public static class MetricsListenerCollection
+{
+    public const string NAME = "metrics-listener";
+}
+
 /// <summary>13.1: запросы к Keycloak считаются по цели и исходу, время ответа пишется в гистограмму; в метках нет путей и realm.</summary>
+[Collection(MetricsListenerCollection.NAME)]
 public sealed class KeycloakMetricsHandlerTests : IDisposable
 {
     private readonly MeterListener _listener = new();

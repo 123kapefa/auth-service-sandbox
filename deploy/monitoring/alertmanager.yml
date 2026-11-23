@@ -1,0 +1,75 @@
+# Alertmanager для сервиса входа (этап 13.3): маршруты по важности и получатели. Пример — подставьте свои адреса и каналы.
+# Правила — alerts.yml; проверка конфигурации — scripts/keycloak/check-alerts.sh (amtool check-config + проверка маршрутов).
+#
+# Важность (label severity): critical — вход не работает или идёт атака, будить; warning — разобраться в рабочее время.
+global:
+  resolve_timeout: 5m
+  # Письма. Пароль SMTP — только из хранилища секретов (smtp_auth_password_file), не в этом файле.
+  smtp_smarthost: smtp.example.com:587
+  smtp_from: auth-alerts@example.com
+  smtp_auth_username: auth-alerts@example.com
+  smtp_auth_password_file: /etc/alertmanager/secrets/smtp-password
+  smtp_require_tls: true
+
+route:
+  receiver: team-mail
+  # Одно уведомление на проект и название; повторы — раз в 4 часа, пока оповещение горит.
+  group_by: [alertname, realm]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # Постоянное оповещение «мониторинг жив» — только внешнему сторожу, каждые 5 минут: пропал сигнал — упал Prometheus, Alertmanager или канал.
+    - matchers: [alertname="Watchdog"]
+      receiver: watchdog
+      group_wait: 0s
+      group_interval: 5m
+      repeat_interval: 5m
+    # Бюджет: оповещение горит 10 минут после порога, а состояние (80 %, SMS выключены) держится до полуночи — «RESOLVED» через 10 минут
+    # сообщил бы человеку, что всё в порядке, хотя это не так. Эти оповещения идут без писем о снятии.
+    - matchers: [alertname="AuthCodeBudgetExhausted"]
+      receiver: on-call-once
+      repeat_interval: 12h
+    - matchers: [alertname="AuthCodeBudgetNearlyExhausted"]
+      receiver: team-mail-once
+      repeat_interval: 12h
+    - matchers: [severity="critical"]
+      receiver: on-call
+      repeat_interval: 1h
+
+receivers:
+  # Внешний «сторож» (dead man's switch: Healthchecks.io, Better Stack, Grafana OnCall и т. п.): ждёт сигнал каждые 5 минут и поднимает тревогу,
+  # когда он пропал. Адрес с токеном — из хранилища секретов (url_file), не в этом файле.
+  - name: watchdog
+    #webhook_configs:
+    #  - url_file: /etc/alertmanager/secrets/watchdog-url
+    #    send_resolved: false
+  - name: team-mail
+    email_configs:
+      - to: team@example.com
+        send_resolved: true
+  - name: team-mail-once
+    email_configs:
+      - to: team@example.com
+        send_resolved: false
+  - name: on-call-once
+    email_configs:
+      - to: oncall@example.com
+        send_resolved: false
+  - name: on-call
+    email_configs:
+      - to: oncall@example.com
+        send_resolved: true
+    # Вместо почты (или рядом): webhook в чат или дежурному сервису.
+    #webhook_configs:
+    #  - url_file: /etc/alertmanager/secrets/oncall-webhook-url   # адрес с токеном — из хранилища секретов, не в этом файле
+    #    send_resolved: true
+
+# Если не работает Keycloak или сервис, оповещения «следствия» (ошибки обновления, доля неудачных входов) не нужны: человек уже разбужен.
+inhibit_rules:
+  - source_matchers: [alertname="AuthServiceDown"]
+    target_matchers: [alertname=~"AuthKeycloakErrors|AuthRefreshFailures|AuthRefreshKeycloakErrors|AuthLoginFailureShareHigh|AuthMetricsMissing"]
+  - source_matchers: [alertname="AuthKeycloakDown"]
+    target_matchers: [alertname=~"AuthKeycloakErrors|AuthRefreshFailures|AuthRefreshKeycloakErrors|AuthLoginFailureShareHigh|AuthCodeVerifiedShareLow"]
+  - source_matchers: [alertname="AuthRedisUnavailable"]
+    target_matchers: [alertname=~"AuthRevocationStoreErrors"]

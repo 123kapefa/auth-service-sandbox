@@ -241,6 +241,7 @@ services:
     depends_on:
       - auth-service
       - keycloak
+      - alertmanager
 
   # Трассы (профиль monitoring): сервис входа и Keycloak шлют spans по OTLP в коллектор (AUTH_OTEL_ENDPOINT=http://otel-collector:4317 и
   # AUTH_TRACING_SAMPLER=parentbased_always_on при запуске сервисов); коллектор вырезает сведения о людях и передаёт Jaeger,
@@ -259,6 +260,19 @@ services:
     image: jaegertracing/jaeger:2.11.0
     ports:
       - "127.0.0.1:${JAEGER_PORT:-16686}:16686"
+
+  # Оповещения (профиль monitoring): Prometheus считает правила deploy/monitoring/alerts.yml, Alertmanager шлёт письма в Mailpit
+  # (http://localhost:8025), интерфейс — http://localhost:9093.
+  alertmanager:
+    profiles: [monitoring]
+    image: prom/alertmanager:v0.28.1
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml", "--storage.path=/alertmanager"]
+    ports:
+      - "127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ./deploy/monitoring/alertmanager.stand.yml:/etc/alertmanager/alertmanager.yml:ro
+    depends_on:
+      - mailpit
 
   grafana:
     profiles: [monitoring]

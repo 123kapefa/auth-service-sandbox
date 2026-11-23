@@ -1,10 +1,15 @@
 # Prometheus для сервиса входа в поставке deploy/compose.yaml: сервис входа (порт метрик 9100) и Keycloak (порт управления 9000).
 # Оба порта не публикуются наружу — Prometheus должен быть в той же сети Docker (или ходить по внутренним адресам кластера).
-# Правила оповещений — alerts.yml (подключается ниже). Дашборд для Grafana — grafana/dashboards/auth-service.json.
+# Правила оповещений — alerts.yml (подключается ниже), получатели — alertmanager.yml. Дашборд для Grafana — grafana/dashboards/auth-service.json.
 # Стенд песочницы (корневой compose.yaml, профиль monitoring) использует prometheus.stand.yml: там контейнеры названы иначе.
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
 
 rule_files:
   - /etc/prometheus/alerts.yml

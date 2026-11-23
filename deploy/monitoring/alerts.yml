@@ -1,2 +1,185 @@
-# Правила оповещений Prometheus (этап 13.3). Пока пусто: правила добавляются вместе с проверкой искусственным сбоем.
-groups: []
+# Правила оповещений Prometheus для сервиса входа (этап 13.3). Подключаются в prometheus.yml (rule_files); получатели и маршруты —
+# alertmanager.yml. Пороги — разумные по умолчанию для проекта с десятками-сотнями входов в час: подберите под свою нагрузку.
+# Каждое правило проверено двумя способами (scripts/keycloak/check-alerts.sh): модульным тестом на искусственных рядах
+# (alerts_test.yml, promtool) и живым сбоем на стенде (остановить Redis, базу, Keycloak, сервис; перебор паролей; коды без ввода).
+#
+# Метки: severity — critical (разбудить: вход не работает или не работает защита) или warning (разобраться в рабочее время, в том числе
+# подозрение на перебор).
+# Доли считаются с защитой от деления на ноль и от малых объёмов (правило молчит, пока событий меньше порога). Счётчики сервиса (auth_*,
+# platformauth_*) и плагина кодов (platform_code_*) создаются нулями заранее — при старте (для плагина — ещё и при первом событии нового проекта):
+# ряд, появившийся сразу со значением 1, Prometheus не видит как приращение, и первое оповещение о бюджете (оно приходит раз в сутки) терялось бы.
+# На случай, если нулевые ряды не созданы, доля введённых кодов подставляет 0, когда ряда «введено» нет совсем.
+groups:
+  - name: auth-service-availability
+    rules:
+      - alert: AuthServiceDown
+        expr: up{job="auth-service"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Сервис входа не отвечает"
+          description: "Prometheus не может собрать метрики сервиса входа ({{ $labels.instance }}) больше минуты: сервис упал, перезапускается или недоступен по сети. Вход и админка не работают."
+
+      - alert: AuthKeycloakDown
+        expr: up{job="keycloak"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Keycloak не отвечает"
+          description: "Prometheus не может собрать метрики Keycloak ({{ $labels.instance }}) больше минуты. Новые входы не проходят; уже вошедшие работают, пока не истечёт токен (до 15 минут)."
+
+      - alert: AuthKeycloakErrors
+        expr: |
+          (
+            sum(increase(auth_keycloak_requests_total{outcome=~"5xx|error"}[5m]))
+            / clamp_min(sum(increase(auth_keycloak_requests_total[5m])), 1)
+          ) > 0.2
+          and sum(increase(auth_keycloak_requests_total[5m])) >= 10
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Keycloak отвечает ошибками сервису входа"
+          description: "{{ $value | humanizePercentage }} запросов сервиса к Keycloak за 5 минут закончились ошибкой сервера (5xx) или обрывом соединения. Смотрите журнал Keycloak и метрики auth_keycloak_requests_total по целям (target)."
+
+      - alert: AuthDatabaseUnavailable
+        expr: auth_dependency_up{dependency="database"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "База сервиса входа недоступна"
+          description: "Проверка готовности базы (Postgres) не проходит больше минуты. Сервис не готов (/health/ready — 503); журнал входов, ключи сервисов и устройства недоступны."
+
+      - alert: AuthRedisUnavailable
+        expr: auth_dependency_up{dependency="redis"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Redis с отметками отзыва недоступен"
+          description: "Проверка готовности Redis не проходит больше минуты. Мгновенный отзыв токенов не работает: в режиме «открыто» токены пропускаются (до 15 минут после отзыва), в режиме «закрыто» сервис отвечает 503."
+
+      - alert: AuthRevocationStoreErrors
+        expr: sum by (mode, kind) (increase(platformauth_revocation_store_errors_total[5m])) > 0
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "Проверка отзыва токенов получает ошибки от Redis ({{ $labels.kind }}, режим {{ $labels.mode }})"
+          description: "kind=connection — Redis недоступен или тайм-аут; kind=server — Redis отказал в команде (ACL, пароль, права пользователя): отзыв токенов не работает, хотя Redis «жив». Смотрите журнал сервиса: «Redis refused the revocation command»."
+
+      - alert: AuthTokenChecksUnavailable
+        expr: sum(increase(platformauth_token_checks_total{status="unavailable"}[5m])) > 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Сервис отклоняет запросы: проверить отзыв токена нельзя (режим «закрыто»)"
+          description: "TokenRevocation:OnStoreFailure=Closed, Redis недоступен: люди получают 503 с кодом auth.revocation_unavailable."
+
+  - name: auth-service-login
+    rules:
+      - alert: AuthLoginFailuresSpike
+        expr: sum by (realm) (increase(keycloak_user_events_total{event="login", error=~"invalid_user_credentials|invalid_user|user_not_found|user_temporarily_disabled"}[5m])) > 30
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: "Всплеск неудачных входов в проекте {{ $labels.realm }}"
+          description: "{{ $value | humanize }} неудачных попыток входа за 5 минут (неверный пароль, неверный код, временная блокировка): похоже на подбор паролей или кодов. Журнал Keycloak: события LOGIN_ERROR по realm; блокировку по IP делает прокси (docs/environments.md, «Прокси»)."
+
+      - alert: AuthLoginFailureShareHigh
+        expr: |
+          (
+            sum by (realm) (increase(keycloak_user_events_total{event="login", error!=""}[15m]))
+            / clamp_min(sum by (realm) (increase(keycloak_user_events_total{event="login"}[15m])), 1)
+          ) > 0.5
+          and sum by (realm) (increase(keycloak_user_events_total{event="login"}[15m])) >= 20
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Больше половины попыток входа в проекте {{ $labels.realm }} неудачны"
+          description: "{{ $value | humanizePercentage }} попыток входа за 15 минут закончились ошибкой. Если растут и отказы, и объём — перебор; если объём обычный — сломан способ входа (письма и коды не доходят, провайдер, тема)."
+
+      - alert: AuthRefreshFailures
+        expr: |
+          (
+            sum(increase(auth_refreshes_total{result=~"rejected|error"}[15m]))
+            / clamp_min(sum(increase(auth_refreshes_total[15m])), 1)
+          ) > 0.3
+          and sum(increase(auth_refreshes_total[15m])) >= 20
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Много отказов при обновлении токенов"
+          description: "{{ $value | humanizePercentage }} обновлений токенов за 15 минут не прошли (rejected — сессия закончилась или refresh украден и повторён; error — Keycloak недоступен). Людей выбрасывает на вход."
+
+      - alert: AuthRefreshKeycloakErrors
+        expr: sum(increase(auth_refreshes_total{result="error"}[5m])) >= 5
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Обновление токенов не доходит до Keycloak"
+          description: "{{ $value | humanize }} обновлений токенов за 5 минут закончились ошибкой Keycloak (недоступен или 5xx): люди теряют сессию через 15 минут."
+
+  - name: auth-service-codes
+    rules:
+      - alert: AuthCodeVerifiedShareLow
+        expr: |
+          (
+            (
+              sum by (realm) (increase(platform_code_verified_total[1h]))
+              or 0 * sum by (realm) (increase(platform_code_sent_total[1h]))
+            )
+            / clamp_min(sum by (realm) (increase(platform_code_sent_total[1h])), 1)
+          ) < 0.4
+          and sum by (realm) (increase(platform_code_sent_total[1h])) >= 20
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Людей, введших присланный код, мало в проекте {{ $labels.realm }}"
+          description: "За час введено {{ $value | humanizePercentage }} отправленных кодов (норма — больше 60–70 %). Коды не доходят (звонки и SMS у провайдера), или идёт накрутка на отправку. Смотрите platform_code_refused_total по причинам и расход в дашборде."
+
+      - alert: AuthCodeBudgetNearlyExhausted
+        expr: sum by (realm) (increase(platform_code_budget_alerts_total{percent="80"}[10m])) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: "Израсходовано 80 % дневного бюджета на коды в проекте {{ $labels.realm }}"
+          description: "При 100 % SMS и звонки отключатся до полуночи (вход по паролю и коду на почту работает). Если расход необычен — накрутка. Письмо «RESOLVED» не придёт: оповещение горит 10 минут после порога, а состояние держится до полуночи."
+
+      - alert: AuthCodeBudgetExhausted
+        expr: sum by (realm) (increase(platform_code_budget_alerts_total{percent="100"}[10m])) > 0
+        labels: { severity: critical }
+        annotations:
+          summary: "Дневной бюджет на коды исчерпан в проекте {{ $labels.realm }}"
+          description: "SMS и звонки с кодами отключены до полуночи по времени проекта: вход по коду на телефон не работает. Письмо «RESOLVED» не придёт: оповещение горит 10 минут после порога, а бюджет остаётся исчерпанным до полуночи."
+
+      - alert: AuthCaptchaUnavailable
+        expr: sum by (realm) (increase(platform_code_captcha_unavailable_total[15m])) > 0
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "SmartCaptcha недоступна в проекте {{ $labels.realm }}"
+          description: "Сервис капчи не отвечает: капча считается пройденной (captcha-on-outage=pass, лимиты действуют) или не пройденной (reject)."
+
+  # Если сломан сам мониторинг, остальные правила молчат. Watchdog горит всегда: Alertmanager отправляет его во внешний «сторож»
+  # (dead man's switch), и пропажа этого сигнала говорит, что Prometheus, Alertmanager или канал до получателя не работают.
+  - name: auth-service-monitoring
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+        labels: { severity: none }
+        annotations:
+          summary: "Мониторинг работает (постоянное оповещение)"
+          description: "Горит всегда. Получатель watchdog в alertmanager.yml передаёт его внешнему сервису, который поднимает тревогу, когда сигнал пропал."
+
+      - alert: AuthMetricsMissing
+        expr: absent(auth_dependency_up{dependency="database"}) or absent(auth_dependency_up{dependency="redis"})
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Нет метрик готовности базы или Redis сервиса входа"
+          description: "Метрика auth_dependency_up пропала: сервис не отдаёт метрики (цель убрана из prometheus.yml, порт метрик закрыт, Metrics:Port=0) или не стартовал. Оповещения о базе и Redis без неё не работают."
+
+      - alert: AuthDependencyChecksStale
+        expr: time() - max(auth_dependency_checked_timestamp_seconds) > 120
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Проверки готовности базы и Redis не выполняются"
+          description: "Последняя проверка была {{ $value | humanizeDuration }} назад: проверка зависла или остановилась, auth_dependency_up показывает старое значение. Перезапустите сервис, смотрите журнал."
