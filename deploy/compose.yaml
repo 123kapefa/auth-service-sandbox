@@ -101,6 +101,45 @@ services:
     volumes:
       - auth_db:/var/lib/postgresql/data
 
+  # Резервные копии обеих баз по расписанию (13.5, docs/migrations.md). Не запускается сам: docker compose --profile backup up -d.
+  # Копии — в томе auth_backups (пары <auth-service|keycloak>-<время>.dump + .sha256), срок хранения и расписание — AUTH_BACKUP_* (deploy/.env.example).
+  # Том на том же диске, что и базы, не спасает от потери диска: копируйте его на другой хост или в хранилище (docs/migrations.md).
+  # Свои Postgres проекта — задайте AUTH_BACKUP_DB_HOST и AUTH_BACKUP_KEYCLOAK_DB_HOST (пользователи и базы — как у auth-db и auth-keycloak-db),
+  # AUTH_BACKUP_PGSSLMODE; auth-db и auth-keycloak-db тогда не нужны — уберите их из depends_on ниже и из своей копии файла.
+  # Версия pg_dump (образ) не должна быть ниже версии сервера Postgres: при необходимости смените image.
+  auth-backup:
+    profiles: [backup]
+    image: postgres:17-alpine
+    entrypoint: ["sh", "-c"]
+    # Расписание — crontab внутри контейнера (busybox crond берёт окружение контейнера: пароли в файл не пишутся).
+    command:
+      - echo "$${AUTH_BACKUP_SCHEDULE:-0 3 * * *} /backup.sh > /proc/1/fd/1 2>&1" > /etc/crontabs/root && exec crond -f -l 8
+    environment:
+      AUTH_BACKUP_SCHEDULE: ${AUTH_BACKUP_SCHEDULE:-0 3 * * *}
+      AUTH_DB_HOST: ${AUTH_BACKUP_DB_HOST:-auth-db}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?нужен AUTH_DB_PASSWORD}
+      KEYCLOAK_DB_HOST: ${AUTH_BACKUP_KEYCLOAK_DB_HOST:-auth-keycloak-db}
+      KEYCLOAK_DB_PASSWORD: ${AUTH_KEYCLOAK_DB_PASSWORD:?нужен AUTH_KEYCLOAK_DB_PASSWORD}
+      BACKUP_RETENTION_DAYS: ${AUTH_BACKUP_RETENTION_DAYS:-14}
+      BACKUP_KEEP_MIN: ${AUTH_BACKUP_KEEP_MIN:-3}
+      # Внешняя база с обязательным TLS: require (или verify-full с PGSSLROOTCERT).
+      PGSSLMODE: ${AUTH_BACKUP_PGSSLMODE:-prefer}
+    volumes:
+      - ./backup/backup.sh:/backup.sh:ro
+      - auth_backups:/backups
+    # Здоров, пока последняя удачная копия моложе суток с запасом (первые сутки после запуска — период разгона).
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f /backups/last-success ] && [ -z \"$$(find /backups/last-success -mmin +$${AUTH_BACKUP_MAX_AGE_MIN:-1560})\" ]"]
+      interval: 5m
+      timeout: 10s
+      retries: 1
+      start_period: 26h
+    depends_on:
+      auth-db:
+        condition: service_healthy
+      auth-keycloak-db:
+        condition: service_healthy
+
   # Redis без пользователей — для одной машины в своей сети. С пользователями (сервис входа пишет, сервисы проекта только читают):
   # раскомментируйте command и volumes, скопируйте deploy/redis/redis.conf.example в redis/redis.conf, замените пароли и укажите
   # AUTH_REDIS=auth-redis:6379,user=auth-service,password=… (docs/environments.md, «Redis: пользователи»).
@@ -193,3 +232,4 @@ services:
 volumes:
   auth_keycloak_db:
   auth_db:
+  auth_backups:

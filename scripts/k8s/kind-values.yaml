@@ -16,6 +16,12 @@ stand:
 ingress:
   enabled: false
 
+# Резервные копии (13.5): CronJob по расписанию по умолчанию; том — готовый PVC, его создаёт scripts/k8s/check-kind.sh.
+backup:
+  enabled: true
+  persistence:
+    existingClaim: kind-backups
+
 database:
   name: auth_service
   user: auth_service
